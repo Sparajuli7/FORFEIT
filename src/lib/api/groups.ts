@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import { getProfilesByIds } from '@/lib/api/profiles'
 import type { Group, GroupMember } from '@/lib/database.types'
 
 async function getCurrentUserId(): Promise<string> {
@@ -94,6 +95,73 @@ export async function getGroupMembers(groupId: string): Promise<GroupMember[]> {
 
   if (error) throw error
   return data ?? []
+}
+
+/** Group member with profile info for H2H opponent selection */
+export type GroupMemberWithProfile = GroupMember & {
+  profile: { id: string; display_name: string; avatar_url: string | null }
+}
+
+/** Get group members with their profile info (for H2H challenge who picker) */
+export async function getGroupMembersWithProfiles(
+  groupId: string,
+): Promise<GroupMemberWithProfile[]> {
+  const members = await getGroupMembers(groupId)
+  if (members.length === 0) return []
+
+  const profileMap = await getProfilesByIds(members.map((m) => m.user_id))
+
+  return members.map((m) => ({
+    ...m,
+    profile: {
+      id: m.user_id,
+      display_name: profileMap.get(m.user_id)?.display_name ?? 'Unknown',
+      avatar_url: profileMap.get(m.user_id)?.avatar_url ?? null,
+    },
+  }))
+}
+
+/** Get members from all user's groups (for recent friends in H2H), excluding self */
+export async function getAllGroupMembersForUser(): Promise<GroupMemberWithProfile[]> {
+  const userId = await getCurrentUserId()
+
+  const { data: memberships, error: memError } = await supabase
+    .from('group_members')
+    .select('group_id')
+    .eq('user_id', userId)
+
+  if (memError) throw memError
+  const groupIds = (memberships ?? []).map((m) => m.group_id)
+  if (groupIds.length === 0) return []
+
+  const { data, error } = await supabase
+    .from('group_members')
+    .select('*')
+    .in('group_id', groupIds)
+    .neq('user_id', userId)
+    .order('joined_at', { ascending: false })
+
+  if (error) throw error
+
+  const rows = data ?? []
+  const userIds = [...new Set(rows.map((r) => r.user_id))]
+  const profileMap = await getProfilesByIds(userIds)
+
+  const seen = new Set<string>()
+  return rows
+    .filter((r) => {
+      if (seen.has(r.user_id)) return false
+      seen.add(r.user_id)
+      return true
+    })
+    .map((r) => ({
+      ...r,
+      profile: {
+        id: r.user_id,
+        display_name: profileMap.get(r.user_id)?.display_name ?? 'Unknown',
+        avatar_url: profileMap.get(r.user_id)?.avatar_url ?? null,
+      },
+    })) as GroupMemberWithProfile[]
 }
 
 export async function leaveGroup(groupId: string): Promise<void> {

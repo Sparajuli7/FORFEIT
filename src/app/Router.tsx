@@ -15,6 +15,7 @@ import { OutcomeReveal } from './screens/OutcomeReveal'
 import { OutcomeWin } from './screens/OutcomeWin'
 import { OutcomeForfeit } from './screens/OutcomeForfeit'
 import { HeadToHead } from './screens/HeadToHead'
+import { H2HCreateScreen } from './screens/H2HCreateScreen'
 import { Competitions } from './screens/Competitions'
 import { HallOfShame } from './screens/HallOfShame'
 import { ProfileScreen } from './screens/ProfileScreen'
@@ -28,6 +29,7 @@ import { GroupDetailScreen } from './screens/GroupDetailScreen'
 import { ProfileEditScreen } from './screens/ProfileEditScreen'
 import { SettingsScreen } from './screens/SettingsScreen'
 import { CompetitionDetailScreen } from './screens/CompetitionDetailScreen'
+import { CompetitionCreateScreen } from './screens/CompetitionCreateScreen'
 import { PunishmentStatsScreen } from './screens/PunishmentStatsScreen'
 
 // ---------------------------------------------------------------------------
@@ -165,12 +167,12 @@ export function AppRouter() {
 
             {/* Head to Head */}
             <Route path="h2h" element={<HeadToHead />} />
-            <Route path="h2h/create" element={<Placeholder name="H2H Challenge Creation" />} />
+            <Route path="h2h/create" element={<H2HCreateScreen />} />
 
             {/* Competitions */}
             <Route path="compete" element={<Competitions />} />
             <Route path="compete/:id" element={<CompetitionDetailScreen />} />
-            <Route path="compete/create" element={<Placeholder name="Create Competition" />} />
+            <Route path="compete/create" element={<CompetitionCreateScreen />} />
 
             {/* Hall of Shame */}
             <Route path="shame" element={<HallOfShame />} />

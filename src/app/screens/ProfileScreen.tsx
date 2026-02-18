@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { useAuthStore, useBetStore } from '@/stores'
 import { getMyBets } from '@/lib/api/bets'
-import { getProfilesByIds } from '@/lib/api/profiles'
+import { getProfilesByIds, getProfile as fetchProfile } from '@/lib/api/profiles'
 import { AvatarWithRepBadge } from '@/app/components/RepBadge'
 import { formatRecord, formatMoney } from '@/lib/utils/formatters'
 import type { BetWithSides } from '@/stores/betStore'
@@ -238,12 +238,10 @@ export function ProfileScreen({ activeScreen, userId }: ProfileScreenProps) {
         setLoading(false)
       }
     } else {
-      import('@/lib/api/profiles').then(({ getProfile }) =>
-        getProfile(targetUserId).then((p) => {
-          setProfile(p)
-          setLoading(false)
-        }),
-      )
+      fetchProfile(targetUserId).then((p) => {
+        setProfile(p)
+        setLoading(false)
+      })
     }
   }, [targetUserId, isOwnProfile, currentProfile, authLoading])
 

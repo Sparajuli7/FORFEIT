@@ -42,6 +42,7 @@ export type NotificationType =
   | 'punishment_assigned'
   | 'punishment_completed'
   | 'group_invite'
+  | 'h2h_challenge'
   | 'general'
 
 // ---------------------------------------------------------------------------

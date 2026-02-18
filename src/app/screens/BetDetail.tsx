@@ -7,6 +7,7 @@ import { useAuthStore } from '@/stores'
 import { useCountdown } from '@/lib/hooks/useCountdown'
 import { useRealtime } from '@/lib/hooks/useRealtime'
 import { getProfilesByIds } from '@/lib/api/profiles'
+import { acceptH2HChallenge, declineH2HChallenge } from '@/lib/api/h2h'
 import { formatMoney } from '@/lib/utils/formatters'
 import { formatOdds } from '@/lib/utils/formatters'
 import { BET_CATEGORIES } from '@/lib/utils/constants'
@@ -52,8 +53,35 @@ export function BetDetail({ onBack }: BetDetailProps) {
   const { riderPct, doubterPct } = formatOdds(riders.length, doubters.length)
   const mySide = activeBetSides.find((s) => s.user_id === user?.id)?.side ?? null
   const isClaimant = activeBet?.claimant_id === user?.id
-  const canJoin = !mySide && (activeBet?.status === 'pending' || activeBet?.status === 'active')
+  const isH2HPendingForMe =
+    activeBet?.bet_type === 'h2h' &&
+    activeBet?.status === 'pending' &&
+    activeBet?.h2h_opponent_id === user?.id
+  const canJoin = !mySide && (activeBet?.status === 'pending' || activeBet?.status === 'active') && !isH2HPendingForMe
+  const showH2HAccept = isH2HPendingForMe
   const showSubmitProof = isClaimant && activeBet?.status === 'active'
+
+  const [h2hLoading, setH2hLoading] = useState(false)
+  const handleAcceptH2H = async () => {
+    if (!id || h2hLoading) return
+    setH2hLoading(true)
+    try {
+      await acceptH2HChallenge(id)
+      fetchBetDetail(id)
+    } finally {
+      setH2hLoading(false)
+    }
+  }
+  const handleDeclineH2H = async () => {
+    if (!id || h2hLoading) return
+    setH2hLoading(true)
+    try {
+      await declineH2HChallenge(id)
+      handleBack()
+    } finally {
+      setH2hLoading(false)
+    }
+  }
 
   useEffect(() => {
     if (id) {
@@ -218,6 +246,31 @@ export function BetDetail({ onBack }: BetDetailProps) {
           </div>
         </div>
       </div>
+
+      {/* H2H Accept/Decline */}
+      {showH2HAccept && (
+        <div className="px-6 mb-6">
+          <div className="bg-bg-card border-2 border-dashed border-gold/50 rounded-2xl p-6 mb-4">
+            <p className="text-center text-text-muted text-sm mb-4">You&apos;ve been challenged!</p>
+            <div className="flex gap-3">
+              <button
+                onClick={handleAcceptH2H}
+                disabled={h2hLoading}
+                className="flex-1 py-4 rounded-2xl bg-accent-green text-white font-bold flex items-center justify-center gap-2 btn-pressed disabled:opacity-50"
+              >
+                Accept ⚔️
+              </button>
+              <button
+                onClick={handleDeclineH2H}
+                disabled={h2hLoading}
+                className="flex-1 py-4 rounded-2xl border-2 border-accent-coral text-accent-coral font-bold btn-pressed disabled:opacity-50"
+              >
+                Decline
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Join CTAs */}
       {canJoin && (

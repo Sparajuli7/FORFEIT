@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { supabase } from '@/lib/supabase'
+import { getLeaderboard } from '@/lib/api/competitions'
 import type {
   Bet,
   BetInsert,
@@ -186,37 +187,15 @@ const useCompetitionStore = create<CompetitionStore>()((set, get) => ({
   fetchLeaderboard: async (betId) => {
     set({ isLoading: true, error: null })
 
-    // Fetch scores joined with profile data
-    const { data, error } = await supabase
-      .from('competition_scores')
-      .select(
-        `
-        *,
-        profiles(id, username, display_name, avatar_url, rep_score)
-      `,
-      )
-      .eq('bet_id', betId)
-      .order('score', { ascending: false })
-
-    if (error) {
-      set({ error: error.message, isLoading: false })
-      return
+    try {
+      const leaderboard = await getLeaderboard(betId)
+      set({ leaderboard, isLoading: false })
+    } catch (err) {
+      set({
+        error: err instanceof Error ? err.message : 'Failed to fetch leaderboard',
+        isLoading: false,
+      })
     }
-
-    const leaderboard: LeaderboardEntry[] = (data ?? []).map((row, index) => ({
-      score: {
-        id: row.id,
-        bet_id: row.bet_id,
-        user_id: row.user_id,
-        score: row.score,
-        proof_url: row.proof_url,
-        updated_at: row.updated_at,
-      },
-      profile: row.profiles as LeaderboardEntry['profile'],
-      rank: index + 1,
-    }))
-
-    set({ leaderboard, isLoading: false })
   },
 
   setActiveCompetition: (competition) => set({ activeCompetition: competition }),

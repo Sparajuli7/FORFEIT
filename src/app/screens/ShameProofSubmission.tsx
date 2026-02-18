@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router'
 import { Image, X } from 'lucide-react'
 import { getOutcome } from '@/lib/api/outcomes'
 import { submitShameProof } from '@/lib/api/shame'
+import { supabase } from '@/lib/supabase'
 import { PrimaryButton } from '../components/PrimaryButton'
 
 export function ShameProofSubmission() {
@@ -25,14 +26,12 @@ export function ShameProofSubmission() {
     getOutcome(id).then((outcome) => {
       if (outcome) {
         setOutcomeId(outcome.id)
-        import('@/lib/supabase').then(({ supabase }) =>
-          supabase
-            .from('bets')
-            .select('title')
-            .eq('id', id)
-            .single()
-            .then(({ data }) => setBetTitle(data?.title ?? 'Bet')),
-        )
+        supabase
+          .from('bets')
+          .select('title')
+          .eq('id', id)
+          .single()
+          .then(({ data }) => setBetTitle(data?.title ?? 'Bet'))
       }
       setLoading(false)
     })

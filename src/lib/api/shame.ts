@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import type { HallOfShameEntry, HallOfShameInsert, Json } from '@/lib/database.types'
 
 const SHAME_BUCKET = 'shame'
 
@@ -11,7 +12,6 @@ async function uploadToShame(path: string, file: File): Promise<string | null> {
   const { data } = supabase.storage.from(SHAME_BUCKET).getPublicUrl(path)
   return data.publicUrl
 }
-import type { HallOfShameEntry, HallOfShameInsert, Json } from '@/lib/database.types'
 
 type Reactions = Record<string, string[]>
 

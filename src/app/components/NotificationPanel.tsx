@@ -20,6 +20,7 @@ const NOTIFICATION_ICONS: Record<NotificationType, string> = {
   punishment_assigned: '💀',
   punishment_completed: '🎉',
   group_invite: '👥',
+  h2h_challenge: '⚔️',
   general: '🔔',
 }
 
