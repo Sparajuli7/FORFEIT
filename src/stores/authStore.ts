@@ -25,6 +25,8 @@ interface AuthActions {
   /** Verify the 6-digit OTP received via SMS */
   verifyOtp: (phone: string, token: string) => Promise<void>
   signOut: () => Promise<void>
+  /** Create a new profile row (for first-time users). Use updateProfile for existing profiles. Returns true on success. */
+  createProfile: (data: { username: string; display_name: string; avatar_url?: string }) => Promise<boolean>
   updateProfile: (data: ProfileUpdate) => Promise<void>
   /** Directly set profile in store (used after profile creation) */
   setProfile: (profile: Profile | null) => void
@@ -149,6 +151,30 @@ const useAuthStore = create<AuthStore>()((set, get) => ({
       set({ error: error.message, isLoading: false })
     }
     // onAuthStateChange fires SIGNED_OUT and clears the store
+  },
+
+  createProfile: async (data) => {
+    const { user } = get()
+    if (!user) return false
+
+    set({ isLoading: true, error: null })
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .insert({
+        id: user.id,
+        username: data.username.toLowerCase(),
+        display_name: data.display_name.trim(),
+        avatar_url: data.avatar_url ?? null,
+      })
+      .select()
+      .single()
+
+    if (error) {
+      set({ error: error.message, isLoading: false })
+      return false
+    }
+    set({ profile, isNewUser: false, isLoading: false })
+    return true
   },
 
   updateProfile: async (data) => {

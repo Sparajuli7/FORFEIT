@@ -51,18 +51,19 @@ export function BetCard({
           <span className="text-xs font-bold px-2.5 py-1 bg-bg-elevated rounded-full uppercase tracking-wide">
             {groupName}
           </span>
-          {status === 'proof' && (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-live-indicator/20 border border-live-indicator/40 rounded-full flash">
-              <div className="w-1.5 h-1.5 rounded-full bg-live-indicator pulse-live"></div>
-              <span className="text-[10px] font-bold text-live-indicator uppercase tracking-wide">
-                👀 PROOF DROPPED
-              </span>
-            </div>
-          )}
         </div>
-        <span className={`text-sm font-black tabular-nums scoreboard-digit ${urgent ? 'text-live-indicator' : 'text-text-primary'}`}>
-          {countdown}
-        </span>
+        {status === 'proof' ? (
+          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-live-indicator/20 border border-live-indicator/40 rounded-full flash">
+            <div className="w-1.5 h-1.5 rounded-full bg-live-indicator pulse-live" />
+            <span className="text-[10px] font-bold text-live-indicator uppercase tracking-wide">
+              👀 PROOF DROPPED
+            </span>
+          </div>
+        ) : (
+          <span className={`text-sm font-black tabular-nums scoreboard-digit ${urgent ? 'text-live-indicator' : 'text-text-primary'}`}>
+            {countdown}
+          </span>
+        )}
       </div>
 
       {/* Category */}

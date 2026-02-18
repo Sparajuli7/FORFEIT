@@ -33,6 +33,7 @@ export interface WizardFields {
   stakeType: StakeType | null
   stakeMoney: number | null        // cents, e.g. 2000 = $20.00
   stakePunishment: PunishmentCard | null
+  stakeCustomPunishment: string | null
   selectedGroup: Group | null
 }
 
@@ -44,6 +45,7 @@ const WIZARD_DEFAULTS: WizardFields = {
   stakeType: null,
   stakeMoney: null,
   stakePunishment: null,
+  stakeCustomPunishment: null,
   selectedGroup: null,
 }
 
@@ -241,6 +243,7 @@ const useBetStore = create<BetStore>()(
         stake_type: wizard.stakeType!,
         stake_money: wizard.stakeMoney,
         stake_punishment_id: wizard.stakePunishment?.id ?? null,
+        stake_custom_punishment: wizard.stakeCustomPunishment,
         status: 'active',
       }
 

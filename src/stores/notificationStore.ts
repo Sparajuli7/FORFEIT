@@ -9,6 +9,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js'
 // ---------------------------------------------------------------------------
 
 let _channel: RealtimeChannel | null = null
+let _onNewNotification: ((n: Notification) => void) | null = null
 
 // ---------------------------------------------------------------------------
 // Types
@@ -29,6 +30,8 @@ interface NotificationActions {
   subscribeToRealtime: () => Promise<void>
   /** Tear down the realtime channel (call on sign-out) */
   unsubscribeFromRealtime: () => Promise<void>
+  /** Set callback for new notifications (e.g. show toast). Call with null to clear. */
+  setOnNewNotification: (cb: ((n: Notification) => void) | null) => void
   clearError: () => void
 }
 
@@ -167,6 +170,7 @@ const useNotificationStore = create<NotificationStore>()(
                 draft.unreadCount += 1
               }
             })
+            _onNewNotification?.(newNotification)
           },
         )
         .on(
@@ -197,6 +201,11 @@ const useNotificationStore = create<NotificationStore>()(
         await supabase.removeChannel(_channel)
         _channel = null
       }
+      _onNewNotification = null
+    },
+
+    setOnNewNotification: (cb) => {
+      _onNewNotification = cb
     },
 
     clearError: () =>

@@ -1,11 +1,20 @@
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import { supabase } from '@/lib/supabase'
+import {
+  addReaction,
+  getPunishmentLeaderboard,
+  getWeeklyShameStats,
+} from '@/lib/api/shame'
+import type { PunishmentLeaderboardEntry, WeeklyShameStats } from '@/lib/api/shame'
 import type { HallOfShameEntry, HallOfShameInsert } from '@/lib/database.types'
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
+
+/** Reactions: { "😭": ["userId1", "userId2"], ... } */
+export type ReactionsWithUsers = Record<string, string[]>
 
 /** Group-level stats shown at the bottom of the Hall of Shame feed */
 export interface GroupShameStats {
@@ -14,6 +23,12 @@ export interface GroupShameStats {
   confirmedPct: number
   disputedPct: number
   pendingPct: number
+}
+
+/** Shame post enriched with bet/outcome for display */
+export type ShamePostEnriched = HallOfShameEntry & {
+  _betTitle?: string
+  _outcomeResult?: string
 }
 
 /** Data required to submit a new shame post */
@@ -28,14 +43,18 @@ export interface PostShameData {
 }
 
 interface ShameState {
-  shamePosts: HallOfShameEntry[]
+  shamePosts: ShamePostEnriched[]
   groupStats: GroupShameStats | null
+  punishmentLeaderboard: PunishmentLeaderboardEntry[]
+  weeklyStats: WeeklyShameStats | null
   isLoading: boolean
   error: string | null
 }
 
 interface ShameActions {
   fetchShameFeed: (groupId: string) => Promise<void>
+  fetchPunishmentLeaderboard: (groupId: string) => Promise<void>
+  fetchWeeklyStats: (groupId: string) => Promise<void>
   postShameProof: (data: PostShameData) => Promise<HallOfShameEntry | null>
   reactToPost: (postId: string, emoji: string) => Promise<void>
   fetchGroupStats: (groupId: string) => Promise<void>
@@ -55,11 +74,37 @@ async function getCurrentUserId(): Promise<string | null> {
   return user?.id ?? null
 }
 
-function safeReactions(raw: unknown): Record<string, number> {
+function parseReactions(raw: unknown): ReactionsWithUsers {
   if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
-    return raw as Record<string, number>
+    const obj = raw as Record<string, unknown>
+    const result: ReactionsWithUsers = {}
+    for (const [k, v] of Object.entries(obj)) {
+      if (Array.isArray(v)) result[k] = v.filter((x): x is string => typeof x === 'string')
+      else result[k] = []
+    }
+    return result
   }
   return {}
+}
+
+/** Get count for display: reactions are { emoji: [userIds] } */
+export function getReactionCounts(reactions: unknown): Record<string, number> {
+  const parsed = parseReactions(reactions)
+  const counts: Record<string, number> = {}
+  for (const [emoji, users] of Object.entries(parsed)) {
+    counts[emoji] = users.length
+  }
+  return counts
+}
+
+/** Check if current user has reacted with this emoji */
+export function hasUserReacted(
+  reactions: unknown,
+  emoji: string,
+  userId: string,
+): boolean {
+  const parsed = parseReactions(reactions)
+  return (parsed[emoji] ?? []).includes(userId)
 }
 
 // ---------------------------------------------------------------------------
@@ -71,6 +116,8 @@ const useShameStore = create<ShameStore>()(
     // ---- state ----
     shamePosts: [],
     groupStats: null,
+    punishmentLeaderboard: [],
+    weeklyStats: null,
     isLoading: false,
     error: null,
 
@@ -88,7 +135,8 @@ const useShameStore = create<ShameStore>()(
         .select(
           `
           *,
-          bets!inner(group_id)
+          bets!inner(group_id, title),
+          outcomes(result)
         `,
         )
         .eq('bets.group_id', groupId)
@@ -99,10 +147,32 @@ const useShameStore = create<ShameStore>()(
         if (error) {
           draft.error = error.message
         } else {
-          // Strip the joined bets field — we only needed it for filtering
-          draft.shamePosts = (data ?? []).map(({ bets: _bets, ...post }) => post as HallOfShameEntry)
+          draft.shamePosts = (data ?? []).map((row) => {
+            const { bets, outcomes, ...post } = row
+            const bet = Array.isArray(bets) ? bets[0] : bets
+            const outcome = Array.isArray(outcomes) ? outcomes[0] : outcomes
+            return {
+              ...post,
+              _betTitle: bet?.title,
+              _outcomeResult: outcome?.result,
+            } as ShamePostEnriched
+          })
         }
         draft.isLoading = false
+      })
+    },
+
+    fetchPunishmentLeaderboard: async (groupId) => {
+      const data = await getPunishmentLeaderboard(groupId)
+      set((draft) => {
+        draft.punishmentLeaderboard = data
+      })
+    },
+
+    fetchWeeklyStats: async (groupId) => {
+      const data = await getWeeklyShameStats(groupId)
+      set((draft) => {
+        draft.weeklyStats = data
       })
     },
 
@@ -149,45 +219,15 @@ const useShameStore = create<ShameStore>()(
       const userId = await getCurrentUserId()
       if (!userId) return
 
-      // Optimistic update first
-      set((draft) => {
-        const post = draft.shamePosts.find((p) => p.id === postId)
-        if (!post) return
-        const reactions = safeReactions(post.reactions)
-        reactions[emoji] = (reactions[emoji] ?? 0) + 1
-        post.reactions = reactions
-      })
-
-      // Fetch current server value to avoid clobbering concurrent reactions
-      const { data: current } = await supabase
-        .from('hall_of_shame')
-        .select('reactions')
-        .eq('id', postId)
-        .single()
-
-      const serverReactions = safeReactions(current?.reactions)
-      serverReactions[emoji] = (serverReactions[emoji] ?? 0) + 1
-
-      const { error } = await supabase
-        .from('hall_of_shame')
-        .update({ reactions: serverReactions })
-        .eq('id', postId)
-
-      if (error) {
-        // Rollback optimistic update
+      try {
+        const updated = await addReaction(postId, emoji, userId)
         set((draft) => {
           const post = draft.shamePosts.find((p) => p.id === postId)
-          if (!post) return
-          const reactions = safeReactions(post.reactions)
-          reactions[emoji] = Math.max(0, (reactions[emoji] ?? 1) - 1)
-          post.reactions = reactions
-          draft.error = error.message
+          if (post) post.reactions = updated as unknown as HallOfShameEntry['reactions']
         })
-      } else {
-        // Sync with confirmed server value
+      } catch (err) {
         set((draft) => {
-          const post = draft.shamePosts.find((p) => p.id === postId)
-          if (post) post.reactions = serverReactions
+          draft.error = err instanceof Error ? err.message : 'Failed to react'
         })
       }
     },
