@@ -1,0 +1,364 @@
+import { create } from 'zustand'
+import { immer } from 'zustand/middleware/immer'
+import { supabase } from '@/lib/supabase'
+import type {
+  Bet,
+  BetSideEntry,
+  BetInsert,
+  BetCategory,
+  BetType,
+  BetStatus,
+  BetSide,
+  StakeType,
+  PunishmentCard,
+  Group,
+} from '@/lib/database.types'
+
+// ---------------------------------------------------------------------------
+// Extended types
+// ---------------------------------------------------------------------------
+
+/** Bet row enriched with its sides — returned from joined fetches */
+export type BetWithSides = Bet & { bet_sides: BetSideEntry[] }
+
+// ---------------------------------------------------------------------------
+// Wizard state
+// ---------------------------------------------------------------------------
+
+export interface WizardFields {
+  claim: string
+  category: BetCategory | null
+  betType: BetType | null
+  deadline: string | null          // ISO 8601 string
+  stakeType: StakeType | null
+  stakeMoney: number | null        // cents, e.g. 2000 = $20.00
+  stakePunishment: PunishmentCard | null
+  selectedGroup: Group | null
+}
+
+const WIZARD_DEFAULTS: WizardFields = {
+  claim: '',
+  category: null,
+  betType: null,
+  deadline: null,
+  stakeType: null,
+  stakeMoney: null,
+  stakePunishment: null,
+  selectedGroup: null,
+}
+
+// ---------------------------------------------------------------------------
+// Filters
+// ---------------------------------------------------------------------------
+
+export interface BetFilters {
+  category: BetCategory | null
+  type: BetType | null
+  status: BetStatus | null
+}
+
+// ---------------------------------------------------------------------------
+// Store types
+// ---------------------------------------------------------------------------
+
+interface BetState {
+  bets: BetWithSides[]
+  activeBet: BetWithSides | null
+  activeBetSides: BetSideEntry[]
+  isLoading: boolean
+  error: string | null
+  filters: BetFilters
+  // Wizard
+  currentStep: number
+  wizard: WizardFields
+}
+
+interface BetActions {
+  /** Fetch bets for a group, optionally filtered */
+  fetchBets: (groupId: string) => Promise<void>
+  fetchBetDetail: (betId: string) => Promise<void>
+  /** Persist the bet wizard state to Supabase. Requires wizard to be complete. */
+  createBet: () => Promise<Bet | null>
+  joinBet: (betId: string, side: BetSide) => Promise<void>
+  setFilters: (filters: Partial<BetFilters>) => void
+  clearFilters: () => void
+  // Wizard
+  resetWizard: () => void
+  updateWizardStep: (step: number, data: Partial<WizardFields>) => void
+  nextStep: () => void
+  prevStep: () => void
+  clearError: () => void
+}
+
+export type BetStore = BetState & BetActions
+
+// ---------------------------------------------------------------------------
+// Computed selectors (use with useBetStore(selector))
+// ---------------------------------------------------------------------------
+
+/** Returns rider/doubter counts and percentage split for the active bet */
+export function selectOdds(state: BetState) {
+  const sides = state.activeBetSides
+  const riderCount = sides.filter((s) => s.side === 'rider').length
+  const doubterCount = sides.filter((s) => s.side === 'doubter').length
+  const total = riderCount + doubterCount
+  return {
+    riderCount,
+    doubterCount,
+    riderPct: total > 0 ? Math.round((riderCount / total) * 100) : 50,
+    doubterPct: total > 0 ? Math.round((doubterCount / total) * 100) : 50,
+  }
+}
+
+/** Returns the current user's side on the active bet, or null if not joined */
+export function selectMySide(
+  state: BetState,
+  userId: string | undefined,
+): BetSide | null {
+  if (!userId) return null
+  const entry = state.activeBetSides.find((s) => s.user_id === userId)
+  return entry?.side ?? null
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+async function getCurrentUserId(): Promise<string | null> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  return user?.id ?? null
+}
+
+const BET_SELECT = '*, bet_sides(*)' as const
+
+// ---------------------------------------------------------------------------
+// Store
+// ---------------------------------------------------------------------------
+
+const useBetStore = create<BetStore>()(
+  immer((set, get) => ({
+    // ---- state ----
+    bets: [],
+    activeBet: null,
+    activeBetSides: [],
+    isLoading: false,
+    error: null,
+    filters: { category: null, type: null, status: null },
+    currentStep: 1,
+    wizard: { ...WIZARD_DEFAULTS },
+
+    // ---- actions ----
+
+    fetchBets: async (groupId) => {
+      set((draft) => {
+        draft.isLoading = true
+        draft.error = null
+      })
+
+      const { filters } = get()
+
+      let query = supabase
+        .from('bets')
+        .select(BET_SELECT)
+        .eq('group_id', groupId)
+        .order('created_at', { ascending: false })
+
+      if (filters.category) query = query.eq('category', filters.category)
+      if (filters.type) query = query.eq('bet_type', filters.type)
+      if (filters.status) query = query.eq('status', filters.status)
+
+      const { data, error } = await query
+
+      set((draft) => {
+        if (error) {
+          draft.error = error.message
+        } else {
+          draft.bets = (data ?? []) as BetWithSides[]
+        }
+        draft.isLoading = false
+      })
+    },
+
+    fetchBetDetail: async (betId) => {
+      set((draft) => {
+        draft.isLoading = true
+        draft.error = null
+      })
+
+      const { data, error } = await supabase
+        .from('bets')
+        .select(BET_SELECT)
+        .eq('id', betId)
+        .single()
+
+      set((draft) => {
+        if (error) {
+          draft.error = error.message
+        } else if (data) {
+          const bet = data as BetWithSides
+          draft.activeBet = bet
+          draft.activeBetSides = bet.bet_sides ?? []
+        }
+        draft.isLoading = false
+      })
+    },
+
+    createBet: async () => {
+      const userId = await getCurrentUserId()
+      if (!userId) return null
+
+      const { wizard } = get()
+
+      // Validate required wizard fields
+      if (
+        !wizard.claim ||
+        !wizard.category ||
+        !wizard.betType ||
+        !wizard.deadline ||
+        !wizard.stakeType ||
+        !wizard.selectedGroup
+      ) {
+        set((draft) => {
+          draft.error = 'Please complete all required fields before submitting.'
+        })
+        return null
+      }
+
+      set((draft) => {
+        draft.isLoading = true
+        draft.error = null
+      })
+
+      const insert: BetInsert = {
+        group_id: wizard.selectedGroup.id,
+        claimant_id: userId,
+        title: wizard.claim.trim().slice(0, 140),
+        category: wizard.category!,
+        bet_type: wizard.betType!,
+        deadline: wizard.deadline!,
+        stake_type: wizard.stakeType!,
+        stake_money: wizard.stakeMoney,
+        stake_punishment_id: wizard.stakePunishment?.id ?? null,
+        status: 'active',
+      }
+
+      const { data, error } = await supabase
+        .from('bets')
+        .insert(insert)
+        .select()
+        .single()
+
+      if (error || !data) {
+        set((draft) => {
+          draft.error = error?.message ?? 'Failed to create bet.'
+          draft.isLoading = false
+        })
+        return null
+      }
+
+      // Creator auto-joins as a rider
+      await supabase.from('bet_sides').insert({
+        bet_id: data.id,
+        user_id: userId,
+        side: 'rider',
+      })
+
+      set((draft) => {
+        draft.bets.unshift({ ...data, bet_sides: [] })
+        draft.isLoading = false
+      })
+
+      return data
+    },
+
+    joinBet: async (betId, side) => {
+      const userId = await getCurrentUserId()
+      if (!userId) return
+
+      set((draft) => {
+        draft.isLoading = true
+        draft.error = null
+      })
+
+      // Prevent duplicate joins
+      const { data: existing } = await supabase
+        .from('bet_sides')
+        .select('id')
+        .eq('bet_id', betId)
+        .eq('user_id', userId)
+        .single()
+
+      if (existing) {
+        set((draft) => {
+          draft.error = 'You have already joined this bet.'
+          draft.isLoading = false
+        })
+        return
+      }
+
+      const { data: newSide, error } = await supabase
+        .from('bet_sides')
+        .insert({ bet_id: betId, user_id: userId, side })
+        .select()
+        .single()
+
+      set((draft) => {
+        if (error) {
+          draft.error = error.message
+        } else if (newSide) {
+          // Update activeBetSides if this is the detail view
+          if (draft.activeBet?.id === betId) {
+            draft.activeBetSides.push(newSide)
+          }
+          // Update the bet in the list
+          const betInList = draft.bets.find((b) => b.id === betId)
+          if (betInList) {
+            betInList.bet_sides.push(newSide)
+          }
+        }
+        draft.isLoading = false
+      })
+    },
+
+    setFilters: (partial) =>
+      set((draft) => {
+        Object.assign(draft.filters, partial)
+      }),
+
+    clearFilters: () =>
+      set((draft) => {
+        draft.filters = { category: null, type: null, status: null }
+      }),
+
+    resetWizard: () =>
+      set((draft) => {
+        draft.currentStep = 1
+        draft.wizard = { ...WIZARD_DEFAULTS }
+      }),
+
+    updateWizardStep: (step, data) =>
+      set((draft) => {
+        draft.currentStep = step
+        Object.assign(draft.wizard, data)
+      }),
+
+    nextStep: () =>
+      set((draft) => {
+        draft.currentStep = Math.min(draft.currentStep + 1, 5)
+      }),
+
+    prevStep: () =>
+      set((draft) => {
+        draft.currentStep = Math.max(draft.currentStep - 1, 1)
+      }),
+
+    clearError: () =>
+      set((draft) => {
+        draft.error = null
+      }),
+  })),
+)
+
+export default useBetStore

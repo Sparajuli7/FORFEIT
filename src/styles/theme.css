@@ -1,0 +1,285 @@
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  /* LIGHT MODE */
+  --bg-primary: #F4F4F8;
+  --bg-card: #FFFFFF;
+  --bg-elevated: #EEEEF5;
+  --accent-green: #00C853;
+  --accent-coral: #FF3D57;
+  --gold: #F59E0B;
+  --purple: #7B61FF;
+  --text-primary: #0A0A0F;
+  --text-muted: #6B7280;
+  --border-subtle: #E2E2EE;
+  --live-indicator: #FF3D57;
+  
+  --font-size: 16px;
+  --radius: 0.75rem;
+}
+
+.dark {
+  /* DARK MODE */
+  --bg-primary: #0A0A0F;
+  --bg-card: #13131A;
+  --bg-elevated: #1C1C27;
+  --accent-green: #00E676;
+  --accent-coral: #FF3D57;
+  --gold: #FFB800;
+  --purple: #7B61FF;
+  --text-primary: #FFFFFF;
+  --text-muted: #6B7280;
+  --border-subtle: #252533;
+  --live-indicator: #FF3D57;
+}
+
+@theme inline {
+  --color-bg-primary: var(--bg-primary);
+  --color-bg-card: var(--bg-card);
+  --color-bg-elevated: var(--bg-elevated);
+  --color-accent-green: var(--accent-green);
+  --color-accent-coral: var(--accent-coral);
+  --color-gold: var(--gold);
+  --color-purple: var(--purple);
+  --color-text-primary: var(--text-primary);
+  --color-text-muted: var(--text-muted);
+  --color-border-subtle: var(--border-subtle);
+  --color-live-indicator: var(--live-indicator);
+}
+
+@layer base {
+  * {
+    @apply border-border-subtle;
+  }
+
+  body {
+    @apply bg-bg-primary text-text-primary;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-feature-settings: 'tnum' 1, 'ss01' 1;
+  }
+
+  html {
+    font-size: var(--font-size);
+  }
+}
+
+/* Diagonal grid pattern (betting slip) */
+.diagonal-grid {
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 24px,
+    rgba(255, 255, 255, 0.015) 24px,
+    rgba(255, 255, 255, 0.015) 26px
+  );
+}
+
+/* Grain texture for premium feel */
+.grain-texture {
+  position: relative;
+}
+
+.grain-texture::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='4.5' numOctaves='5' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 1;
+}
+
+.dark .grain-texture::before {
+  opacity: 0.04;
+}
+
+/* Glitch effect for FORFEIT wordmark */
+.glitch-text {
+  position: relative;
+  display: inline-block;
+}
+
+.glitch-text::before {
+  content: attr(data-text);
+  position: absolute;
+  left: 3px;
+  top: 2px;
+  color: var(--accent-coral);
+  opacity: 0.8;
+  z-index: -1;
+}
+
+/* Pulsing live indicator */
+@keyframes pulse-live {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(0.85);
+  }
+}
+
+.pulse-live {
+  animation: pulse-live 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Flashing indicator for proof dropped */
+@keyframes flash {
+  0%, 50%, 100% {
+    opacity: 1;
+  }
+  25%, 75% {
+    opacity: 0.3;
+  }
+}
+
+.flash {
+  animation: flash 1s ease-in-out infinite;
+}
+
+/* Marquee scroll */
+@keyframes marquee {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  display: inline-block;
+  animation: marquee 25s linear infinite;
+}
+
+/* Tabular numbers for stats */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+
+/* Scoreboard digit style */
+.scoreboard-digit {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+}
+
+/* Button pressed state */
+.btn-pressed:active {
+  transform: scale(0.97);
+  filter: brightness(0.85);
+}
+
+/* Green glow for CTAs */
+.glow-green {
+  box-shadow: 0 0 24px rgba(0, 230, 118, 0.35);
+}
+
+.dark .glow-green {
+  box-shadow: 0 0 28px rgba(0, 230, 118, 0.45);
+}
+
+/* Status left border */
+.border-l-status {
+  border-left-width: 3px;
+}
+
+.border-status-active {
+  border-left-color: var(--accent-green);
+}
+
+.border-status-proof {
+  border-left-color: var(--live-indicator);
+}
+
+.border-status-completed {
+  border-left-color: var(--gold);
+}
+
+.border-status-purple {
+  border-left-color: var(--purple);
+}
+
+.border-status-disputed {
+  border-left-color: var(--accent-coral);
+}
+
+/* Dashed receipt border */
+.receipt-border {
+  border: 2px dashed currentColor;
+}
+
+/* Perforated edge effect */
+.perforated-bottom {
+  position: relative;
+}
+
+.perforated-bottom::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 8px;
+  background-image: radial-gradient(circle, transparent 40%, currentColor 40%);
+  background-size: 12px 8px;
+  background-position: 0 0;
+}
+
+/* Hide scrollbar */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Line clamp */
+.line-clamp-1 {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Playing card suit symbols */
+.card-suit {
+  font-size: 1.2em;
+  line-height: 1;
+}
+
+/* Slight rotation for receipt realism */
+.rotate-slight {
+  transform: rotate(-1deg);
+}
+
+/* Inner glow for dark mode cards */
+.dark .card-inner-glow {
+  box-shadow: inset 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+/* Light mode card shadow */
+.card-shadow-light {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.dark .card-shadow-light {
+  box-shadow: none;
+}
+
+/* Safe area padding */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
