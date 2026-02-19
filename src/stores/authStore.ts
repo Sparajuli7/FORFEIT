@@ -3,6 +3,9 @@ import { supabase } from '@/lib/supabase'
 import type { User } from '@supabase/supabase-js'
 import type { Profile, ProfileUpdate } from '@/lib/database.types'
 
+// Track the auth listener so we can unsubscribe before re-subscribing
+let _authSubscription: { unsubscribe: () => void } | null = null
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -90,8 +93,11 @@ const useAuthStore = create<AuthStore>()((set, get) => ({
       set({ isLoading: false })
     }
 
+    // Unsubscribe previous listener if initialize is called again
+    _authSubscription?.unsubscribe()
+
     // Keep store in sync across tabs and token refreshes
-    supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' && session?.user) {
         // Avoid redundant DB round-trips if user object is unchanged
         if (get().user?.id === session.user.id && get().profile) return
@@ -118,6 +124,7 @@ const useAuthStore = create<AuthStore>()((set, get) => ({
         })
       }
     })
+    _authSubscription = subscription
   },
 
   signInWithEmail: async (email) => {

@@ -31,9 +31,11 @@ export type GroupStore = GroupState & GroupActions
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Generate a random 6-char alphanumeric invite code */
+/** Generate a cryptographically random 8-char alphanumeric invite code */
 function generateInviteCode(): string {
-  return Math.random().toString(36).slice(2, 8).toUpperCase()
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' // no 0/O/1/I to avoid confusion
+  const bytes = crypto.getRandomValues(new Uint8Array(8))
+  return Array.from(bytes, (b) => chars[b % chars.length]).join('')
 }
 
 async function getCurrentUserId(): Promise<string | null> {
