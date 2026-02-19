@@ -65,6 +65,9 @@ async function getCurrentUserId(): Promise<string | null> {
  * Upload a single file to Supabase Storage and return its public URL.
  * Bucket must exist and have appropriate RLS policies.
  */
+/** Tracks which files failed to upload so the user can be notified */
+const _failedUploads: string[] = []
+
 async function uploadFile(
   bucket: string,
   path: string,
@@ -74,7 +77,10 @@ async function uploadFile(
     upsert: false,
     contentType: file.type,
   })
-  if (error) return null
+  if (error) {
+    _failedUploads.push(file.name)
+    return null
+  }
 
   const {
     data: { publicUrl },
@@ -101,6 +107,9 @@ const useProofStore = create<ProofStore>()((set, get) => ({
     if (!userId) return null
 
     set({ isSubmitting: true, error: null })
+
+    // Reset failed upload tracker
+    _failedUploads.length = 0
 
     const timestamp = Date.now()
     const basePath = `proofs/${betId}/${userId}/${timestamp}`
@@ -132,6 +141,21 @@ const useProofStore = create<ProofStore>()((set, get) => ({
       screenshotUrls = results.filter((u): u is string => u !== null)
     }
 
+    // Abort if ALL files failed to upload (no proof media at all)
+    const hasAnyMedia = frontUrl || backUrl || videoUrl || documentUrl || screenshotUrls?.length
+    if (!hasAnyMedia && _failedUploads.length > 0) {
+      set({
+        error: `Upload failed for: ${_failedUploads.join(', ')}. Please try again.`,
+        isSubmitting: false,
+      })
+      return null
+    }
+
+    // Warn about partial failures but continue
+    if (_failedUploads.length > 0) {
+      console.warn('[proofStore] Some files failed to upload:', _failedUploads)
+    }
+
     const { data: proof, error } = await supabase
       .from('proofs')
       .insert({
@@ -154,10 +178,14 @@ const useProofStore = create<ProofStore>()((set, get) => ({
     }
 
     // Advance bet status to proof_submitted
-    await supabase
+    const { error: statusError } = await supabase
       .from('bets')
       .update({ status: 'proof_submitted' })
       .eq('id', betId)
+
+    if (statusError) {
+      console.warn('[proofStore] Proof saved but failed to update bet status:', statusError.message)
+    }
 
     set((state) => ({
       proofs: [proof, ...state.proofs],
