@@ -21,6 +21,7 @@ import { HallOfShame } from './screens/HallOfShame'
 import { ProfileScreen } from './screens/ProfileScreen'
 import { EmailEntryScreen } from './screens/EmailEntryScreen'
 import { OTPScreen } from './screens/OTPScreen'
+import { AuthCallbackScreen } from './screens/AuthCallbackScreen'
 import { ProfileSetupScreen } from './screens/ProfileSetupScreen'
 import { GroupJoinScreen } from './screens/GroupJoinScreen'
 import { GroupCreateScreen } from './screens/GroupCreateScreen'
@@ -149,6 +150,7 @@ export function AppRouter() {
           <Route index element={<SplashRoute />} />
           <Route path="auth/email" element={<EmailEntryScreen />} />
           <Route path="auth/phone" element={<Navigate to="/auth/email" replace />} />
+          <Route path="auth/callback" element={<AuthCallbackScreen />} />
           <Route path="auth/otp" element={<OTPScreen />} />
           <Route path="auth/profile-setup" element={<ProfileSetupScreen />} />
         </Route>

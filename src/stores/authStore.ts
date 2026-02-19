@@ -122,7 +122,14 @@ const useAuthStore = create<AuthStore>()((set, get) => ({
 
   signInWithEmail: async (email) => {
     set({ isLoading: true, error: null })
-    const { error } = await supabase.auth.signInWithOtp({ email })
+    const redirectTo =
+      typeof window !== 'undefined'
+        ? `${window.location.origin}/auth/callback`
+        : undefined
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: redirectTo ? { emailRedirectTo: redirectTo } : undefined,
+    })
     // OTP sent — isLoading stays false, UI should show OTP input
     if (error) {
       set({ error: error.message, isLoading: false })
