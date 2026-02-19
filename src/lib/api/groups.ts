@@ -56,14 +56,13 @@ export async function createGroup(name: string, emoji: string): Promise<Group> {
 }
 
 export async function getGroupByInviteCode(code: string): Promise<Group | null> {
-  const { data, error } = await supabase
-    .from('groups')
-    .select('*')
-    .eq('invite_code', code.toUpperCase())
-    .single()
+  const { data, error } = await supabase.rpc('get_group_by_invite_code', {
+    invite_code: code.trim().toUpperCase(),
+  })
 
-  if (error && error.code !== 'PGRST116') throw error
-  return data
+  if (error) return null
+  const row = Array.isArray(data) ? data[0] : data
+  return (row as Group) ?? null
 }
 
 export async function joinGroup(groupId: string): Promise<void> {

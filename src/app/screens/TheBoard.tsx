@@ -216,7 +216,22 @@ export function TheBoard() {
   return (
     <div className="h-full bg-bg-primary grain-texture overflow-y-auto pb-24">
       {/* Header */}
-      <div className="px-6 pt-12 pb-4">
+        <div className="px-6 pt-12 pb-4">
+        {/* Create / Join group — always visible when user has groups */}
+        <div className="flex items-center gap-2 mb-3">
+          <button
+            onClick={() => navigate('/group/create')}
+            className="px-3 py-1.5 rounded-full text-xs font-bold bg-accent-green/20 text-accent-green border border-accent-green/40"
+          >
+            + Create group
+          </button>
+          <button
+            onClick={() => navigate('/group/join')}
+            className="px-3 py-1.5 rounded-full text-xs font-bold bg-bg-elevated text-text-muted border border-border-subtle"
+          >
+            Join with code
+          </button>
+        </div>
         <div className="flex items-start justify-between mb-4">
           <div>
             <h1 className="text-[11px] font-bold uppercase tracking-[0.1em] text-text-muted mb-1">

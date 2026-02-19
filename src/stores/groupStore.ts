@@ -133,14 +133,20 @@ const useGroupStore = create<GroupStore>()((set, get) => ({
 
     set({ isLoading: true, error: null })
 
-    // Find group by invite code
-    const { data: group, error: findError } = await supabase
-      .from('groups')
-      .select('*')
-      .eq('invite_code', code.toUpperCase())
-      .single()
+    // Find group by invite code (RPC bypasses RLS so non-members can look up)
+    const { data: groupRows, error: findError } = await supabase
+      .rpc('get_group_by_invite_code', { invite_code: code.trim().toUpperCase() })
 
-    if (findError || !group) {
+    const group = Array.isArray(groupRows) ? groupRows[0] : groupRows ?? null
+    if (findError) {
+      const msg =
+        findError.message?.includes('function') || findError.code === '42883'
+          ? 'Join by code not set up. Run the SQL in Supabase (see 002_get_group_by_invite_code.sql).'
+          : findError.message ?? 'No group found with that code.'
+      set({ error: msg, isLoading: false })
+      return null
+    }
+    if (!group || !group.id) {
       set({ error: 'No group found with that code.', isLoading: false })
       return null
     }
@@ -171,6 +177,7 @@ const useGroupStore = create<GroupStore>()((set, get) => ({
 
     set((state) => ({
       groups: [...state.groups, group],
+      activeGroup: group,
       isLoading: false,
     }))
 

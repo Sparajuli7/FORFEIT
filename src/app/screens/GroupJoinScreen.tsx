@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router'
 import { useGroupStore } from '@/stores'
 import { Input } from '@/app/components/ui/input'
@@ -8,8 +8,13 @@ import { ChevronLeft } from 'lucide-react'
 export function GroupJoinScreen() {
   const navigate = useNavigate()
   const joinGroupByCode = useGroupStore((s) => s.joinGroupByCode)
+  const clearError = useGroupStore((s) => s.clearError)
   const error = useGroupStore((s) => s.error)
   const isLoading = useGroupStore((s) => s.isLoading)
+
+  useEffect(() => {
+    clearError()
+  }, [clearError])
 
   const [code, setCode] = useState('')
 

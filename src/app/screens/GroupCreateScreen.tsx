@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router'
 import { ChevronLeft } from 'lucide-react'
 import { useGroupStore } from '@/stores'
@@ -12,8 +12,13 @@ export function GroupCreateScreen() {
   const navigate = useNavigate()
   const createGroup = useGroupStore((s) => s.createGroup)
   const setActiveGroup = useGroupStore((s) => s.setActiveGroup)
+  const clearError = useGroupStore((s) => s.clearError)
   const error = useGroupStore((s) => s.error)
   const isLoading = useGroupStore((s) => s.isLoading)
+
+  useEffect(() => {
+    clearError()
+  }, [clearError])
 
   const [name, setName] = useState('')
   const [emoji, setEmoji] = useState('🔥')
