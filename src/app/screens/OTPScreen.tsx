@@ -8,10 +8,10 @@ const RESEND_COOLDOWN_SEC = 60
 export function OTPScreen() {
   const navigate = useNavigate()
   const location = useLocation()
-  const phone = (location.state as { phone?: string })?.phone
+  const email = (location.state as { email?: string })?.email
 
   const verifyOtp = useAuthStore((s) => s.verifyOtp)
-  const signInWithPhone = useAuthStore((s) => s.signInWithPhone)
+  const signInWithEmail = useAuthStore((s) => s.signInWithEmail)
   const isLoading = useAuthStore((s) => s.isLoading)
   const error = useAuthStore((s) => s.error)
   const profile = useAuthStore((s) => s.profile)
@@ -22,9 +22,9 @@ export function OTPScreen() {
   const [resendCooldown, setResendCooldown] = useState(0)
 
   const submitOtp = useCallback(async () => {
-    if (!phone || otp.length !== 6) return
-    await verifyOtp(phone, otp)
-  }, [phone, otp, verifyOtp])
+    if (!email || otp.length !== 6) return
+    await verifyOtp(email, otp)
+  }, [email, otp, verifyOtp])
 
   useEffect(() => {
     if (otp.length === 6) {
@@ -49,13 +49,13 @@ export function OTPScreen() {
   }, [resendCooldown])
 
   const handleResend = async () => {
-    if (!phone || resendCooldown > 0) return
-    await signInWithPhone(phone)
+    if (!email || resendCooldown > 0) return
+    await signInWithEmail(email)
     setResendCooldown(RESEND_COOLDOWN_SEC)
   }
 
-  if (!phone) {
-    navigate('/auth/phone', { replace: true })
+  if (!email) {
+    navigate('/auth/email', { replace: true })
     return null
   }
 
@@ -66,7 +66,7 @@ export function OTPScreen() {
           Enter the code
         </h1>
         <p className="text-text-muted text-sm mb-8">
-          We sent a 6-digit code to {phone}
+          We sent a 6-digit code to {email}
         </p>
 
         <div className="flex justify-center mb-6">

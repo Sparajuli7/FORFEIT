@@ -19,7 +19,7 @@ import { H2HCreateScreen } from './screens/H2HCreateScreen'
 import { Competitions } from './screens/Competitions'
 import { HallOfShame } from './screens/HallOfShame'
 import { ProfileScreen } from './screens/ProfileScreen'
-import { PhoneEntryScreen } from './screens/PhoneEntryScreen'
+import { EmailEntryScreen } from './screens/EmailEntryScreen'
 import { OTPScreen } from './screens/OTPScreen'
 import { ProfileSetupScreen } from './screens/ProfileSetupScreen'
 import { GroupJoinScreen } from './screens/GroupJoinScreen'
@@ -63,8 +63,8 @@ function SplashRoute() {
   const navigate = useNavigate()
   return (
     <Splash
-      onEnter={() => navigate('/auth/phone')}
-      onLogin={() => navigate('/auth/phone')}
+      onEnter={() => navigate('/auth/email')}
+      onLogin={() => navigate('/auth/email')}
     />
   )
 }
@@ -147,7 +147,8 @@ export function AppRouter() {
         {/* ---- PUBLIC (no auth required) ---- */}
         <Route element={<AuthLayout />}>
           <Route index element={<SplashRoute />} />
-          <Route path="auth/phone" element={<PhoneEntryScreen />} />
+          <Route path="auth/email" element={<EmailEntryScreen />} />
+          <Route path="auth/phone" element={<Navigate to="/auth/email" replace />} />
           <Route path="auth/otp" element={<OTPScreen />} />
           <Route path="auth/profile-setup" element={<ProfileSetupScreen />} />
         </Route>

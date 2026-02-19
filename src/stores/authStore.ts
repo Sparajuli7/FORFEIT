@@ -20,10 +20,10 @@ interface AuthState {
 interface AuthActions {
   /** Check current session and subscribe to auth state changes. Call once on app mount. */
   initialize: () => Promise<void>
-  /** Send OTP SMS to phone number (E.164 format, e.g. +14155552671) */
-  signInWithPhone: (phone: string) => Promise<void>
-  /** Verify the 6-digit OTP received via SMS */
-  verifyOtp: (phone: string, token: string) => Promise<void>
+  /** Send OTP to email address (Supabase Email provider) */
+  signInWithEmail: (email: string) => Promise<void>
+  /** Verify the 6-digit OTP received via email */
+  verifyOtp: (email: string, token: string) => Promise<void>
   signOut: () => Promise<void>
   /** Create a new profile row (for first-time users). Use updateProfile for existing profiles. Returns true on success. */
   createProfile: (data: { username: string; display_name: string; avatar_url?: string }) => Promise<boolean>
@@ -120,9 +120,9 @@ const useAuthStore = create<AuthStore>()((set, get) => ({
     })
   },
 
-  signInWithPhone: async (phone) => {
+  signInWithEmail: async (email) => {
     set({ isLoading: true, error: null })
-    const { error } = await supabase.auth.signInWithOtp({ phone })
+    const { error } = await supabase.auth.signInWithOtp({ email })
     // OTP sent — isLoading stays false, UI should show OTP input
     if (error) {
       set({ error: error.message, isLoading: false })
@@ -131,12 +131,12 @@ const useAuthStore = create<AuthStore>()((set, get) => ({
     }
   },
 
-  verifyOtp: async (phone, token) => {
+  verifyOtp: async (email, token) => {
     set({ isLoading: true, error: null })
     const { error } = await supabase.auth.verifyOtp({
-      phone,
+      email,
       token,
-      type: 'sms',
+      type: 'email',
     })
     if (error) {
       set({ error: error.message, isLoading: false })

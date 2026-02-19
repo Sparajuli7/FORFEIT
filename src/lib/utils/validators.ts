@@ -40,6 +40,19 @@ export function validateStake(
   return { valid: true }
 }
 
+/** Simple email validation for auth flow */
+export function validateEmail(email: string): ValidationResult {
+  const trimmed = email.trim().toLowerCase()
+  if (!trimmed) {
+    return { valid: false, error: 'Email is required.' }
+  }
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  if (!emailRegex.test(trimmed)) {
+    return { valid: false, error: 'Enter a valid email address.' }
+  }
+  return { valid: true }
+}
+
 export function validatePhone(phone: string): { valid: boolean; formatted: string; error?: string } {
   const digits = phone.replace(/\D/g, '')
 

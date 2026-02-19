@@ -10,7 +10,7 @@ export function useAuth() {
   const error = useAuthStore((s) => s.error)
 
   const initialize = useAuthStore((s) => s.initialize)
-  const signInWithPhone = useAuthStore((s) => s.signInWithPhone)
+  const signInWithEmail = useAuthStore((s) => s.signInWithEmail)
   const verifyOtp = useAuthStore((s) => s.verifyOtp)
   const signOut = useAuthStore((s) => s.signOut)
   const updateProfile = useAuthStore((s) => s.updateProfile)
@@ -18,10 +18,10 @@ export function useAuth() {
   const clearError = useAuthStore((s) => s.clearError)
 
   const login = useCallback(
-    async (phone: string) => {
-      await signInWithPhone(phone)
+    async (email: string) => {
+      await signInWithEmail(email)
     },
-    [signInWithPhone],
+    [signInWithEmail],
   )
 
   const logout = useCallback(async () => {
