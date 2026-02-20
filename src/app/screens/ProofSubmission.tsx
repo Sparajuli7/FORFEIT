@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router'
-import { Image, Video, FileText, X } from 'lucide-react'
+import { Image, Video, FileText, Camera, X } from 'lucide-react'
 import { useBetStore } from '@/stores'
 import { useProofStore } from '@/stores'
 import type { ProofType } from '@/lib/database.types'
@@ -29,7 +29,7 @@ export function ProofSubmission({ onSubmit, onBack }: ProofSubmissionProps) {
   const isSubmitting = useProofStore((s) => s.isSubmitting)
   const error = useProofStore((s) => s.error)
 
-  const [mode, setMode] = useState<'camera' | 'upload'>('camera')
+  const [mode, setMode] = useState<'camera' | 'upload'>('upload')
   const [countdown, setCountdown] = useState<number | null>(null)
   const [proofType, setProofType] = useState<ProofType>('camera')
   const [caption, setCaption] = useState('')
@@ -283,19 +283,26 @@ export function ProofSubmission({ onSubmit, onBack }: ProofSubmissionProps) {
           <div className="grid grid-cols-2 gap-3">
             <label className="bg-bg-card border border-border-subtle rounded-xl p-4 flex flex-col items-center gap-2 hover:border-accent-green transition-colors cursor-pointer">
               <Image className="w-8 h-8 text-accent-green" />
-              <span className="text-xs font-bold text-text-primary">📸 Gallery</span>
-              <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, 'screenshot')} />
+              <span className="text-xs font-bold text-text-primary">Photos</span>
+              <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleFileChange(e, 'screenshot')} />
             </label>
             <label className="bg-bg-card border border-border-subtle rounded-xl p-4 flex flex-col items-center gap-2 hover:border-accent-green transition-colors cursor-pointer">
               <Video className="w-8 h-8 text-accent-green" />
-              <span className="text-xs font-bold text-text-primary">🎥 Video</span>
+              <span className="text-xs font-bold text-text-primary">Video</span>
               <input type="file" accept="video/*" className="hidden" onChange={(e) => handleFileChange(e, 'video')} />
             </label>
             <label className="bg-bg-card border border-border-subtle rounded-xl p-4 flex flex-col items-center gap-2 hover:border-accent-green transition-colors cursor-pointer">
               <FileText className="w-8 h-8 text-accent-green" />
-              <span className="text-xs font-bold text-text-primary">📄 Document</span>
+              <span className="text-xs font-bold text-text-primary">Document</span>
               <input type="file" accept=".pdf,.doc,.docx" className="hidden" onChange={(e) => handleFileChange(e, 'document')} />
             </label>
+            <button
+              onClick={() => setMode('camera')}
+              className="bg-bg-card border border-border-subtle rounded-xl p-4 flex flex-col items-center gap-2 hover:border-accent-green transition-colors"
+            >
+              <Camera className="w-8 h-8 text-accent-green" />
+              <span className="text-xs font-bold text-text-primary">Live Camera</span>
+            </button>
           </div>
         </div>
 

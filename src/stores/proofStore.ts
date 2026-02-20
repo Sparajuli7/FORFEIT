@@ -108,26 +108,27 @@ async function uploadFile(
  */
 async function autoResolveIfMajority(proofId: string): Promise<void> {
   // Get the proof to find the bet
-  const { data: proof } = await supabase
+  const { data: proofRow } = await supabase
     .from('proofs')
     .select('bet_id')
     .eq('id', proofId)
-    .single()
-  if (!proof) return
+    .single() as { data: { bet_id: string } | null }
+  if (!proofRow) return
+  const betId = proofRow.bet_id
 
   // Check if outcome already exists
   const { data: existing } = await supabase
     .from('outcomes')
     .select('id')
-    .eq('bet_id', proof.bet_id)
-    .maybeSingle()
+    .eq('bet_id', betId)
+    .maybeSingle() as { data: { id: string } | null }
   if (existing) return
 
   // Count bet participants (riders + doubters)
   const { data: sides } = await supabase
     .from('bet_sides')
     .select('user_id')
-    .eq('bet_id', proof.bet_id)
+    .eq('bet_id', betId) as { data: { user_id: string }[] | null }
   const participantCount = sides?.length ?? 0
   if (participantCount < 2) return // Need at least 2 participants
 
@@ -135,7 +136,7 @@ async function autoResolveIfMajority(proofId: string): Promise<void> {
   const { data: allVotes } = await supabase
     .from('proof_votes')
     .select('vote')
-    .eq('proof_id', proofId)
+    .eq('proof_id', proofId) as { data: { vote: string }[] | null }
 
   const confirms = (allVotes ?? []).filter((v) => v.vote === 'confirm').length
   const disputes = (allVotes ?? []).filter((v) => v.vote === 'dispute').length
@@ -150,15 +151,15 @@ async function autoResolveIfMajority(proofId: string): Promise<void> {
   // Create outcome
   await supabase
     .from('outcomes')
-    .insert({ bet_id: proof.bet_id, result } as never)
+    .insert({ bet_id: betId, result } as never)
 
   // Update bet status
   await supabase
     .from('bets')
     .update({ status: 'completed' } as never)
-    .eq('id', proof.bet_id)
+    .eq('id', betId)
 
-  console.info(`[proofStore] Auto-resolved bet ${proof.bet_id} → ${result}`)
+  console.info(`[proofStore] Auto-resolved bet ${betId} → ${result}`)
 }
 
 // ---------------------------------------------------------------------------
