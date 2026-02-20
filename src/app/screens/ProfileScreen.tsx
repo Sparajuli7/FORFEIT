@@ -196,7 +196,7 @@ function ProfileContent({
       ) : (
         <div className="px-6 mt-8 pb-8">
           <button
-            onClick={() => navigate('/h2h/create', { state: { opponentId: profile.id } })}
+            onClick={() => navigate('/compete/create', { state: { opponentId: profile.id } })}
             className="w-full py-3 rounded-xl bg-accent-green text-white font-bold text-sm"
           >
             Challenge
