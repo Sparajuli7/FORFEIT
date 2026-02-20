@@ -33,6 +33,8 @@ interface AuthActions {
   verifyOtp: (email: string, token: string) => Promise<void>
   /** Set or update the user's password (for existing OTP-only accounts) */
   setPassword: (password: string) => Promise<void>
+  /** Sign in with Google OAuth */
+  signInWithGoogle: () => Promise<void>
   signOut: () => Promise<void>
   /** Create a new profile row (for first-time users). Use updateProfile for existing profiles. Returns true on success. */
   createProfile: (data: { username: string; display_name: string; avatar_url?: string }) => Promise<boolean>
@@ -186,6 +188,22 @@ const useAuthStore = create<AuthStore>()((set, get) => ({
     } else {
       set({ isLoading: false, error: null })
     }
+  },
+
+  signInWithGoogle: async () => {
+    set({ isLoading: true, error: null })
+    const redirectTo =
+      typeof window !== 'undefined'
+        ? `${window.location.origin}/auth/callback`
+        : undefined
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: redirectTo ? { redirectTo } : undefined,
+    })
+    if (error) {
+      set({ error: error.message, isLoading: false })
+    }
+    // Browser redirects to Google — onAuthStateChange handles the rest on return
   },
 
   signOut: async () => {
