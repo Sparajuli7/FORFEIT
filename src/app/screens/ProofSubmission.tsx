@@ -11,6 +11,7 @@ const PROOF_TYPES: { type: ProofType; icon: string; label: string }[] = [
   { type: 'screenshot', icon: '🖼️', label: 'Screenshot' },
   { type: 'video', icon: '🎥', label: 'Video' },
   { type: 'document', icon: '📄', label: 'Document' },
+  { type: 'text', icon: '📝', label: 'Text' },
 ]
 
 interface ProofSubmissionProps {
@@ -160,7 +161,8 @@ export function ProofSubmission({ onSubmit, onBack }: ProofSubmissionProps) {
     if (video) files.videoFile = video
     if (doc) files.documentFile = doc
 
-    if (!files.frontCameraFile && !files.backCameraFile && !files.screenshotFiles?.length && !files.videoFile && !files.documentFile) {
+    const hasAnyFile = files.frontCameraFile || files.backCameraFile || files.screenshotFiles?.length || files.videoFile || files.documentFile
+    if (!hasAnyFile && !caption.trim()) {
       return
     }
 
@@ -173,7 +175,7 @@ export function ProofSubmission({ onSubmit, onBack }: ProofSubmissionProps) {
 
   const handleBack = () => (onBack ? onBack() : navigate(-1))
 
-  const hasProof = frontBlob || backBlob || uploadFiles.length > 0
+  const hasProof = frontBlob || backBlob || uploadFiles.length > 0 || caption.trim().length > 0
 
   if (submitted) {
     return (

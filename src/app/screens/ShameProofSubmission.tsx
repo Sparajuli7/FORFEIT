@@ -1,10 +1,15 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router'
-import { Image, X } from 'lucide-react'
+import { Image, Video, FileText, X } from 'lucide-react'
 import { getOutcome } from '@/lib/api/outcomes'
 import { submitShameProof } from '@/lib/api/shame'
 import { supabase } from '@/lib/supabase'
 import { PrimaryButton } from '../components/PrimaryButton'
+
+interface UploadEntry {
+  file: File
+  type: 'front' | 'back' | 'screenshot' | 'video' | 'document'
+}
 
 export function ShameProofSubmission() {
   const { id } = useParams<{ id: string }>()
@@ -12,14 +17,11 @@ export function ShameProofSubmission() {
   const [outcomeId, setOutcomeId] = useState<string | null>(null)
   const [betTitle, setBetTitle] = useState('')
   const [loading, setLoading] = useState(true)
-  const [frontBlob, setFrontBlob] = useState<Blob | null>(null)
-  const [backBlob, setBackBlob] = useState<Blob | null>(null)
-  const [uploadFiles, setUploadFiles] = useState<File[]>([])
+  const [uploadFiles, setUploadFiles] = useState<UploadEntry[]>([])
   const [caption, setCaption] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
-  const frontVideoRef = useRef<HTMLVideoElement>(null)
-  const backVideoRef = useRef<HTMLVideoElement>(null)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!id) return
@@ -37,10 +39,10 @@ export function ShameProofSubmission() {
     })
   }, [id])
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const addFiles = (e: React.ChangeEvent<HTMLInputElement>, type: UploadEntry['type']) => {
     const files = e.target.files
     if (!files?.length) return
-    setUploadFiles((prev) => [...prev, ...Array.from(files)])
+    setUploadFiles((prev) => [...prev, ...Array.from(files).map((file) => ({ file, type }))])
     e.target.value = ''
   }
 
@@ -51,30 +53,42 @@ export function ShameProofSubmission() {
   const handleSubmit = async () => {
     if (!id || !outcomeId) return
 
-    const frontFile = frontBlob ? new File([frontBlob], 'front.jpg', { type: 'image/jpeg' }) : undefined
-    const backFile = backBlob ? new File([backBlob], 'back.jpg', { type: 'image/jpeg' }) : undefined
+    const hasFiles = uploadFiles.length > 0
+    const hasCaption = caption.trim().length > 0
 
-    if (!frontFile && !backFile && uploadFiles.length === 0) return
+    if (!hasFiles && !hasCaption) {
+      setError('Add proof media or a text description.')
+      return
+    }
 
     setSubmitting(true)
+    setError(null)
     try {
+      const frontFile = uploadFiles.find((u) => u.type === 'front')?.file
+      const backFile = uploadFiles.find((u) => u.type === 'back')?.file
+      const videoFile = uploadFiles.find((u) => u.type === 'video')?.file
+      const documentFile = uploadFiles.find((u) => u.type === 'document')?.file
+      const screenshotFiles = uploadFiles.filter((u) => u.type === 'screenshot').map((u) => u.file)
+
       await submitShameProof(id, outcomeId, {
         frontFile,
         backFile,
-        screenshotFiles: uploadFiles.length > 0 ? uploadFiles : undefined,
+        videoFile,
+        documentFile,
+        screenshotFiles: screenshotFiles.length > 0 ? screenshotFiles : undefined,
         caption: caption.trim() || undefined,
       })
       setSubmitted(true)
       setTimeout(() => navigate('/shame'), 1200)
     } catch (err) {
-      console.error(err)
+      setError(err instanceof Error ? err.message : 'Upload failed. Please try again.')
     } finally {
       setSubmitting(false)
     }
   }
 
   const handleBack = () => navigate(-1)
-  const hasProof = frontBlob || backBlob || uploadFiles.length > 0
+  const hasProof = uploadFiles.length > 0 || caption.trim().length > 0
 
   if (loading) {
     return (
@@ -96,7 +110,7 @@ export function ShameProofSubmission() {
   if (submitted) {
     return (
       <div className="h-full bg-bg-primary flex flex-col items-center justify-center">
-        <div className="text-6xl mb-4">✓</div>
+        <div className="text-6xl mb-4">&#10003;</div>
         <p className="text-accent-green font-bold text-xl">Punishment proof submitted!</p>
       </div>
     )
@@ -106,7 +120,7 @@ export function ShameProofSubmission() {
     <div className="h-full bg-bg-primary overflow-y-auto pb-8">
       <div className="px-6 pt-12 pb-6 border-b border-border-subtle">
         <button onClick={handleBack} className="text-text-primary font-bold mb-4">
-          ← Back
+          &larr; Back
         </button>
         <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-text-muted mb-2">
           SUBMIT PUNISHMENT PROOF
@@ -115,104 +129,74 @@ export function ShameProofSubmission() {
       </div>
 
       <div className="px-6 py-6 space-y-4">
+        {/* Upload buttons */}
         <div>
-          <label className="block text-xs font-bold text-text-muted mb-2">Front photo</label>
-          <label className="block aspect-[3/4] rounded-xl border-2 border-dashed border-border-subtle flex flex-col items-center justify-center cursor-pointer hover:border-accent-green/50 transition-colors overflow-hidden">
-            {frontBlob ? (
-              <img
-                src={URL.createObjectURL(frontBlob)}
-                alt="Front"
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <>
-                <Image className="w-12 h-12 text-text-muted mb-2" />
-                <span className="text-sm text-text-muted">Tap to add</span>
-              </>
-            )}
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0]
-                if (f) setFrontBlob(f)
-              }}
-            />
-          </label>
+          <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-text-muted mb-3">UPLOAD EVIDENCE</p>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="bg-bg-card border border-border-subtle rounded-xl p-4 flex flex-col items-center gap-2 hover:border-accent-green transition-colors cursor-pointer">
+              <Image className="w-8 h-8 text-accent-green" />
+              <span className="text-xs font-bold text-text-primary">Photos</span>
+              <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => addFiles(e, 'screenshot')} />
+            </label>
+            <label className="bg-bg-card border border-border-subtle rounded-xl p-4 flex flex-col items-center gap-2 hover:border-accent-green transition-colors cursor-pointer">
+              <Video className="w-8 h-8 text-accent-green" />
+              <span className="text-xs font-bold text-text-primary">Video</span>
+              <input type="file" accept="video/*" className="hidden" onChange={(e) => addFiles(e, 'video')} />
+            </label>
+            <label className="bg-bg-card border border-border-subtle rounded-xl p-4 flex flex-col items-center gap-2 hover:border-accent-green transition-colors cursor-pointer">
+              <FileText className="w-8 h-8 text-accent-green" />
+              <span className="text-xs font-bold text-text-primary">Document</span>
+              <input type="file" accept=".pdf,.doc,.docx" className="hidden" onChange={(e) => addFiles(e, 'document')} />
+            </label>
+          </div>
         </div>
 
-        <div>
-          <label className="block text-xs font-bold text-text-muted mb-2">Back photo</label>
-          <label className="block aspect-[3/4] rounded-xl border-2 border-dashed border-border-subtle flex flex-col items-center justify-center cursor-pointer hover:border-accent-green/50 transition-colors overflow-hidden">
-            {backBlob ? (
-              <img
-                src={URL.createObjectURL(backBlob)}
-                alt="Back"
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <>
-                <Image className="w-12 h-12 text-text-muted mb-2" />
-                <span className="text-sm text-text-muted">Tap to add</span>
-              </>
-            )}
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0]
-                if (f) setBackBlob(f)
-              }}
-            />
-          </label>
-        </div>
+        {/* File previews */}
+        {uploadFiles.length > 0 && (
+          <div className="flex gap-2 flex-wrap">
+            {uploadFiles.map((u, i) => (
+              <div key={i} className="relative w-20 h-20 rounded-lg overflow-hidden border border-border-subtle">
+                {u.file.type.startsWith('image/') ? (
+                  <img src={URL.createObjectURL(u.file)} alt="" className="w-full h-full object-cover" />
+                ) : u.file.type.startsWith('video/') ? (
+                  <div className="w-full h-full flex flex-col items-center justify-center bg-bg-elevated">
+                    <Video className="w-5 h-5 text-accent-green mb-1" />
+                    <span className="text-[10px] text-text-muted truncate max-w-full px-1">{u.file.name}</span>
+                  </div>
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center bg-bg-elevated">
+                    <FileText className="w-5 h-5 text-accent-green mb-1" />
+                    <span className="text-[10px] text-text-muted truncate max-w-full px-1">{u.file.name}</span>
+                  </div>
+                )}
+                <button
+                  onClick={() => removeFile(i)}
+                  className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-accent-coral text-white flex items-center justify-center"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
 
+        {/* Caption / text proof */}
         <div>
-          <label className="block text-xs font-bold text-text-muted mb-2">Screenshots (optional)</label>
-          <label className="block rounded-xl border-2 border-dashed border-border-subtle p-6 flex flex-col items-center justify-center cursor-pointer hover:border-accent-green/50 transition-colors">
-            <Image className="w-8 h-8 text-text-muted mb-2" />
-            <span className="text-sm text-text-muted">Add screenshots</span>
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              className="hidden"
-              onChange={handleFileChange}
-            />
+          <label className="text-[11px] font-bold uppercase tracking-[0.1em] text-text-muted mb-2 block">
+            DESCRIPTION {uploadFiles.length === 0 ? '' : '(OPTIONAL)'}
           </label>
-          {uploadFiles.length > 0 && (
-            <div className="flex flex-wrap gap-2 mt-2">
-              {uploadFiles.map((f, i) => (
-                <div key={i} className="relative">
-                  <img
-                    src={URL.createObjectURL(f)}
-                    alt=""
-                    className="w-16 h-16 object-cover rounded-lg"
-                  />
-                  <button
-                    onClick={() => removeFile(i)}
-                    className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-accent-coral text-white flex items-center justify-center"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              ))}
-            </div>
+          <textarea
+            value={caption}
+            onChange={(e) => setCaption(e.target.value)}
+            placeholder={uploadFiles.length === 0 ? 'Describe what happened as proof...' : 'Add context...'}
+            className="w-full h-24 bg-bg-card border border-border-subtle rounded-xl p-3 text-text-primary placeholder:text-text-muted resize-none"
+          />
+          {uploadFiles.length === 0 && caption.trim().length > 0 && (
+            <p className="text-xs text-text-muted mt-1">Text-only proof will be submitted</p>
           )}
         </div>
 
-        <div>
-          <label className="block text-xs font-bold text-text-muted mb-2">Caption (optional)</label>
-          <input
-            type="text"
-            value={caption}
-            onChange={(e) => setCaption(e.target.value)}
-            placeholder="Add a caption..."
-            className="w-full h-12 rounded-xl bg-bg-elevated border border-border-subtle px-4 text-text-primary"
-          />
-        </div>
+        {error && <p className="text-destructive text-sm">{error}</p>}
 
         <PrimaryButton
           onClick={handleSubmit}

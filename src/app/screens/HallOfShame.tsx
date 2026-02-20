@@ -6,6 +6,8 @@ import { getReactionCounts, hasUserReacted } from '@/stores/shameStore'
 import { getProfilesWithRepByIds } from '@/lib/api/profiles'
 import { useRealtimeSubscription } from '@/lib/hooks/useRealtime'
 import { REACTION_EMOJIS } from '@/lib/utils/constants'
+import { MediaGallery } from '@/app/components/MediaGallery'
+import type { MediaItem } from '@/app/components/MediaGallery'
 import type { ShamePostEnriched } from '@/stores/shameStore'
 import type { ProfileWithRep } from '@/lib/api/profiles'
 
@@ -226,23 +228,8 @@ function ShameCard({
         </span>
       </div>
 
-      {/* Photos */}
-      <div className="flex">
-        <div className="flex-1 aspect-[3/4] bg-bg-elevated overflow-hidden">
-          {post.front_url ? (
-            <img src={post.front_url} alt="Front" className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-4xl">📷</div>
-          )}
-        </div>
-        <div className="flex-1 aspect-[3/4] bg-bg-elevated overflow-hidden">
-          {post.back_url ? (
-            <img src={post.back_url} alt="Back" className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-4xl">📷</div>
-          )}
-        </div>
-      </div>
+      {/* Media */}
+      <ShameMedia post={post} />
 
       <div className="p-4">
         <div className="mb-2">
@@ -253,9 +240,11 @@ function ShameCard({
           </p>
         </div>
 
-        <p className="text-accent-coral font-bold text-sm mb-3">
-          {post.caption ?? 'Punishment completed'}
-        </p>
+        {post.caption && (
+          <p className="text-accent-coral font-bold text-sm mb-3">
+            {post.caption}
+          </p>
+        )}
 
         {verifiedCount > 0 && (
           <p className="text-xs text-accent-green font-bold mb-3 uppercase tracking-wide">
@@ -293,6 +282,32 @@ function ShameCard({
           </button>
         </div>
       </div>
+    </div>
+  )
+}
+
+function ShameMedia({ post }: { post: ShamePostEnriched }) {
+  const items: MediaItem[] = []
+  if (post.front_url) items.push({ url: post.front_url, type: 'image', label: 'Front' })
+  if (post.back_url) items.push({ url: post.back_url, type: 'image', label: 'Back' })
+  if (post.screenshot_urls?.length) {
+    post.screenshot_urls.forEach((url, i) => items.push({ url, type: 'image', label: `Screenshot ${i + 1}` }))
+  }
+  if (post.video_url) {
+    items.push({ url: post.video_url, type: 'video', label: 'Video' })
+  }
+  if (post.document_url) {
+    items.push({ url: post.document_url, type: 'document', label: 'Document' })
+  }
+
+  if (items.length === 0) {
+    // Text-only proof — no media to show
+    return null
+  }
+
+  return (
+    <div className="p-2">
+      <MediaGallery items={items} />
     </div>
   )
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router'
-import { ArrowLeft, Share2 } from 'lucide-react'
+import { ArrowLeft, Share2, Pencil, Check, X } from 'lucide-react'
 import { useBetStore } from '@/stores'
 import { useProofStore } from '@/stores'
 import { useAuthStore } from '@/stores'
@@ -13,6 +13,8 @@ import { BET_CATEGORIES } from '@/lib/utils/constants'
 import { OddsBar } from '../components/OddsBar'
 import { PrimaryButton } from '../components/PrimaryButton'
 import { ShareSheet } from '../components/ShareSheet'
+import { MediaGallery } from '../components/MediaGallery'
+import type { MediaItem } from '../components/MediaGallery'
 import { getBetShareUrl, getBetShareText, shareWithNative } from '@/lib/share'
 
 const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop'
@@ -44,9 +46,12 @@ export function BetDetail({ onBack }: BetDetailProps) {
   const votes = useProofStore((s) => s.votes)
   const fetchProofs = useProofStore((s) => s.fetchProofs)
   const voteOnProof = useProofStore((s) => s.voteOnProof)
+  const updateCaption = useProofStore((s) => s.updateCaption)
   const getVoteCounts = useProofStore((s) => s.getVoteCounts)
 
   const [profileMap, setProfileMap] = useState<Map<string, { display_name: string; avatar_url: string | null }>>(new Map())
+  const [editingProofId, setEditingProofId] = useState<string | null>(null)
+  const [editCaption, setEditCaption] = useState('')
 
   // Always call useCountdown (Rules of Hooks). Use current time as fallback when no bet so countdown is expired.
   const countdown = useCountdown(activeBet?.deadline ?? new Date().toISOString())
@@ -285,26 +290,64 @@ export function BetDetail({ onBack }: BetDetailProps) {
             const myVote = votes.find((v) => v.proof_id === proof.id && v.user_id === user?.id)
             const canVote = !myVote && user?.id !== proof.submitted_by
 
+            // Build media items for the gallery
+            const mediaItems: MediaItem[] = []
+            if (proof.front_camera_url) mediaItems.push({ url: proof.front_camera_url, type: 'image', label: 'Front' })
+            if (proof.back_camera_url) mediaItems.push({ url: proof.back_camera_url, type: 'image', label: 'Back' })
+            if (proof.screenshot_urls?.length) {
+              proof.screenshot_urls.forEach((url, i) => mediaItems.push({ url, type: 'image', label: `Screenshot ${i + 1}` }))
+            }
+            if (proof.video_url) mediaItems.push({ url: proof.video_url, type: 'video', label: 'Video' })
+            if (proof.document_url) mediaItems.push({ url: proof.document_url, type: 'document', label: 'Document' })
+
             return (
               <div key={proof.id} className="bg-bg-card rounded-2xl border border-border-subtle p-4 mb-4">
-                <div className="grid grid-cols-2 gap-2 mb-4">
-                  {proof.front_camera_url && (
-                    <img src={proof.front_camera_url} alt="Front" className="rounded-lg aspect-[3/4] object-cover" />
-                  )}
-                  {proof.back_camera_url && (
-                    <img src={proof.back_camera_url} alt="Back" className="rounded-lg aspect-[3/4] object-cover" />
-                  )}
-                  {proof.video_url && (
-                    <video src={proof.video_url} controls className="rounded-lg w-full" />
-                  )}
-                  {proof.document_url && (
-                    <a href={proof.document_url} target="_blank" rel="noreferrer" className="text-accent-green text-sm">
-                      View document
-                    </a>
-                  )}
-                </div>
-                {proof.caption && <p className="text-sm text-text-muted mb-4">{proof.caption}</p>}
-                <div className="flex items-center gap-2 mb-4">
+                <MediaGallery items={mediaItems} caption={editingProofId === proof.id ? undefined : proof.caption} />
+
+                {/* Text-only proof (no media) */}
+                {mediaItems.length === 0 && proof.caption && editingProofId !== proof.id && (
+                  <div className="bg-bg-elevated rounded-xl p-4 border border-border-subtle">
+                    <p className="text-sm text-text-primary">{proof.caption}</p>
+                  </div>
+                )}
+
+                {/* Inline caption edit */}
+                {editingProofId === proof.id ? (
+                  <div className="flex items-center gap-2 mt-2">
+                    <input
+                      type="text"
+                      value={editCaption}
+                      onChange={(e) => setEditCaption(e.target.value)}
+                      className="flex-1 h-9 rounded-lg bg-bg-elevated border border-border-subtle px-3 text-sm text-text-primary"
+                      autoFocus
+                    />
+                    <button
+                      onClick={async () => {
+                        await updateCaption(proof.id, editCaption)
+                        setEditingProofId(null)
+                      }}
+                      className="w-8 h-8 rounded-lg bg-accent-green flex items-center justify-center"
+                    >
+                      <Check className="w-4 h-4 text-white" />
+                    </button>
+                    <button
+                      onClick={() => setEditingProofId(null)}
+                      className="w-8 h-8 rounded-lg bg-bg-elevated flex items-center justify-center"
+                    >
+                      <X className="w-4 h-4 text-text-muted" />
+                    </button>
+                  </div>
+                ) : user?.id === proof.submitted_by ? (
+                  <button
+                    onClick={() => { setEditingProofId(proof.id); setEditCaption(proof.caption ?? '') }}
+                    className="flex items-center gap-1 mt-2 text-xs text-text-muted hover:text-accent-green transition-colors"
+                  >
+                    <Pencil className="w-3 h-3" />
+                    {proof.caption ? 'Edit caption' : 'Add caption'}
+                  </button>
+                ) : null}
+
+                <div className="flex items-center gap-2 mt-4 mb-4">
                   <span className="text-xs text-text-muted">Confirm: {counts.confirm}</span>
                   <span className="text-xs text-text-muted">Dispute: {counts.dispute}</span>
                 </div>
@@ -314,13 +357,13 @@ export function BetDetail({ onBack }: BetDetailProps) {
                       onClick={() => voteOnProof(proof.id, 'confirm')}
                       className="flex-1 py-2 rounded-xl bg-accent-green text-white font-bold text-sm"
                     >
-                      Confirm ✓
+                      Confirm
                     </button>
                     <button
                       onClick={() => voteOnProof(proof.id, 'dispute')}
                       className="flex-1 py-2 rounded-xl bg-accent-coral text-white font-bold text-sm"
                     >
-                      Dispute ✗
+                      Dispute
                     </button>
                   </div>
                 )}
@@ -330,6 +373,16 @@ export function BetDetail({ onBack }: BetDetailProps) {
               </div>
             )
           })}
+
+          {/* Resubmit proof — claimant only */}
+          {isClaimant && (
+            <button
+              onClick={() => navigate(`/bet/${id}/proof`)}
+              className="w-full text-center text-sm font-bold text-text-muted hover:text-accent-green transition-colors mt-2"
+            >
+              + Submit additional proof
+            </button>
+          )}
         </div>
       )}
 

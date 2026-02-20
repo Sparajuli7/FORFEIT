@@ -43,6 +43,8 @@ interface ProofActions {
   ) => Promise<Proof | null>
   fetchProofs: (betId: string) => Promise<void>
   voteOnProof: (proofId: string, vote: VoteChoice) => Promise<void>
+  /** Update caption on an existing proof */
+  updateCaption: (proofId: string, caption: string) => Promise<void>
   /** Derive vote counts from currently-loaded votes (no extra DB call) */
   getVoteCounts: (proofId: string) => VoteCounts
   clearError: () => void
@@ -96,6 +98,67 @@ async function uploadFile(
     data: { publicUrl },
   } = supabase.storage.from(bucket).getPublicUrl(fullPath)
   return publicUrl
+}
+
+/**
+ * After a vote, check if a simple majority of bet participants has voted
+ * the same way. If so, auto-resolve the outcome.
+ * - confirm majority → claimant_succeeded
+ * - dispute majority → claimant_failed
+ */
+async function autoResolveIfMajority(proofId: string): Promise<void> {
+  // Get the proof to find the bet
+  const { data: proof } = await supabase
+    .from('proofs')
+    .select('bet_id')
+    .eq('id', proofId)
+    .single()
+  if (!proof) return
+
+  // Check if outcome already exists
+  const { data: existing } = await supabase
+    .from('outcomes')
+    .select('id')
+    .eq('bet_id', proof.bet_id)
+    .maybeSingle()
+  if (existing) return
+
+  // Count bet participants (riders + doubters)
+  const { data: sides } = await supabase
+    .from('bet_sides')
+    .select('user_id')
+    .eq('bet_id', proof.bet_id)
+  const participantCount = sides?.length ?? 0
+  if (participantCount < 2) return // Need at least 2 participants
+
+  // Get all votes for this proof
+  const { data: allVotes } = await supabase
+    .from('proof_votes')
+    .select('vote')
+    .eq('proof_id', proofId)
+
+  const confirms = (allVotes ?? []).filter((v) => v.vote === 'confirm').length
+  const disputes = (allVotes ?? []).filter((v) => v.vote === 'dispute').length
+  const majority = Math.floor(participantCount / 2) + 1
+
+  let result: 'claimant_succeeded' | 'claimant_failed' | null = null
+  if (confirms >= majority) result = 'claimant_succeeded'
+  else if (disputes >= majority) result = 'claimant_failed'
+
+  if (!result) return
+
+  // Create outcome
+  await supabase
+    .from('outcomes')
+    .insert({ bet_id: proof.bet_id, result } as never)
+
+  // Update bet status
+  await supabase
+    .from('bets')
+    .update({ status: 'completed' } as never)
+    .eq('id', proof.bet_id)
+
+  console.info(`[proofStore] Auto-resolved bet ${proof.bet_id} → ${result}`)
 }
 
 // ---------------------------------------------------------------------------
@@ -266,6 +329,9 @@ const useProofStore = create<ProofStore>()((set, get) => ({
         )
         return { votes: [...others, newVote] }
       })
+
+      // Auto-resolve: check if majority reached among bet participants
+      await autoResolveIfMajority(proofId)
     }
   },
 
@@ -281,6 +347,24 @@ const useProofStore = create<ProofStore>()((set, get) => ({
       total,
       confirmPct: total > 0 ? Math.round((confirm / total) * 100) : 0,
     }
+  },
+
+  updateCaption: async (proofId, caption) => {
+    const { error } = await supabase
+      .from('proofs')
+      .update({ caption } as never)
+      .eq('id', proofId)
+
+    if (error) {
+      set({ error: error.message })
+      return
+    }
+
+    set((state) => ({
+      proofs: state.proofs.map((p) =>
+        p.id === proofId ? { ...p, caption } : p,
+      ),
+    }))
   },
 
   clearError: () => set({ error: null }),
