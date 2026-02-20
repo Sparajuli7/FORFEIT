@@ -78,6 +78,8 @@ interface BetState {
 interface BetActions {
   /** Fetch bets for a group, optionally filtered */
   fetchBets: (groupId: string) => Promise<void>
+  /** Fetch bets for multiple groups (combined feed), optionally filtered */
+  fetchBetsForGroupIds: (groupIds: string[]) => Promise<void>
   fetchBetDetail: (betId: string) => Promise<void>
   /** Persist the bet wizard state to Supabase. Requires wizard to be complete. */
   createBet: () => Promise<Bet | null>
@@ -165,6 +167,44 @@ const useBetStore = create<BetStore>()(
         .from('bets')
         .select(BET_SELECT)
         .eq('group_id', groupId)
+        .order('created_at', { ascending: false })
+
+      if (filters.category) query = query.eq('category', filters.category)
+      if (filters.type) query = query.eq('bet_type', filters.type)
+      if (filters.status) query = query.eq('status', filters.status)
+
+      const { data, error } = await query
+
+      set((draft) => {
+        if (error) {
+          draft.error = error.message
+        } else {
+          draft.bets = (data ?? []) as BetWithSides[]
+        }
+        draft.isLoading = false
+      })
+    },
+
+    fetchBetsForGroupIds: async (groupIds) => {
+      if (groupIds.length === 0) {
+        set((draft) => {
+          draft.bets = []
+          draft.isLoading = false
+        })
+        return
+      }
+
+      set((draft) => {
+        draft.isLoading = true
+        draft.error = null
+      })
+
+      const { filters } = get()
+
+      let query = supabase
+        .from('bets')
+        .select(BET_SELECT)
+        .in('group_id', groupIds)
         .order('created_at', { ascending: false })
 
       if (filters.category) query = query.eq('category', filters.category)

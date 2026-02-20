@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router'
 import { Bell } from 'lucide-react'
 import { BetCard } from '../components/BetCard'
@@ -86,6 +86,7 @@ export function TheBoard() {
 
   const bets = useBetStore((s) => s.bets)
   const fetchBets = useBetStore((s) => s.fetchBets)
+  const fetchBetsForGroupIds = useBetStore((s) => s.fetchBetsForGroupIds)
   const setFilters = useBetStore((s) => s.setFilters)
   const filters = useBetStore((s) => s.filters)
   const isLoading = useBetStore((s) => s.isLoading)
@@ -96,24 +97,29 @@ export function TheBoard() {
   const [activeFilterId, setActiveFilterId] = useState('all')
   const [notificationOpen, setNotificationOpen] = useState(false)
   const [claimantMap, setClaimantMap] = useState<Map<string, { display_name: string; avatar_url: string | null }>>(new Map())
+  const initialGroupSetRef = useRef(false)
 
-  const effectiveGroup = activeGroup ?? groups[0] ?? null
+  /** null = "All Groups" feed; otherwise the selected single group */
+  const effectiveGroup = activeGroup
 
   useEffect(() => {
     fetchGroups()
   }, [fetchGroups])
 
   useEffect(() => {
-    if (groups.length > 0 && !activeGroup) {
+    if (groups.length > 0 && activeGroup === null && !initialGroupSetRef.current) {
       setActiveGroup(groups[0])
+      initialGroupSetRef.current = true
     }
   }, [groups, activeGroup, setActiveGroup])
 
   useEffect(() => {
     if (effectiveGroup) {
       fetchBets(effectiveGroup.id)
+    } else if (groups.length > 0 && initialGroupSetRef.current) {
+      fetchBetsForGroupIds(groups.map((g) => g.id))
     }
-  }, [effectiveGroup?.id, fetchBets, filters])
+  }, [effectiveGroup?.id, groups, fetchBets, fetchBetsForGroupIds, filters])
 
 
   useEffect(() => {
@@ -126,12 +132,14 @@ export function TheBoard() {
     'bets',
     () => {
       if (effectiveGroup) fetchBets(effectiveGroup.id)
+      else if (groups.length > 0) fetchBetsForGroupIds(groups.map((g) => g.id))
     },
     { filter: effectiveGroup ? `group_id=eq.${effectiveGroup.id}` : undefined },
   )
 
   useRealtime('bet_sides', () => {
     if (effectiveGroup) fetchBets(effectiveGroup.id)
+    else if (groups.length > 0) fetchBetsForGroupIds(groups.map((g) => g.id))
   })
 
   const filteredBets = useMemo(() => {
@@ -235,6 +243,34 @@ export function TheBoard() {
             Join with code
           </button>
         </div>
+
+        {/* Group switcher — scrollable chips, All Groups + one per group */}
+        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-3 mb-1">
+          <button
+            onClick={() => setActiveGroup(null)}
+            className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap shrink-0 ${
+              effectiveGroup === null
+                ? 'bg-accent-green/20 text-accent-green border border-accent-green/40'
+                : 'bg-bg-elevated text-text-muted'
+            }`}
+          >
+            All Groups
+          </button>
+          {groups.map((g) => (
+            <button
+              key={g.id}
+              onClick={() => setActiveGroup(g)}
+              className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap shrink-0 ${
+                effectiveGroup?.id === g.id
+                  ? 'bg-accent-green/20 text-accent-green border border-accent-green/40'
+                  : 'bg-bg-elevated text-text-muted'
+              }`}
+            >
+              {g.avatar_emoji} {g.name}
+            </button>
+          ))}
+        </div>
+
         <div className="flex items-start justify-between mb-4">
           <div>
             <h1 className="text-[11px] font-bold uppercase tracking-[0.1em] text-text-muted mb-1">
@@ -310,7 +346,7 @@ export function TheBoard() {
                 : 'bg-bg-elevated text-text-muted'
             }`}
           >
-            Group Feed
+            {effectiveGroup ? `${effectiveGroup.avatar_emoji} ${effectiveGroup.name}` : 'Group Feed'}
           </button>
         </div>
 
