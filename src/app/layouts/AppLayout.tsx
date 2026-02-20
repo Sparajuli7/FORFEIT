@@ -1,5 +1,5 @@
 import { Outlet, useNavigate, useLocation } from 'react-router'
-import { LayoutGrid, Swords, Trophy, Skull, User } from 'lucide-react'
+import { LayoutGrid, Trophy, Skull, User } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useNotifications } from '@/lib/hooks/useNotifications'
 
@@ -13,8 +13,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { id: 'home', label: 'Home', path: '/home', icon: LayoutGrid },
-  { id: 'h2h', label: 'H2H', path: '/h2h', icon: Swords },
-  { id: 'compete', label: 'Compete', path: '/compete', icon: Trophy, boost: true },
+  { id: 'compete', label: 'Competition', path: '/compete', icon: Trophy, boost: true },
   { id: 'shame', label: 'Shame', path: '/shame', icon: Skull },
   { id: 'profile', label: 'Profile', path: '/profile', icon: User },
 ]

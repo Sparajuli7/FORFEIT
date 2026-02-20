@@ -8,6 +8,8 @@ import type { BetOutcomeDetails } from '@/lib/api/outcomes'
 import type { OutcomeResult } from '@/lib/database.types'
 import { PrimaryButton } from '../components/PrimaryButton'
 import { PunishmentReceipt } from '../components/PunishmentReceipt'
+import { ShareSheet } from '../components/ShareSheet'
+import { getBetShareUrl, getOutcomeShareText, shareWithNative } from '@/lib/share'
 
 interface OutcomeRevealProps {
   onShare?: () => void
@@ -23,6 +25,7 @@ export function OutcomeReveal({ onShare, onBack }: OutcomeRevealProps) {
   const [profiles, setProfiles] = useState<ProfileMap>(new Map())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [shareSheetOpen, setShareSheetOpen] = useState(false)
 
   useEffect(() => {
     if (!id) return
@@ -50,22 +53,28 @@ export function OutcomeReveal({ onShare, onBack }: OutcomeRevealProps) {
   }, [id])
 
   const handleShare = async () => {
-    if (!data) return
-    const result = data.outcome.result
+    if (!data || !id) return
+    const result = data.outcome.result as 'claimant_succeeded' | 'claimant_failed' | 'voided'
     const claimantName = profiles.get(data.bet.claimant_id)?.display_name ?? 'Claimant'
-    const riders = data.betSides.filter((s) => s.side === 'rider').map((s) => profiles.get(s.user_id)?.display_name ?? 'Unknown')
-    const doubters = data.betSides.filter((s) => s.side === 'doubter').map((s) => profiles.get(s.user_id)?.display_name ?? 'Unknown')
-    let text = ''
-    if (result === 'claimant_succeeded') {
-      text = `🏆 ${claimantName} WON: "${data.bet.title}" — ${doubters.length ? doubters.join(', ') + ' owe up!' : 'Claimant proved it!'}`
-    } else if (result === 'claimant_failed') {
-      text = `😬 FORFEIT: ${claimantName} lost "${data.bet.title}" — owes ${riders.length ? riders.join(', ') : 'the group'}`
+    const riderNames = data.betSides.filter((s) => s.side === 'rider').map((s) => profiles.get(s.user_id)?.display_name ?? 'Unknown')
+    const doubterNames = data.betSides.filter((s) => s.side === 'doubter').map((s) => profiles.get(s.user_id)?.display_name ?? 'Unknown')
+    const text = getOutcomeShareText({
+      title: data.bet.title,
+      claimantName,
+      result,
+      riderNames,
+      doubterNames,
+    })
+    const url = getBetShareUrl(id)
+    const usedNative = await shareWithNative({ title: 'Share result', text, url })
+    if (usedNative) {
+      onShare?.() ?? navigate('/home')
     } else {
-      text = `🤝 NO CONTEST: "${data.bet.title}" was voided.`
+      setShareSheetOpen(true)
     }
-    try {
-      await navigator.clipboard.writeText(text)
-    } catch (_) {}
+  }
+
+  const handleSharedDone = () => {
     onShare?.() ?? navigate('/home')
   }
 
@@ -107,9 +116,31 @@ export function OutcomeReveal({ onShare, onBack }: OutcomeRevealProps) {
     year: 'numeric',
   })
 
+  const outcomeShareText = getOutcomeShareText({
+    title: bet.title,
+    claimantName,
+    result,
+    riderNames: riders.map((r) => profiles.get(r.user_id)?.display_name ?? 'Unknown'),
+    doubterNames: doubters.map((d) => profiles.get(d.user_id)?.display_name ?? 'Unknown'),
+  })
+  const outcomeShareUrl = id ? getBetShareUrl(id) : ''
+
+  const shareSheet = (
+    <ShareSheet
+      open={shareSheetOpen}
+      onOpenChange={setShareSheetOpen}
+      title="Share result"
+      text={outcomeShareText}
+      url={outcomeShareUrl}
+      onShared={handleSharedDone}
+    />
+  )
+
   // WIN
   if (result === 'claimant_succeeded') {
     return (
+      <>
+        {shareSheet}
       <div
         className="h-full flex flex-col items-center justify-between px-6 py-12 relative overflow-hidden"
         style={{
@@ -207,12 +238,15 @@ export function OutcomeReveal({ onShare, onBack }: OutcomeRevealProps) {
           </PrimaryButton>
         </div>
       </div>
+      </>
     )
   }
 
   // LOSE
   if (result === 'claimant_failed') {
     return (
+      <>
+        {shareSheet}
       <div
         className="h-full flex flex-col items-center justify-between px-6 py-12 relative overflow-hidden"
         style={{
@@ -289,11 +323,14 @@ export function OutcomeReveal({ onShare, onBack }: OutcomeRevealProps) {
           </button>
         </div>
       </div>
+      </>
     )
   }
 
   // VOID
   return (
+    <>
+      {shareSheet}
     <div
       className="h-full flex flex-col items-center justify-between px-6 py-12"
       style={{
@@ -329,5 +366,6 @@ export function OutcomeReveal({ onShare, onBack }: OutcomeRevealProps) {
         </PrimaryButton>
       </div>
     </div>
+    </>
   )
 }

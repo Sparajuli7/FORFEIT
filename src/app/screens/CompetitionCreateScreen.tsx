@@ -4,7 +4,7 @@ import { ChevronLeft } from 'lucide-react'
 import { format } from 'date-fns'
 import { motion, AnimatePresence } from 'motion/react'
 import { createCompetition } from '@/lib/api/competitions'
-import { getGroupMembersWithProfiles } from '@/lib/api/groups'
+import { getGroupMembersWithProfiles, getAllGroupMembersForUser } from '@/lib/api/groups'
 import { getApprovedPunishments } from '@/lib/api/punishments'
 import { STAKE_PRESETS, BET_CATEGORIES } from '@/lib/utils/constants'
 import { formatMoney } from '@/lib/utils/formatters'
@@ -40,9 +40,13 @@ export function CompetitionCreateScreen() {
   const [category, setCategory] = useState<BetCategory>('fitness')
   const [metricTemplate, setMetricTemplate] = useState(0)
   const [metricFill, setMetricFill] = useState('')
+  const [participantSource, setParticipantSource] = useState<'groups' | 'friends'>('groups')
+  const [groupSelectMode, setGroupSelectMode] = useState<'whole' | 'individuals'>('individuals')
   const [selectedGroup, setSelectedGroup] = useState<{ id: string; name: string } | null>(null)
   const [participants, setParticipants] = useState<GroupMemberWithProfile[]>([])
   const [groupMembers, setGroupMembers] = useState<GroupMemberWithProfile[]>([])
+  const [friendsList, setFriendsList] = useState<GroupMemberWithProfile[]>([])
+  const [competitionGroupId, setCompetitionGroupId] = useState<string | null>(null)
 
   const [startDate, setStartDate] = useState<Date>(() => new Date())
   const [endDate, setEndDate] = useState<Date>(() => {
@@ -81,6 +85,12 @@ export function CompetitionCreateScreen() {
   }, [selectedGroup?.id])
 
   useEffect(() => {
+    if (participantSource === 'friends') {
+      getAllGroupMembersForUser().then(setFriendsList)
+    }
+  }, [participantSource])
+
+  useEffect(() => {
     getApprovedPunishments().then((p) =>
       setPunishments(p.map((x) => ({ id: x.id, text: x.text }))),
     )
@@ -94,14 +104,29 @@ export function CompetitionCreateScreen() {
     )
   }
 
+  const addWholeGroup = () => {
+    if (!selectedGroup || groupMembers.length === 0) return
+    setParticipants((prev) => {
+      const existingIds = new Set(prev.map((p) => p.user_id))
+      const toAdd = groupMembers.filter((m) => !existingIds.has(m.user_id))
+      return [...prev, ...toAdd]
+    })
+  }
+
+  const resolvedGroupId = participantSource === 'friends' ? competitionGroupId : selectedGroup?.id
+
   const handleBack = () => {
     if (step === 1) navigate(-1)
     else setStep((s) => s - 1)
   }
 
   const handleSubmit = async () => {
-    if (!title.trim() || !selectedGroup) {
-      setError('Please add a title and select a group.')
+    if (!title.trim()) {
+      setError('Please add a title.')
+      return
+    }
+    if (!resolvedGroupId) {
+      setError(participantSource === 'friends' ? 'Please select a group to post this competition to.' : 'Please select a group and add participants.')
       return
     }
     const end = new Date(endDate)
@@ -124,7 +149,7 @@ export function CompetitionCreateScreen() {
     try {
       const comp = await createCompetition({
         title: title.trim(),
-        groupId: selectedGroup.id,
+        groupId: resolvedGroupId,
         category,
         metric,
         participantIds: participants.map((p) => p.user_id),
@@ -268,58 +293,186 @@ export function CompetitionCreateScreen() {
               </h2>
 
               <div>
-                <label className="text-xs font-bold text-text-muted block mb-2">Group</label>
-                <Select
-                  value={selectedGroup?.id ?? ''}
-                  onValueChange={(id) => {
-                    const g = groups.find((x) => x.id === id)
-                    setSelectedGroup(g ? { id: g.id, name: g.name } : null)
-                  }}
-                >
-                  <SelectTrigger className="h-12">
-                    <SelectValue placeholder="Select group" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {groups.map((g) => (
-                      <SelectItem key={g.id} value={g.id}>
-                        {g.avatar_emoji} {g.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <p className="text-xs font-bold text-text-muted uppercase mb-2">
-                  Select participants ({participants.length} selected)
-                </p>
-                <div className="space-y-2 max-h-48 overflow-y-auto">
-                  {groupMembers.map((m) => {
-                    const selected = participants.some((p) => p.user_id === m.user_id)
-                    return (
-                      <button
-                        key={m.user_id}
-                        onClick={() => toggleParticipant(m)}
-                        className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-colors ${
-                          selected ? 'border-accent-green bg-accent-green/10' : 'border-border-subtle bg-bg-card'
-                        }`}
-                      >
-                        <div className="w-10 h-10 rounded-full overflow-hidden bg-bg-elevated">
-                          <img
-                            src={m.profile.avatar_url ?? ''}
-                            alt=""
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        <span className="font-bold text-text-primary">{m.profile.display_name}</span>
-                        {selected && <span className="text-accent-green ml-auto">✓</span>}
-                      </button>
-                    )
-                  })}
+                <p className="text-xs font-bold text-text-muted uppercase mb-2">Add from</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setParticipantSource('groups')}
+                    className={`flex-1 py-3 rounded-xl font-bold text-sm ${
+                      participantSource === 'groups' ? 'bg-accent-green text-white' : 'bg-bg-elevated text-text-muted'
+                    }`}
+                  >
+                    Within groups
+                  </button>
+                  <button
+                    onClick={() => setParticipantSource('friends')}
+                    className={`flex-1 py-3 rounded-xl font-bold text-sm ${
+                      participantSource === 'friends' ? 'bg-accent-green text-white' : 'bg-bg-elevated text-text-muted'
+                    }`}
+                  >
+                    List of friends
+                  </button>
                 </div>
               </div>
 
-              <PrimaryButton onClick={() => setStep(4)}>Next</PrimaryButton>
+              {participantSource === 'groups' && (
+                <>
+                  <div>
+                    <p className="text-xs font-bold text-text-muted uppercase mb-2">Select by</p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setGroupSelectMode('whole')}
+                        className={`flex-1 py-3 rounded-xl font-bold text-sm ${
+                          groupSelectMode === 'whole' ? 'bg-accent-green text-white' : 'bg-bg-elevated text-text-muted'
+                        }`}
+                      >
+                        Whole group
+                      </button>
+                      <button
+                        onClick={() => setGroupSelectMode('individuals')}
+                        className={`flex-1 py-3 rounded-xl font-bold text-sm ${
+                          groupSelectMode === 'individuals' ? 'bg-accent-green text-white' : 'bg-bg-elevated text-text-muted'
+                        }`}
+                      >
+                        Individual members
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-text-muted block mb-2">Group</label>
+                    <Select
+                      value={selectedGroup?.id ?? ''}
+                      onValueChange={(id) => {
+                        const g = groups.find((x) => x.id === id)
+                        setSelectedGroup(g ? { id: g.id, name: g.name } : null)
+                      }}
+                    >
+                      <SelectTrigger className="h-12">
+                        <SelectValue placeholder="Select group" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {groups.map((g) => (
+                          <SelectItem key={g.id} value={g.id}>
+                            {g.avatar_emoji} {g.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {groupSelectMode === 'whole' ? (
+                    <div>
+                      <p className="text-xs font-bold text-text-muted uppercase mb-2">
+                        Add entire group at once ({participants.length} participants selected total)
+                      </p>
+                      <button
+                        onClick={addWholeGroup}
+                        disabled={!selectedGroup || groupMembers.length === 0}
+                        className="w-full py-3 rounded-xl font-bold text-sm bg-accent-green/20 text-accent-green border border-accent-green/40 disabled:opacity-50"
+                      >
+                        Add whole group {selectedGroup ? `(${groupMembers.length} members)` : ''}
+                      </button>
+                      {participants.length > 0 && (
+                        <p className="text-xs text-text-muted mt-2">
+                          You can change the group above and add another whole group.
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <div>
+                      <p className="text-xs font-bold text-text-muted uppercase mb-2">
+                        Select participants ({participants.length} selected)
+                      </p>
+                      <div className="space-y-2 max-h-48 overflow-y-auto">
+                        {groupMembers.map((m) => {
+                          const selected = participants.some((p) => p.user_id === m.user_id)
+                          return (
+                            <button
+                              key={m.user_id}
+                              onClick={() => toggleParticipant(m)}
+                              className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-colors ${
+                                selected ? 'border-accent-green bg-accent-green/10' : 'border-border-subtle bg-bg-card'
+                              }`}
+                            >
+                              <div className="w-10 h-10 rounded-full overflow-hidden bg-bg-elevated">
+                                <img
+                                  src={m.profile.avatar_url ?? ''}
+                                  alt=""
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                              <span className="font-bold text-text-primary">{m.profile.display_name}</span>
+                              {selected && <span className="text-accent-green ml-auto">✓</span>}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {participantSource === 'friends' && (
+                <>
+                  <div>
+                    <label className="text-xs font-bold text-text-muted block mb-2">Post competition to group</label>
+                    <Select
+                      value={competitionGroupId ?? ''}
+                      onValueChange={(id) => setCompetitionGroupId(id || null)}
+                    >
+                      <SelectTrigger className="h-12">
+                        <SelectValue placeholder="Select group" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {groups.map((g) => (
+                          <SelectItem key={g.id} value={g.id}>
+                            {g.avatar_emoji} {g.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-text-muted uppercase mb-2">
+                      Select friends ({participants.length} selected)
+                    </p>
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {friendsList.map((m) => {
+                        const selected = participants.some((p) => p.user_id === m.user_id)
+                        return (
+                          <button
+                            key={m.user_id}
+                            onClick={() => toggleParticipant(m)}
+                            className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-colors ${
+                              selected ? 'border-accent-green bg-accent-green/10' : 'border-border-subtle bg-bg-card'
+                            }`}
+                          >
+                            <div className="w-10 h-10 rounded-full overflow-hidden bg-bg-elevated">
+                              <img
+                                src={m.profile.avatar_url ?? ''}
+                                alt=""
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                            <span className="font-bold text-text-primary">{m.profile.display_name}</span>
+                            {selected && <span className="text-accent-green ml-auto">✓</span>}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              <PrimaryButton
+                onClick={() => setStep(4)}
+                disabled={
+                  participants.length === 0 ||
+                  (participantSource === 'friends' && !competitionGroupId)
+                }
+              >
+                Next
+              </PrimaryButton>
             </motion.div>
           )}
 
@@ -465,7 +618,7 @@ export function CompetitionCreateScreen() {
 
               {error && <p className="text-destructive text-sm">{error}</p>}
 
-              <PrimaryButton onClick={handleSubmit} disabled={isSubmitting || !selectedGroup}>
+              <PrimaryButton onClick={handleSubmit} disabled={isSubmitting || !resolvedGroupId}>
                 {isSubmitting ? 'Creating...' : 'Create Competition'}
               </PrimaryButton>
             </motion.div>

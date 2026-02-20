@@ -14,8 +14,6 @@ import { ShameProofSubmission } from './screens/ShameProofSubmission'
 import { OutcomeReveal } from './screens/OutcomeReveal'
 import { OutcomeWin } from './screens/OutcomeWin'
 import { OutcomeForfeit } from './screens/OutcomeForfeit'
-import { HeadToHead } from './screens/HeadToHead'
-import { H2HCreateScreen } from './screens/H2HCreateScreen'
 import { Competitions } from './screens/Competitions'
 import { HallOfShame } from './screens/HallOfShame'
 import { ProfileScreen } from './screens/ProfileScreen'
@@ -168,11 +166,7 @@ export function AppRouter() {
             <Route path="bet/:id/shame-proof" element={<ShameProofSubmission />} />
             <Route path="bet/:id/outcome" element={<OutcomeRevealRoute />} />
 
-            {/* Head to Head */}
-            <Route path="h2h" element={<HeadToHead />} />
-            <Route path="h2h/create" element={<H2HCreateScreen />} />
-
-            {/* Competitions */}
+            {/* Competition (merged with former H2H) */}
             <Route path="compete" element={<Competitions />} />
             <Route path="compete/:id" element={<CompetitionDetailScreen />} />
             <Route path="compete/create" element={<CompetitionCreateScreen />} />

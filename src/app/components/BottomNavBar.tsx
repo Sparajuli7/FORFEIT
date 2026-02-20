@@ -6,8 +6,7 @@ interface BottomNavBarProps {
 export function BottomNavBar({ activeScreen, onNavigate }: BottomNavBarProps) {
   const navItems = [
     { id: 'home', label: 'Home', icon: '📊' },
-    { id: 'h2h', label: 'H2H', icon: '⚔️' },
-    { id: 'compete', label: 'Compete', icon: '🏆', boost: true },
+    { id: 'compete', label: 'Competition', icon: '🏆', boost: true },
     { id: 'shame', label: 'Shame', icon: '💀' },
     { id: 'profile', label: 'Profile', icon: '👤' }
   ];

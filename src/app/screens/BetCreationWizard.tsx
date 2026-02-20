@@ -237,7 +237,7 @@ export function BetCreationWizard() {
                 <button
                   onClick={() => {
                     setClaimMode('challenge')
-                    navigate('/h2h/create')
+                    navigate('/compete/create')
                   }}
                   className={`flex-1 py-3 rounded-full font-semibold ${
                     claimMode === 'challenge' ? 'bg-accent-green text-white' : 'bg-bg-elevated text-text-muted'
@@ -315,7 +315,6 @@ export function BetCreationWizard() {
                   {[
                     { id: 'long' as BetType, label: 'Long' },
                     { id: 'quick' as BetType, label: 'Quick' },
-                    { id: 'h2h' as BetType, label: 'H2H' },
                     { id: 'competition' as BetType, label: 'Competition' },
                   ].map(({ id, label }) => (
                     <button

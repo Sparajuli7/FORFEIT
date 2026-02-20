@@ -18,7 +18,6 @@ const FILTER_CHIPS: { id: string; label: string; category?: BetCategory; type?: 
   { id: 'fitness', label: '🏋️ Fitness', category: 'fitness' },
   { id: 'money', label: '💰 Money', category: 'money' },
   { id: 'social', label: '🎭 Social', category: 'social' },
-  { id: 'h2h', label: '⚔️ H2H', type: 'h2h' },
   { id: 'compete', label: '🏆 Compete', type: 'competition' },
   { id: 'wildcard', label: 'Wildcard 🎲', category: 'wildcard' },
 ]
