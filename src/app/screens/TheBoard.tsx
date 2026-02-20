@@ -218,7 +218,10 @@ export function TheBoard() {
       {/* Header */}
         <div className="px-6 pt-12 pb-4">
         {/* Create / Join group — always visible when user has groups */}
-        <div className="flex items-center gap-2 mb-3">
+        <div className="flex items-center gap-2 mb-3 flex-wrap">
+          <span className="text-xs text-text-muted font-medium tabular-nums">
+            {groups.length} {groups.length === 1 ? 'group' : 'groups'}
+          </span>
           <button
             onClick={() => navigate('/group/create')}
             className="px-3 py-1.5 rounded-full text-xs font-bold bg-accent-green/20 text-accent-green border border-accent-green/40"

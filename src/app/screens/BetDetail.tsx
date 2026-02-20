@@ -47,7 +47,8 @@ export function BetDetail({ onBack }: BetDetailProps) {
 
   const [profileMap, setProfileMap] = useState<Map<string, { display_name: string; avatar_url: string | null }>>(new Map())
 
-  const countdown = activeBet ? useCountdown(activeBet.deadline) : null
+  // Always call useCountdown (Rules of Hooks). Use current time as fallback when no bet so countdown is expired.
+  const countdown = useCountdown(activeBet?.deadline ?? new Date().toISOString())
   const riders = activeBetSides.filter((s) => s.side === 'rider')
   const doubters = activeBetSides.filter((s) => s.side === 'doubter')
   const { riderPct, doubterPct } = formatOdds(riders.length, doubters.length)
