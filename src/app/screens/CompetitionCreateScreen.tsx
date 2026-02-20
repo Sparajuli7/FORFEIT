@@ -55,6 +55,7 @@ export function CompetitionCreateScreen() {
     return d
   })
   const [recurrence, setRecurrence] = useState(false)
+  const [activeCalendar, setActiveCalendar] = useState<'start' | 'end'>('start')
 
   const [scoringMethod, setScoringMethod] = useState<'self_reported' | 'group_verified'>('self_reported')
 
@@ -488,23 +489,84 @@ export function CompetitionCreateScreen() {
                 Timeframe
               </h2>
 
-              <div>
-                <label className="text-xs font-bold text-text-muted block mb-2">Start</label>
-                <Calendar
-                  mode="single"
-                  selected={startDate}
-                  onSelect={(d) => d && setStartDate(d)}
-                  disabled={(d) => d < new Date(new Date().setHours(0, 0, 0, 0))}
-                />
+              {/* Date selector tabs */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setActiveCalendar('start')}
+                  className={`flex-1 py-3 rounded-xl font-bold text-sm text-center transition-colors ${
+                    activeCalendar === 'start'
+                      ? 'bg-accent-green text-white'
+                      : 'bg-bg-elevated text-text-muted'
+                  }`}
+                >
+                  <span className="block text-[10px] uppercase tracking-wider opacity-70 mb-0.5">Start</span>
+                  {format(startDate, 'MMM d, yyyy')}
+                </button>
+                <button
+                  onClick={() => setActiveCalendar('end')}
+                  className={`flex-1 py-3 rounded-xl font-bold text-sm text-center transition-colors ${
+                    activeCalendar === 'end'
+                      ? 'bg-accent-green text-white'
+                      : 'bg-bg-elevated text-text-muted'
+                  }`}
+                >
+                  <span className="block text-[10px] uppercase tracking-wider opacity-70 mb-0.5">End</span>
+                  {format(endDate, 'MMM d, yyyy')}
+                </button>
               </div>
-              <div>
-                <label className="text-xs font-bold text-text-muted block mb-2">End</label>
-                <Calendar
-                  mode="single"
-                  selected={endDate}
-                  onSelect={(d) => d && setEndDate(d)}
-                  disabled={(d) => d < startDate}
-                />
+
+              {/* Single calendar that switches between start/end */}
+              <div className="bg-bg-card rounded-xl border border-border-subtle p-2">
+                {activeCalendar === 'start' ? (
+                  <Calendar
+                    key="start-cal"
+                    mode="single"
+                    selected={startDate}
+                    onSelect={(d) => {
+                      if (!d) return
+                      setStartDate(d)
+                      // If start date is after end date, push end date forward
+                      if (d >= endDate) {
+                        const newEnd = new Date(d)
+                        newEnd.setDate(newEnd.getDate() + 7)
+                        setEndDate(newEnd)
+                      }
+                      setActiveCalendar('end')
+                    }}
+                    disabled={(d) => d < new Date(new Date().setHours(0, 0, 0, 0))}
+                    defaultMonth={startDate}
+                  />
+                ) : (
+                  <Calendar
+                    key="end-cal"
+                    mode="single"
+                    selected={endDate}
+                    onSelect={(d) => {
+                      if (!d) return
+                      setEndDate(d)
+                    }}
+                    disabled={(d) => {
+                      const startDay = new Date(startDate)
+                      startDay.setHours(0, 0, 0, 0)
+                      return d <= startDay
+                    }}
+                    defaultMonth={endDate}
+                  />
+                )}
+              </div>
+
+              {/* Duration summary */}
+              <div className="bg-bg-elevated rounded-xl p-3 text-center">
+                <span className="text-sm text-text-muted">Duration: </span>
+                <span className="text-sm font-bold text-text-primary">
+                  {(() => {
+                    const days = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
+                    if (days < 7) return `${days} day${days !== 1 ? 's' : ''}`
+                    const weeks = Math.floor(days / 7)
+                    const remaining = days % 7
+                    return `${weeks} week${weeks !== 1 ? 's' : ''}${remaining > 0 ? ` ${remaining} day${remaining !== 1 ? 's' : ''}` : ''}`
+                  })()}
+                </span>
               </div>
 
               <div className="flex items-center justify-between">

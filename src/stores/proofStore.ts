@@ -65,26 +65,36 @@ async function getCurrentUserId(): Promise<string | null> {
  * Upload a single file to Supabase Storage and return its public URL.
  * Bucket must exist and have appropriate RLS policies.
  */
-/** Tracks which files failed to upload so the user can be notified */
-const _failedUploads: string[] = []
+/** Get file extension from a File object */
+function getExt(file: File): string {
+  const fromName = file.name.split('.').pop()?.toLowerCase()
+  if (fromName && fromName !== file.name) return `.${fromName}`
+  const mimeMap: Record<string, string> = {
+    'image/jpeg': '.jpg', 'image/png': '.png', 'image/gif': '.gif', 'image/webp': '.webp',
+    'video/mp4': '.mp4', 'video/quicktime': '.mov', 'video/webm': '.webm',
+    'application/pdf': '.pdf',
+  }
+  return mimeMap[file.type] ?? ''
+}
 
 async function uploadFile(
   bucket: string,
   path: string,
   file: File,
 ): Promise<string | null> {
-  const { error } = await supabase.storage.from(bucket).upload(path, file, {
-    upsert: false,
+  const fullPath = `${path}${getExt(file)}`
+  const { error } = await supabase.storage.from(bucket).upload(fullPath, file, {
+    upsert: true,
     contentType: file.type,
   })
   if (error) {
-    _failedUploads.push(file.name)
+    console.warn(`[proofStore] Upload failed for ${file.name}:`, error.message)
     return null
   }
 
   const {
     data: { publicUrl },
-  } = supabase.storage.from(bucket).getPublicUrl(path)
+  } = supabase.storage.from(bucket).getPublicUrl(fullPath)
   return publicUrl
 }
 
@@ -108,25 +118,29 @@ const useProofStore = create<ProofStore>()((set, get) => ({
 
     set({ isSubmitting: true, error: null })
 
-    // Reset failed upload tracker
-    _failedUploads.length = 0
-
     const timestamp = Date.now()
     const basePath = `proofs/${betId}/${userId}/${timestamp}`
+
+    // Track which files were attempted vs succeeded
+    const attempted: string[] = []
+    const trackUpload = async (bucket: string, path: string, file: File): Promise<string | null> => {
+      attempted.push(file.name)
+      return uploadFile(bucket, path, file)
+    }
 
     // Upload all provided files in parallel
     const [frontUrl, backUrl, videoUrl, documentUrl] = await Promise.all([
       files.frontCameraFile
-        ? uploadFile('proofs', `${basePath}/front`, files.frontCameraFile)
+        ? trackUpload('proofs', `${basePath}/front`, files.frontCameraFile)
         : null,
       files.backCameraFile
-        ? uploadFile('proofs', `${basePath}/back`, files.backCameraFile)
+        ? trackUpload('proofs', `${basePath}/back`, files.backCameraFile)
         : null,
       files.videoFile
-        ? uploadFile('proofs', `${basePath}/video`, files.videoFile)
+        ? trackUpload('proofs', `${basePath}/video`, files.videoFile)
         : null,
       files.documentFile
-        ? uploadFile('proofs', `${basePath}/document`, files.documentFile)
+        ? trackUpload('proofs', `${basePath}/document`, files.documentFile)
         : null,
     ])
 
@@ -135,25 +149,26 @@ const useProofStore = create<ProofStore>()((set, get) => ({
     if (files.screenshotFiles?.length) {
       const results = await Promise.all(
         files.screenshotFiles.map((f, i) =>
-          uploadFile('proofs', `${basePath}/screenshot_${i}`, f),
+          trackUpload('proofs', `${basePath}/screenshot_${i}`, f),
         ),
       )
       screenshotUrls = results.filter((u): u is string => u !== null)
     }
 
-    // Abort if ALL files failed to upload (no proof media at all)
-    const hasAnyMedia = frontUrl || backUrl || videoUrl || documentUrl || screenshotUrls?.length
-    if (!hasAnyMedia && _failedUploads.length > 0) {
+    // Check which uploads succeeded
+    const succeeded = [frontUrl, backUrl, videoUrl, documentUrl, ...(screenshotUrls ?? [])].filter(Boolean)
+    const hasAnyMedia = succeeded.length > 0
+    const hasCaption = caption && caption.trim().length > 0
+
+    // Abort if no media uploaded AND no text caption (text-only proof is OK)
+    if (!hasAnyMedia && !hasCaption) {
       set({
-        error: `Upload failed for: ${_failedUploads.join(', ')}. Please try again.`,
+        error: attempted.length > 0
+          ? 'Upload failed. Please check your connection and try again.'
+          : 'Please add proof media or a text description.',
         isSubmitting: false,
       })
       return null
-    }
-
-    // Warn about partial failures but continue
-    if (_failedUploads.length > 0) {
-      console.warn('[proofStore] Some files failed to upload:', _failedUploads)
     }
 
     const { data: proof, error } = await supabase

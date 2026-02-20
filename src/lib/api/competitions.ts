@@ -141,6 +141,18 @@ export async function submitScore(
 ): Promise<void> {
   const userId = await getCurrentUserId()
 
+  // Check if competition deadline has passed before allowing score submission
+  const { data: bet, error: betError } = await supabase
+    .from('bets')
+    .select('deadline')
+    .eq('id', betId)
+    .single()
+
+  if (betError) throw betError
+  if (bet && new Date(bet.deadline) < new Date()) {
+    throw new Error('This competition has ended. No more scores can be submitted.')
+  }
+
   const { error } = await supabase
     .from('competition_scores')
     .upsert(

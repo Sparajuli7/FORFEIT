@@ -61,22 +61,31 @@ export function CompetitionDetailScreen() {
 
   const handleBack = () => navigate(-1)
 
+  const now = new Date()
   const isLive =
     competition &&
-    new Date(competition.created_at) <= new Date() &&
-    new Date(competition.deadline) >= new Date()
+    new Date(competition.created_at) <= now &&
+    new Date(competition.deadline) >= now
+
+  const isEnded =
+    competition &&
+    (competition.status === 'completed' || new Date(competition.deadline) < now)
 
   const startDate = competition ? new Date(competition.created_at) : new Date()
   const endDate = competition ? new Date(competition.deadline) : new Date()
-  const now = Date.now()
   const total = endDate.getTime() - startDate.getTime()
-  const elapsed = now - startDate.getTime()
+  const elapsed = Date.now() - startDate.getTime()
   const progressPct = total > 0 ? Math.min(100, Math.max(0, (elapsed / total) * 100)) : 0
 
   const isParticipant = leaderboard.some((e) => e.score.user_id === user?.id)
 
   const handleSubmitScore = async () => {
     if (!id) return
+    // Enforce deadline — don't allow score submissions after competition ends
+    if (competition && new Date(competition.deadline) < new Date()) {
+      setScoreError('This competition has ended. No more scores can be submitted.')
+      return
+    }
     const score = parseInt(scoreInput, 10)
     if (isNaN(score) || score < 0) {
       setScoreError('Enter a valid number')
@@ -133,6 +142,11 @@ export function CompetitionDetailScreen() {
               <div className="flex items-center gap-1 px-2 py-1 bg-accent-green/20 rounded-full">
                 <div className="w-1.5 h-1.5 rounded-full bg-accent-green pulse-live" />
                 <span className="text-[10px] font-bold text-accent-green uppercase">LIVE</span>
+              </div>
+            )}
+            {isEnded && (
+              <div className="flex items-center gap-1 px-2 py-1 bg-text-muted/20 rounded-full">
+                <span className="text-[10px] font-bold text-text-muted uppercase">ENDED</span>
               </div>
             )}
           </div>

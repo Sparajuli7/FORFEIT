@@ -45,6 +45,21 @@
   --color-text-muted: var(--text-muted);
   --color-border-subtle: var(--border-subtle);
   --color-live-indicator: var(--live-indicator);
+
+  /* shadcn/ui base tokens (used by Calendar, Button, etc.) */
+  --color-background: var(--bg-primary);
+  --color-foreground: var(--text-primary);
+  --color-primary: var(--accent-green);
+  --color-primary-foreground: #ffffff;
+  --color-accent: var(--bg-elevated);
+  --color-accent-foreground: var(--text-primary);
+  --color-muted-foreground: var(--text-muted);
+  --color-destructive: var(--accent-coral);
+  --color-border: var(--border-subtle);
+  --color-input: var(--border-subtle);
+  --color-ring: var(--accent-green);
+  --color-secondary: var(--bg-elevated);
+  --color-secondary-foreground: var(--text-primary);
 }
 
 @layer base {
