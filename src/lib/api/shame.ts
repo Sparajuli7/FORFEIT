@@ -83,7 +83,21 @@ export interface ShameProofFiles {
   frontFile?: File
   backFile?: File
   screenshotFiles?: File[]
+  videoFile?: File
+  documentFile?: File
   caption?: string
+}
+
+/** Get file extension from a File object */
+function getExt(file: File): string {
+  const fromName = file.name.split('.').pop()?.toLowerCase()
+  if (fromName && fromName !== file.name) return `.${fromName}`
+  const mimeMap: Record<string, string> = {
+    'image/jpeg': '.jpg', 'image/png': '.png', 'image/gif': '.gif', 'image/webp': '.webp',
+    'video/mp4': '.mp4', 'video/quicktime': '.mov', 'video/webm': '.webm',
+    'application/pdf': '.pdf',
+  }
+  return mimeMap[file.type] ?? ''
 }
 
 /** Upload files to shame bucket and create hall_of_shame record */
@@ -100,11 +114,13 @@ export async function submitShameProof(
   const ts = Date.now()
   const basePath = `${user.id}/${betId}/${ts}`
 
-  const [frontUrl, backUrl, ...screenshotUrls] = await Promise.all([
-    files.frontFile ? uploadToShame(`${basePath}/front.jpg`, files.frontFile) : null,
-    files.backFile ? uploadToShame(`${basePath}/back.jpg`, files.backFile) : null,
+  const [frontUrl, backUrl, videoUrl, documentUrl, ...screenshotUrls] = await Promise.all([
+    files.frontFile ? uploadToShame(`${basePath}/front${getExt(files.frontFile)}`, files.frontFile) : null,
+    files.backFile ? uploadToShame(`${basePath}/back${getExt(files.backFile)}`, files.backFile) : null,
+    files.videoFile ? uploadToShame(`${basePath}/video${getExt(files.videoFile)}`, files.videoFile) : null,
+    files.documentFile ? uploadToShame(`${basePath}/document${getExt(files.documentFile)}`, files.documentFile) : null,
     ...(files.screenshotFiles ?? []).map((f, i) =>
-      uploadToShame(`${basePath}/screenshot_${i}.jpg`, f),
+      uploadToShame(`${basePath}/screenshot_${i}${getExt(f)}`, f),
     ),
   ])
 
@@ -113,6 +129,8 @@ export async function submitShameProof(
     outcome_id: outcomeId,
     front_url: frontUrl ?? null,
     back_url: backUrl ?? null,
+    video_url: videoUrl ?? null,
+    document_url: documentUrl ?? null,
     screenshot_urls:
       screenshotUrls.filter((u): u is string => u !== null).length > 0
         ? screenshotUrls.filter((u): u is string => u !== null)

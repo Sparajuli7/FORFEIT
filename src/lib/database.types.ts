@@ -22,7 +22,7 @@ export type BetStatus =
 
 export type BetSide = 'rider' | 'doubter'
 
-export type ProofType = 'camera' | 'screenshot' | 'video' | 'document'
+export type ProofType = 'camera' | 'screenshot' | 'video' | 'document' | 'text'
 
 export type VoteChoice = 'confirm' | 'dispute'
 
@@ -162,6 +162,8 @@ export interface HallOfShameRow {
   front_url: string | null
   back_url: string | null
   screenshot_urls: string[] | null
+  video_url: string | null
+  document_url: string | null
   caption: string | null
   reactions: Json                   // e.g. { "😭": 12, "💀": 8, "🔥": 5 }
   is_public: boolean
@@ -215,7 +217,7 @@ export type PunishmentCardInsert = Omit<PunishmentCardRow, 'id' | 'created_at'> 
   Partial<Pick<PunishmentCardRow, 'submitted_by' | 'times_assigned' | 'times_completed' | 'times_disputed'>>
 
 export type HallOfShameInsert = Omit<HallOfShameRow, 'id' | 'submitted_at'> &
-  Partial<Pick<HallOfShameRow, 'front_url' | 'back_url' | 'screenshot_urls' | 'caption' | 'reactions' | 'is_public'>>
+  Partial<Pick<HallOfShameRow, 'front_url' | 'back_url' | 'screenshot_urls' | 'video_url' | 'document_url' | 'caption' | 'reactions' | 'is_public'>>
 
 export type CompetitionScoreInsert = Omit<CompetitionScoreRow, 'id' | 'updated_at'> &
   Partial<Pick<CompetitionScoreRow, 'proof_url'>>

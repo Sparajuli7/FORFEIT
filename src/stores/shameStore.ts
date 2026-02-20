@@ -38,6 +38,8 @@ export interface PostShameData {
   frontUrl?: string
   backUrl?: string
   screenshotUrls?: string[]
+  videoUrl?: string
+  documentUrl?: string
   caption?: string
   isPublic?: boolean
 }
@@ -192,6 +194,8 @@ const useShameStore = create<ShameStore>()(
         front_url: data.frontUrl ?? null,
         back_url: data.backUrl ?? null,
         screenshot_urls: data.screenshotUrls ?? null,
+        video_url: data.videoUrl ?? null,
+        document_url: data.documentUrl ?? null,
         caption: data.caption ?? null,
         reactions: {},
         is_public: data.isPublic ?? true,

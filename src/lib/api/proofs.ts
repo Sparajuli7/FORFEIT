@@ -1,20 +1,33 @@
 import { supabase } from '@/lib/supabase'
 import type { Proof, ProofVote, ProofType, VoteChoice } from '@/lib/database.types'
 
+/** Get file extension from a File object */
+function getExt(file: File): string {
+  const fromName = file.name.split('.').pop()?.toLowerCase()
+  if (fromName && fromName !== file.name) return `.${fromName}`
+  const mimeMap: Record<string, string> = {
+    'image/jpeg': '.jpg', 'image/png': '.png', 'image/gif': '.gif', 'image/webp': '.webp',
+    'video/mp4': '.mp4', 'video/quicktime': '.mov', 'video/webm': '.webm',
+    'application/pdf': '.pdf',
+  }
+  return mimeMap[file.type] ?? ''
+}
+
 async function uploadFile(
   bucket: string,
   path: string,
   file: File,
 ): Promise<string> {
-  const { error } = await supabase.storage.from(bucket).upload(path, file, {
-    upsert: false,
+  const fullPath = `${path}${getExt(file)}`
+  const { error } = await supabase.storage.from(bucket).upload(fullPath, file, {
+    upsert: true,
     contentType: file.type,
   })
   if (error) throw error
 
   const {
     data: { publicUrl },
-  } = supabase.storage.from(bucket).getPublicUrl(path)
+  } = supabase.storage.from(bucket).getPublicUrl(fullPath)
   return publicUrl
 }
 
