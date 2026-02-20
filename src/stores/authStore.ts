@@ -23,10 +23,10 @@ interface AuthState {
 interface AuthActions {
   /** Check current session and subscribe to auth state changes. Call once on app mount. */
   initialize: () => Promise<void>
-  /** Send OTP to email address (Supabase Email provider) */
-  signInWithEmail: (email: string) => Promise<void>
-  /** Verify the 6-digit OTP received via email */
-  verifyOtp: (email: string, token: string) => Promise<void>
+  /** Create a new account with email + password */
+  signUp: (email: string, password: string) => Promise<void>
+  /** Sign in with email + password */
+  signIn: (email: string, password: string) => Promise<void>
   signOut: () => Promise<void>
   /** Create a new profile row (for first-time users). Use updateProfile for existing profiles. Returns true on success. */
   createProfile: (data: { username: string; display_name: string; avatar_url?: string }) => Promise<boolean>
@@ -127,33 +127,24 @@ const useAuthStore = create<AuthStore>()((set, get) => ({
     _authSubscription = subscription
   },
 
-  signInWithEmail: async (email) => {
+  signUp: async (email, password) => {
     set({ isLoading: true, error: null })
-    const redirectTo =
-      typeof window !== 'undefined'
-        ? `${window.location.origin}/auth/callback`
-        : undefined
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: redirectTo ? { emailRedirectTo: redirectTo } : undefined,
-    })
-    // OTP sent — isLoading stays false, UI should show OTP input
+    const { error } = await supabase.auth.signUp({ email, password })
     if (error) {
       set({ error: error.message, isLoading: false })
     } else {
       set({ isLoading: false })
     }
+    // On success, onAuthStateChange fires SIGNED_IN and updates the store
   },
 
-  verifyOtp: async (email, token) => {
+  signIn: async (email, password) => {
     set({ isLoading: true, error: null })
-    const { error } = await supabase.auth.verifyOtp({
-      email,
-      token,
-      type: 'email',
-    })
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) {
       set({ error: error.message, isLoading: false })
+    } else {
+      set({ isLoading: false })
     }
     // On success, onAuthStateChange fires SIGNED_IN and updates the store
   },

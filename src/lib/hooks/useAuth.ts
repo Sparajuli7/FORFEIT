@@ -10,18 +10,18 @@ export function useAuth() {
   const error = useAuthStore((s) => s.error)
 
   const initialize = useAuthStore((s) => s.initialize)
-  const signInWithEmail = useAuthStore((s) => s.signInWithEmail)
-  const verifyOtp = useAuthStore((s) => s.verifyOtp)
+  const signUp = useAuthStore((s) => s.signUp)
+  const signIn = useAuthStore((s) => s.signIn)
   const signOut = useAuthStore((s) => s.signOut)
   const updateProfile = useAuthStore((s) => s.updateProfile)
   const setProfile = useAuthStore((s) => s.setProfile)
   const clearError = useAuthStore((s) => s.clearError)
 
   const login = useCallback(
-    async (email: string) => {
-      await signInWithEmail(email)
+    async (email: string, password: string) => {
+      await signIn(email, password)
     },
-    [signInWithEmail],
+    [signIn],
   )
 
   const logout = useCallback(async () => {
@@ -36,8 +36,8 @@ export function useAuth() {
     isNewUser,
     error,
     initialize,
+    signUp,
     login,
-    verifyOtp,
     logout,
     updateProfile,
     setProfile,

@@ -19,9 +19,8 @@ import { H2HCreateScreen } from './screens/H2HCreateScreen'
 import { Competitions } from './screens/Competitions'
 import { HallOfShame } from './screens/HallOfShame'
 import { ProfileScreen } from './screens/ProfileScreen'
-import { EmailEntryScreen } from './screens/EmailEntryScreen'
-import { OTPScreen } from './screens/OTPScreen'
-import { AuthCallbackScreen } from './screens/AuthCallbackScreen'
+import { SignUpScreen } from './screens/SignUpScreen'
+import { LoginScreen } from './screens/LoginScreen'
 import { ProfileSetupScreen } from './screens/ProfileSetupScreen'
 import { GroupJoinScreen } from './screens/GroupJoinScreen'
 import { GroupCreateScreen } from './screens/GroupCreateScreen'
@@ -64,8 +63,8 @@ function SplashRoute() {
   const navigate = useNavigate()
   return (
     <Splash
-      onEnter={() => navigate('/auth/email')}
-      onLogin={() => navigate('/auth/email')}
+      onEnter={() => navigate('/auth/signup')}
+      onLogin={() => navigate('/auth/login')}
     />
   )
 }
@@ -148,10 +147,12 @@ export function AppRouter() {
         {/* ---- PUBLIC (no auth required) ---- */}
         <Route element={<AuthLayout />}>
           <Route index element={<SplashRoute />} />
-          <Route path="auth/email" element={<EmailEntryScreen />} />
-          <Route path="auth/phone" element={<Navigate to="/auth/email" replace />} />
-          <Route path="auth/callback" element={<AuthCallbackScreen />} />
-          <Route path="auth/otp" element={<OTPScreen />} />
+          <Route path="auth/signup" element={<SignUpScreen />} />
+          <Route path="auth/login" element={<LoginScreen />} />
+          <Route path="auth/email" element={<Navigate to="/auth/login" replace />} />
+          <Route path="auth/phone" element={<Navigate to="/auth/login" replace />} />
+          <Route path="auth/callback" element={<Navigate to="/auth/login" replace />} />
+          <Route path="auth/otp" element={<Navigate to="/auth/login" replace />} />
           <Route path="auth/profile-setup" element={<ProfileSetupScreen />} />
         </Route>
 

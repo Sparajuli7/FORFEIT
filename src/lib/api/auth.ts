@@ -1,17 +1,14 @@
 import { supabase } from '@/lib/supabase'
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js'
 
-export async function signInWithOtp(email: string) {
-  const { error } = await supabase.auth.signInWithOtp({ email })
+export async function signUp(email: string, password: string) {
+  const { data, error } = await supabase.auth.signUp({ email, password })
   if (error) throw error
+  return data
 }
 
-export async function verifyOtp(email: string, token: string) {
-  const { data, error } = await supabase.auth.verifyOtp({
-    email,
-    token,
-    type: 'email',
-  })
+export async function signInWithPassword(email: string, password: string) {
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password })
   if (error) throw error
   return data
 }

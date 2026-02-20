@@ -74,6 +74,23 @@ export function validatePhone(phone: string): { valid: boolean; formatted: strin
   return { valid: true, formatted }
 }
 
+export function validatePassword(password: string): ValidationResult {
+  if (!password) {
+    return { valid: false, error: 'Password is required.' }
+  }
+  if (password.length < 8) {
+    return { valid: false, error: 'Password must be at least 8 characters.' }
+  }
+  return { valid: true }
+}
+
+export function validatePasswordMatch(password: string, confirm: string): ValidationResult {
+  if (confirm !== password) {
+    return { valid: false, error: 'Passwords do not match.' }
+  }
+  return { valid: true }
+}
+
 export function validateUsername(username: string): ValidationResult {
   const trimmed = username.trim()
 

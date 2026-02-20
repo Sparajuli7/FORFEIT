@@ -86,7 +86,7 @@ export function ProfileSetupScreen() {
   }
 
   if (!user) {
-    navigate('/auth/email', { replace: true })
+    navigate('/auth/signup', { replace: true })
     return null
   }
 
