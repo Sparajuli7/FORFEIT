@@ -8,7 +8,7 @@ interface HomeFeedProps {
 
 export function HomeFeed({ activeScreen, onNavigate }: HomeFeedProps) {
   return (
-    <div className="h-full bg-bg-primary overflow-y-auto pb-24">
+    <div className="h-full bg-bg-primary overflow-y-auto pb-6">
       {/* Header */}
       <div className="px-6 pt-12 pb-6">
         <div className="flex items-center justify-between mb-6">

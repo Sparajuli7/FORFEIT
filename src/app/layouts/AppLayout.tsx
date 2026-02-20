@@ -40,12 +40,12 @@ export function AppLayout() {
 
   return (
     <div className="h-full bg-bg-primary grain-texture flex flex-col overflow-hidden">
-      <div className="flex-1 overflow-y-auto pb-20">
+      <div className="flex-1 overflow-y-auto">
         <Outlet />
       </div>
 
       {/* Bottom Navigation */}
-      <nav className="absolute bottom-0 left-0 right-0 h-20 bg-bg-primary border-t border-border-subtle flex items-center justify-around pb-safe">
+      <nav className="shrink-0 h-20 bg-bg-primary border-t border-border-subtle flex items-center justify-around pb-safe">
         {NAV_ITEMS.map((item) => {
           const isActive = activeTab === item.id
           const Icon = item.icon

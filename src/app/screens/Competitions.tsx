@@ -70,7 +70,7 @@ export function Competitions() {
   }
 
   return (
-    <div className="h-full bg-bg-primary overflow-y-auto pb-24">
+    <div className="h-full bg-bg-primary overflow-y-auto pb-6">
       <div className="px-6 pt-12 pb-6">
         <h1 className="text-3xl font-black text-text-primary mb-2">🏆 COMPETITIONS</h1>
         <p className="text-sm text-text-muted">Run a contest. Crown a winner.</p>

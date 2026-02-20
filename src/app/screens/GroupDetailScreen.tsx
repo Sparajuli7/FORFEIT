@@ -142,7 +142,7 @@ export function GroupDetailScreen() {
   const inviteLink = `${APP_URL}/group/join/${group.invite_code}`
 
   return (
-    <div className="h-full bg-bg-primary grain-texture overflow-y-auto pb-24">
+    <div className="h-full bg-bg-primary grain-texture overflow-y-auto pb-6">
       <button
         onClick={() => navigate(-1)}
         className="absolute top-6 left-6 p-2 -m-2 text-text-muted hover:text-text-primary transition-colors z-10"

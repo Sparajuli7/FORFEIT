@@ -23,7 +23,7 @@ export function ProfileSportsbook({ onNavigate }: ProfileSportsbookProps) {
   ];
 
   return (
-    <div className="h-full bg-bg-primary overflow-y-auto pb-24">
+    <div className="h-full bg-bg-primary overflow-y-auto pb-6">
       {/* Header Card - Fighter Style */}
       <div className="px-6 pt-12 pb-6">
         <div className="bg-bg-card border border-border-subtle rounded-xl p-6">

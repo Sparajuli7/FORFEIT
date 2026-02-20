@@ -29,7 +29,7 @@ export function HallOfShameRevamped({ onNavigate }: HallOfShameRevampedProps) {
   ];
 
   return (
-    <div className="h-full bg-bg-primary overflow-y-auto pb-24">
+    <div className="h-full bg-bg-primary overflow-y-auto pb-6">
       {/* Header */}
       <div className="px-6 pt-12 pb-4">
         <h1 className="text-3xl font-black text-text-primary mb-2">

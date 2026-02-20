@@ -46,7 +46,7 @@ function ProfileContent({
     : parseInt(String(profile.biggest_loss), 10) || 0
 
   return (
-    <div className="h-full bg-bg-primary overflow-y-auto pb-24">
+    <div className="h-full bg-bg-primary overflow-y-auto pb-6">
       {/* Header */}
       <div className="px-6 pt-12 pb-8 text-center">
         <div className="flex justify-center mb-4">

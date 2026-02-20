@@ -293,6 +293,16 @@ export function CompetitionCreateScreen() {
                 </div>
               </div>
 
+              <div className="border-t border-border-subtle pt-4">
+                <p className="text-xs text-text-muted mb-3">Or make this a personal challenge instead</p>
+                <button
+                  onClick={() => navigate('/bet/create')}
+                  className="w-full py-3 rounded-xl font-bold text-sm bg-bg-elevated text-accent-green border border-accent-green/40 hover:bg-accent-green/10 transition-colors"
+                >
+                  Personal Challenge
+                </button>
+              </div>
+
               <PrimaryButton onClick={() => setStep(3)}>Next</PrimaryButton>
             </motion.div>
           )}
