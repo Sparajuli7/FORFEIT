@@ -223,7 +223,7 @@ export function TheBoard() {
   return (
     <div className="h-full bg-bg-primary grain-texture overflow-y-auto pb-6">
       {/* Header */}
-        <div className="px-6 pt-12 pb-4">
+        <div className="px-6 pt-4 pb-4">
         {/* Create / Join group — always visible when user has groups */}
         <div className="flex items-center gap-2 mb-3 flex-wrap">
           <span className="text-xs text-text-muted font-medium tabular-nums">
@@ -400,7 +400,7 @@ export function TheBoard() {
       <NotificationPanel open={notificationOpen} onOpenChange={setNotificationOpen} />
 
       {/* FAB with Quick Bet label */}
-      <div className="fixed bottom-24 left-1/2 -translate-x-1/2 flex items-center gap-3 z-10">
+      <div className="fixed bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-3 z-10">
         <span className="text-xs font-bold text-text-muted uppercase tracking-wide bg-bg-elevated px-3 py-1.5 rounded-full border border-border-subtle">
           Quick Bet
         </span>

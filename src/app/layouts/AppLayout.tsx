@@ -40,12 +40,8 @@ export function AppLayout() {
 
   return (
     <div className="h-full bg-bg-primary grain-texture flex flex-col overflow-hidden">
-      <div className="flex-1 overflow-y-auto">
-        <Outlet />
-      </div>
-
-      {/* Bottom Navigation */}
-      <nav className="shrink-0 h-20 bg-bg-primary border-t border-border-subtle flex items-center justify-around pb-safe">
+      {/* Top Navigation */}
+      <nav className="shrink-0 pt-safe bg-bg-primary border-b border-border-subtle flex items-end justify-around pb-2 pt-2">
         {NAV_ITEMS.map((item) => {
           const isActive = activeTab === item.id
           const Icon = item.icon
@@ -54,7 +50,7 @@ export function AppLayout() {
             <button
               key={item.id}
               onClick={() => navigate(item.path)}
-              className={`flex flex-col items-center gap-0.5 transition-all ${item.boost ? '-mt-2' : ''}`}
+              className={`flex flex-col items-center gap-0.5 transition-all`}
             >
               <Icon
                 className={`w-6 h-6 transition-all ${
@@ -76,6 +72,10 @@ export function AppLayout() {
           )
         })}
       </nav>
+
+      <div className="flex-1 overflow-y-auto">
+        <Outlet />
+      </div>
     </div>
   )
 }
