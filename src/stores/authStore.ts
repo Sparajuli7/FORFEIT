@@ -27,6 +27,12 @@ interface AuthActions {
   signUp: (email: string, password: string) => Promise<void>
   /** Sign in with email + password */
   signIn: (email: string, password: string) => Promise<void>
+  /** Send OTP code to email address */
+  sendOtp: (email: string) => Promise<void>
+  /** Verify a 6-digit OTP code */
+  verifyOtp: (email: string, token: string) => Promise<void>
+  /** Set or update the user's password (for existing OTP-only accounts) */
+  setPassword: (password: string) => Promise<void>
   signOut: () => Promise<void>
   /** Create a new profile row (for first-time users). Use updateProfile for existing profiles. Returns true on success. */
   createProfile: (data: { username: string; display_name: string; avatar_url?: string }) => Promise<boolean>
@@ -147,6 +153,39 @@ const useAuthStore = create<AuthStore>()((set, get) => ({
       set({ isLoading: false })
     }
     // On success, onAuthStateChange fires SIGNED_IN and updates the store
+  },
+
+  sendOtp: async (email) => {
+    set({ isLoading: true, error: null })
+    const { error } = await supabase.auth.signInWithOtp({ email })
+    if (error) {
+      set({ error: error.message, isLoading: false })
+    } else {
+      set({ isLoading: false })
+    }
+  },
+
+  verifyOtp: async (email, token) => {
+    set({ isLoading: true, error: null })
+    const { error } = await supabase.auth.verifyOtp({
+      email,
+      token,
+      type: 'email',
+    })
+    if (error) {
+      set({ error: error.message, isLoading: false })
+    }
+    // On success, onAuthStateChange fires SIGNED_IN and updates the store
+  },
+
+  setPassword: async (password) => {
+    set({ isLoading: true, error: null })
+    const { error } = await supabase.auth.updateUser({ password })
+    if (error) {
+      set({ error: error.message, isLoading: false })
+    } else {
+      set({ isLoading: false, error: null })
+    }
   },
 
   signOut: async () => {

@@ -12,6 +12,9 @@ export function useAuth() {
   const initialize = useAuthStore((s) => s.initialize)
   const signUp = useAuthStore((s) => s.signUp)
   const signIn = useAuthStore((s) => s.signIn)
+  const sendOtp = useAuthStore((s) => s.sendOtp)
+  const verifyOtp = useAuthStore((s) => s.verifyOtp)
+  const setPassword = useAuthStore((s) => s.setPassword)
   const signOut = useAuthStore((s) => s.signOut)
   const updateProfile = useAuthStore((s) => s.updateProfile)
   const setProfile = useAuthStore((s) => s.setProfile)
@@ -38,6 +41,9 @@ export function useAuth() {
     initialize,
     signUp,
     login,
+    sendOtp,
+    verifyOtp,
+    setPassword,
     logout,
     updateProfile,
     setProfile,
