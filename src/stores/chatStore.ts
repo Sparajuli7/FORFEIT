@@ -12,6 +12,8 @@ import {
   getGroupConversation,
   getCompetitionConversation,
   getOrCreateDMConversation,
+  createGroupConversation,
+  createCompetitionConversation,
 } from '@/lib/api/chat'
 import type { ConversationWithMeta, MessageWithSender } from '@/lib/api/chat'
 
@@ -110,7 +112,20 @@ const useChatStore = create<ChatStore>()(
     },
 
     openConversation: async (id: string) => {
-      const conv = get().conversations.find((c) => c.id === id)
+      let conv = get().conversations.find((c) => c.id === id)
+
+      // If conversation isn't in local list, fetch all conversations first
+      if (!conv) {
+        try {
+          const conversations = await getUserConversations()
+          set((draft) => {
+            draft.conversations = conversations
+          })
+          conv = conversations.find((c) => c.id === id)
+        } catch {
+          // Continue anyway — we can still load messages
+        }
+      }
 
       set((draft) => {
         draft.activeConversation = conv ?? null
@@ -237,15 +252,41 @@ const useChatStore = create<ChatStore>()(
     },
 
     getOrCreateGroupChat: async (groupId) => {
+      // Try to find existing conversation
       const conv = await getGroupConversation(groupId)
       if (conv) return conv.id
-      throw new Error('Group conversation not found. It should have been auto-created.')
+
+      // Lazily create for groups that existed before chat feature
+      const userId = await getCurrentUserId()
+      if (!userId) throw new Error('Not authenticated')
+
+      const { data: members } = await supabase
+        .from('group_members')
+        .select('user_id')
+        .eq('group_id', groupId)
+
+      const memberIds = (members ?? []).map((m) => m.user_id)
+      const created = await createGroupConversation(groupId, memberIds)
+      return created.id
     },
 
     getOrCreateCompetitionChat: async (betId) => {
+      // Try to find existing conversation
       const conv = await getCompetitionConversation(betId)
       if (conv) return conv.id
-      throw new Error('Competition conversation not found. It should have been auto-created.')
+
+      // Lazily create for competitions that existed before chat feature
+      const userId = await getCurrentUserId()
+      if (!userId) throw new Error('Not authenticated')
+
+      const { data: sides } = await supabase
+        .from('bet_sides')
+        .select('user_id')
+        .eq('bet_id', betId)
+
+      const participantIds = (sides ?? []).map((s) => s.user_id)
+      const created = await createCompetitionConversation(betId, participantIds)
+      return created.id
     },
 
     getOrCreateDM: async (otherUserId) => {

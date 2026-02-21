@@ -38,6 +38,7 @@ export function CompetitionDetailScreen() {
   const [proofFile, setProofFile] = useState<File | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [scoreError, setScoreError] = useState<string | null>(null)
+  const [openingChat, setOpeningChat] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -170,15 +171,27 @@ export function CompetitionDetailScreen() {
 
           {/* Competition Chat */}
           <button
+            disabled={openingChat}
             onClick={async () => {
-              if (!id) return
-              const convId = await useChatStore.getState().getOrCreateCompetitionChat(id)
-              navigate(`/chat/${convId}`)
+              if (!id || openingChat) return
+              setOpeningChat(true)
+              try {
+                const convId = await useChatStore.getState().getOrCreateCompetitionChat(id)
+                navigate(`/chat/${convId}`)
+              } catch (e) {
+                console.error('Failed to open competition chat:', e)
+              } finally {
+                setOpeningChat(false)
+              }
             }}
             className="w-full flex items-center gap-3 bg-bg-card border border-border-subtle rounded-xl p-3 mb-3 hover:bg-bg-elevated transition-colors"
           >
             <div className="w-9 h-9 rounded-full bg-accent-green/20 flex items-center justify-center">
-              <MessageCircle className="w-4 h-4 text-accent-green" />
+              {openingChat ? (
+                <div className="w-4 h-4 border-2 border-accent-green border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <MessageCircle className="w-4 h-4 text-accent-green" />
+              )}
             </div>
             <p className="flex-1 text-sm font-bold text-text-primary text-left">Competition Chat</p>
             <span className="text-xs text-text-muted">Talk trash &rarr;</span>

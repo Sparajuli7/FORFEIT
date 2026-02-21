@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router'
-import { MessageCircle } from 'lucide-react'
+import { MessageCircle, Loader2 } from 'lucide-react'
 import { useAuthStore, useBetStore, useChatStore } from '@/stores'
 import { getMyBets } from '@/lib/api/bets'
 import { getProfilesByIds, getProfile as fetchProfile } from '@/lib/api/profiles'
@@ -34,6 +34,7 @@ function ProfileContent({
   isOwnProfile: boolean
 }) {
   const navigate = useNavigate()
+  const [openingDM, setOpeningDM] = useState(false)
   const winRate = formatWinRate(profile.wins, profile.losses)
   const completionRate = formatCompletionRate(
     profile.punishments_completed,
@@ -209,14 +210,27 @@ function ProfileContent({
             Challenge
           </button>
           <button
+            disabled={openingDM}
             onClick={async () => {
-              const convId = await useChatStore.getState().getOrCreateDM(profile.id)
-              navigate(`/chat/${convId}`)
+              if (openingDM) return
+              setOpeningDM(true)
+              try {
+                const convId = await useChatStore.getState().getOrCreateDM(profile.id)
+                navigate(`/chat/${convId}`)
+              } catch (e) {
+                console.error('Failed to open DM:', e)
+              } finally {
+                setOpeningDM(false)
+              }
             }}
             className="w-full py-3 rounded-xl bg-bg-elevated text-text-primary font-bold text-sm border border-border-subtle flex items-center justify-center gap-2"
           >
-            <MessageCircle className="w-4 h-4" />
-            Message
+            {openingDM ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <MessageCircle className="w-4 h-4" />
+            )}
+            {openingDM ? 'Opening...' : 'Message'}
           </button>
         </div>
       )}

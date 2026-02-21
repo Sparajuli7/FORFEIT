@@ -91,6 +91,7 @@ export function GroupDetailScreen() {
   const [profileMap, setProfileMap] = useState<Map<string, ProfileWithRep>>(new Map())
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
   const [leaving, setLeaving] = useState(false)
+  const [openingChat, setOpeningChat] = useState(false)
 
   const group = groups.find((g) => g.id === id)
 
@@ -196,15 +197,27 @@ export function GroupDetailScreen() {
 
         {/* Group Chat */}
         <button
+          disabled={openingChat}
           onClick={async () => {
-            if (!id) return
-            const convId = await useChatStore.getState().getOrCreateGroupChat(id)
-            navigate(`/chat/${convId}`)
+            if (!id || openingChat) return
+            setOpeningChat(true)
+            try {
+              const convId = await useChatStore.getState().getOrCreateGroupChat(id)
+              navigate(`/chat/${convId}`)
+            } catch (e) {
+              console.error('Failed to open group chat:', e)
+            } finally {
+              setOpeningChat(false)
+            }
           }}
           className="w-full flex items-center gap-3 bg-bg-card border border-border-subtle rounded-xl p-4 mb-6 hover:bg-bg-elevated transition-colors"
         >
           <div className="w-10 h-10 rounded-full bg-accent-green/20 flex items-center justify-center">
-            <MessageCircle className="w-5 h-5 text-accent-green" />
+            {openingChat ? (
+              <div className="w-5 h-5 border-2 border-accent-green border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <MessageCircle className="w-5 h-5 text-accent-green" />
+            )}
           </div>
           <div className="flex-1 text-left">
             <p className="text-sm font-bold text-text-primary">Group Chat</p>
