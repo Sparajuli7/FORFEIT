@@ -67,16 +67,16 @@ async function getCurrentUserId(): Promise<string | null> {
  * Upload a single file to Supabase Storage and return its public URL.
  * Bucket must exist and have appropriate RLS policies.
  */
-/** Get file extension from a File object */
+/** Get file extension from a File object (so storage URLs work) */
 function getExt(file: File): string {
   const fromName = file.name.split('.').pop()?.toLowerCase()
-  if (fromName && fromName !== file.name) return `.${fromName}`
+  if (fromName && fromName !== file.name && /^[a-z0-9]+$/i.test(fromName)) return `.${fromName}`
   const mimeMap: Record<string, string> = {
-    'image/jpeg': '.jpg', 'image/png': '.png', 'image/gif': '.gif', 'image/webp': '.webp',
-    'video/mp4': '.mp4', 'video/quicktime': '.mov', 'video/webm': '.webm',
+    'image/jpeg': '.jpg', 'image/jpg': '.jpg', 'image/png': '.png', 'image/gif': '.gif', 'image/webp': '.webp', 'image/heic': '.heic',
+    'video/mp4': '.mp4', 'video/quicktime': '.mov', 'video/webm': '.webm', 'video/x-m4v': '.m4v', 'video/3gpp': '.3gp',
     'application/pdf': '.pdf',
   }
-  return mimeMap[file.type] ?? ''
+  return mimeMap[file.type] ?? (file.type.startsWith('image/') ? '.jpg' : file.type.startsWith('video/') ? '.mp4' : '.bin')
 }
 
 async function uploadFile(
@@ -87,7 +87,7 @@ async function uploadFile(
   const fullPath = `${path}${getExt(file)}`
   const { error } = await supabase.storage.from(bucket).upload(fullPath, file, {
     upsert: true,
-    contentType: file.type,
+    contentType: file.type || undefined,
   })
   if (error) {
     console.warn(`[proofStore] Upload failed for ${file.name}:`, error.message)

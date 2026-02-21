@@ -133,20 +133,39 @@ export function ShameProofSubmission() {
         <div>
           <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-text-muted mb-3">UPLOAD EVIDENCE</p>
           <div className="grid grid-cols-2 gap-3">
-            <label className="bg-bg-card border border-border-subtle rounded-xl p-4 flex flex-col items-center gap-2 hover:border-accent-green transition-colors cursor-pointer">
-              <Image className="w-8 h-8 text-accent-green" />
-              <span className="text-xs font-bold text-text-primary">Photos</span>
-              <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => addFiles(e, 'screenshot')} />
+            <label className="relative block bg-bg-card border border-border-subtle rounded-xl p-4 flex flex-col items-center gap-2 hover:border-accent-green transition-colors cursor-pointer min-h-[100px]">
+              <Image className="w-8 h-8 text-accent-green pointer-events-none" />
+              <span className="text-xs font-bold text-text-primary pointer-events-none">Photos</span>
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                onChange={(e) => addFiles(e, 'screenshot')}
+                aria-label="Upload photos"
+              />
             </label>
-            <label className="bg-bg-card border border-border-subtle rounded-xl p-4 flex flex-col items-center gap-2 hover:border-accent-green transition-colors cursor-pointer">
-              <Video className="w-8 h-8 text-accent-green" />
-              <span className="text-xs font-bold text-text-primary">Video</span>
-              <input type="file" accept="video/*" className="hidden" onChange={(e) => addFiles(e, 'video')} />
+            <label className="relative block bg-bg-card border border-border-subtle rounded-xl p-4 flex flex-col items-center gap-2 hover:border-accent-green transition-colors cursor-pointer min-h-[100px]">
+              <Video className="w-8 h-8 text-accent-green pointer-events-none" />
+              <span className="text-xs font-bold text-text-primary pointer-events-none">Video</span>
+              <input
+                type="file"
+                accept="video/*"
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                onChange={(e) => addFiles(e, 'video')}
+                aria-label="Upload video"
+              />
             </label>
-            <label className="bg-bg-card border border-border-subtle rounded-xl p-4 flex flex-col items-center gap-2 hover:border-accent-green transition-colors cursor-pointer">
-              <FileText className="w-8 h-8 text-accent-green" />
-              <span className="text-xs font-bold text-text-primary">Document</span>
-              <input type="file" accept=".pdf,.doc,.docx" className="hidden" onChange={(e) => addFiles(e, 'document')} />
+            <label className="relative block bg-bg-card border border-border-subtle rounded-xl p-4 flex flex-col items-center gap-2 hover:border-accent-green transition-colors cursor-pointer min-h-[100px]">
+              <FileText className="w-8 h-8 text-accent-green pointer-events-none" />
+              <span className="text-xs font-bold text-text-primary pointer-events-none">Document</span>
+              <input
+                type="file"
+                accept=".pdf,.doc,.docx,application/pdf"
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                onChange={(e) => addFiles(e, 'document')}
+                aria-label="Upload document"
+              />
             </label>
           </div>
         </div>
