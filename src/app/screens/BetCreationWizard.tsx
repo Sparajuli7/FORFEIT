@@ -4,16 +4,14 @@ import { ChevronLeft, Shuffle } from 'lucide-react'
 import { format } from 'date-fns'
 import { motion, AnimatePresence } from 'motion/react'
 import useEmblaCarousel from 'embla-carousel-react'
-import { useBetStore } from '@/stores'
-import { useGroupStore } from '@/stores'
-import { getApprovedPunishments, getPunishmentStats } from '@/lib/api/punishments'
-import { QUICK_TEMPLATES, BET_CATEGORIES, STAKE_PRESETS } from '@/lib/utils/constants'
+import { useBetStore, useGroupStore, useAuthStore } from '@/stores'
+import { getApprovedPunishments, getPunishmentStats, createPunishment } from '@/lib/api/punishments'
+import { QUICK_TEMPLATES, STAKE_PRESETS } from '@/lib/utils/constants'
 import { formatMoney } from '@/lib/utils/formatters'
 import { validateClaim } from '@/lib/utils/validators'
 import { PrimaryButton } from '../components/PrimaryButton'
 import { PlayingCardPunishment } from '../components/PlayingCardPunishment'
 import { Calendar } from '../components/ui/calendar'
-import { Slider } from '../components/ui/slider'
 import {
   Select,
   SelectContent,
@@ -28,24 +26,13 @@ import {
   DialogTitle,
 } from '../components/ui/dialog'
 import { Input } from '../components/ui/input'
-import type { BetCategory, BetType, PunishmentCard, PunishmentDifficulty, PunishmentCategory } from '@/lib/database.types'
-import { createPunishment } from '@/lib/api/punishments'
+import type { PunishmentCard, PunishmentDifficulty, PunishmentCategory, Bet } from '@/lib/database.types'
 import { getBetDetail } from '@/lib/api/bets'
-
-function detectCategory(text: string): BetCategory | null {
-  const lower = text.toLowerCase()
-  if (/\b(gym|workout|run|exercise|fitness|squat|push.?up|5k|marathon)\b/.test(lower)) return 'fitness'
-  if (/\b(money|dollar|pay|cash|bet|stake)\b/.test(lower)) return 'money'
-  if (/\b(social|party|drink|alcohol|smoke|post|story|tiktok)\b/.test(lower)) return 'social'
-  return null
-}
-
-const QUICK_SLIDER_STEPS = 24
-const QUICK_MIN_MINS = 15
-const QUICK_MAX_MINS = 6 * 60
+import { FunContractModal } from '../components/FunContractModal'
 
 export function BetCreationWizard() {
   const navigate = useNavigate()
+  const location = useLocation()
   const currentStep = useBetStore((s) => s.currentStep)
   const wizard = useBetStore((s) => s.wizard)
   const updateWizardStep = useBetStore((s) => s.updateWizardStep)
@@ -59,11 +46,10 @@ export function BetCreationWizard() {
 
   const groups = useGroupStore((s) => s.groups)
   const fetchGroups = useGroupStore((s) => s.fetchGroups)
-  const location = useLocation()
+  const profile = useAuthStore((s) => s.profile)
+
   const templateAppliedRef = useRef(false)
 
-  const [claimMode, setClaimMode] = useState<'personal' | 'challenge'>('personal')
-  const [quickSliderValue, setQuickSliderValue] = useState(8)
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(() => {
     const d = new Date()
     d.setDate(d.getDate() + 1)
@@ -72,12 +58,20 @@ export function BetCreationWizard() {
   const [selectedTime, setSelectedTime] = useState('17:00')
   const [punishments, setPunishments] = useState<PunishmentCard[]>([])
   const [punishmentStats, setPunishmentStats] = useState<Record<string, { completionRate: number; timesAssigned: number }>>({})
+
+  // Templates dialog
+  const [templatesOpen, setTemplatesOpen] = useState(false)
+
+  // Custom punishment dialog
   const [customPunishmentOpen, setCustomPunishmentOpen] = useState(false)
   const [customPunishmentText, setCustomPunishmentText] = useState('')
   const [customDifficulty, setCustomDifficulty] = useState<PunishmentDifficulty>('medium')
   const [customCategory, setCustomCategory] = useState<PunishmentCategory>('social')
   const [customIsCommunity, setCustomIsCommunity] = useState(true)
-  const [showSuccess, setShowSuccess] = useState(false)
+
+  // Fun contract
+  const [createdBet, setCreatedBet] = useState<Bet | null>(null)
+  const [contractOpen, setContractOpen] = useState(false)
 
   const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true, align: 'center' })
   const [selectedPunishmentIndex, setSelectedPunishmentIndex] = useState(0)
@@ -93,6 +87,25 @@ export function BetCreationWizard() {
     fetchGroups()
   }, [fetchGroups])
 
+  // Auto-select single group when on step 2
+  useEffect(() => {
+    if (currentStep === 2 && !wizard.selectedGroup && groups.length === 1) {
+      updateWizardStep(2, { selectedGroup: groups[0] })
+    }
+  }, [currentStep, groups, wizard.selectedGroup, updateWizardStep])
+
+  // Restore date/time state when navigating back to step 2
+  useEffect(() => {
+    if (currentStep === 2 && wizard.deadline) {
+      const d = new Date(wizard.deadline)
+      if (!isNaN(d.getTime())) {
+        setSelectedDate(d)
+        setSelectedTime(`${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`)
+      }
+    }
+  }, [currentStep])
+
+  // Load from template bet (Remix feature)
   const templateBetId = (location.state as { templateBetId?: string } | null)?.templateBetId
   useEffect(() => {
     if (!templateBetId || templateAppliedRef.current) return
@@ -104,20 +117,6 @@ export function BetCreationWizard() {
       })
       .catch(() => {})
   }, [templateBetId, groups, loadWizardFromTemplate])
-
-  useEffect(() => {
-    if (currentStep === 5 && !wizard.selectedGroup && groups.length === 1) {
-      updateWizardStep(5, { selectedGroup: groups[0] })
-    }
-  }, [currentStep, groups, wizard.selectedGroup, updateWizardStep])
-
-  useEffect(() => {
-    if (currentStep === 3 && wizard.deadline && wizard.betType !== 'quick') {
-      const d = new Date(wizard.deadline)
-      setSelectedDate(d)
-      setSelectedTime(`${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`)
-    }
-  }, [currentStep])
 
   useEffect(() => {
     getApprovedPunishments().then(setPunishments)
@@ -138,47 +137,12 @@ export function BetCreationWizard() {
     })
   }, [punishments])
 
-  useEffect(() => {
-    const detected = wizard.claim ? detectCategory(wizard.claim) : null
-    if (detected && !wizard.category) {
-      updateWizardStep(currentStep, { category: detected })
-    }
-  }, [wizard.claim])
-
   const handleBack = () => {
     if (currentStep === 1) navigate(-1)
     else prevStep()
   }
 
-  const handleNext = () => {
-    if (currentStep === 1) {
-      const { valid, error: err } = validateClaim(wizard.claim)
-      if (!valid) return
-      updateWizardStep(1, { claim: wizard.claim.trim() })
-    }
-    if (currentStep === 2) {
-      if (!wizard.category || !wizard.betType) return
-    }
-    if (currentStep === 3) {
-      const deadline = computeDeadline()
-      if (!deadline || deadline <= new Date()) return
-      updateWizardStep(3, { deadline: deadline.toISOString() })
-    }
-    if (currentStep === 4) {
-      if (!wizard.stakeType) return
-      if ((wizard.stakeType === 'money' || wizard.stakeType === 'both') && (!wizard.stakeMoney || wizard.stakeMoney <= 0)) return
-      if ((wizard.stakeType === 'punishment' || wizard.stakeType === 'both') && !wizard.stakePunishment && !wizard.stakeCustomPunishment) return
-    }
-    nextStep()
-  }
-
   function computeDeadline(): Date | null {
-    if (wizard.betType === 'quick') {
-      const mins = QUICK_MIN_MINS + (quickSliderValue / QUICK_SLIDER_STEPS) * (QUICK_MAX_MINS - QUICK_MIN_MINS)
-      const d = new Date()
-      d.setMinutes(d.getMinutes() + Math.round(mins))
-      return d
-    }
     if (!selectedDate) return null
     const [h, m] = selectedTime.split(':').map(Number)
     const d = new Date(selectedDate)
@@ -186,22 +150,33 @@ export function BetCreationWizard() {
     return d
   }
 
+  const handleNext = () => {
+    if (currentStep === 1) {
+      const { valid } = validateClaim(wizard.claim)
+      if (!valid) return
+      updateWizardStep(1, { claim: wizard.claim.trim() })
+    }
+    if (currentStep === 2) {
+      const deadline = computeDeadline()
+      if (!deadline || deadline <= new Date()) return
+      if (!wizard.selectedGroup) return
+      updateWizardStep(2, { deadline: deadline.toISOString() })
+    }
+    nextStep()
+  }
+
   const handleDropIt = async () => {
-    if (!wizard.selectedGroup) return
-    const deadline = wizard.deadline ?? computeDeadline()?.toISOString()
-    if (!deadline) return
-    updateWizardStep(5, { deadline, selectedGroup: wizard.selectedGroup })
+    if (!wizard.stakeType) return
+    if ((wizard.stakeType === 'money' || wizard.stakeType === 'both') && (!wizard.stakeMoney || wizard.stakeMoney <= 0)) return
+    if ((wizard.stakeType === 'punishment' || wizard.stakeType === 'both') && !wizard.stakePunishment && !wizard.stakeCustomPunishment) return
     const bet = await createBet()
     if (bet) {
-      setShowSuccess(true)
-      setTimeout(() => {
-        resetWizard()
-        navigate(`/bet/${bet.id}`)
-      }, 1200)
+      setCreatedBet(bet)
+      setContractOpen(true)
     }
   }
 
-  const progressPct = (currentStep / 5) * 100
+  const progressPct = (currentStep / 3) * 100
   const currentPunishment = punishments[selectedPunishmentIndex]
 
   return (
@@ -213,13 +188,12 @@ export function BetCreationWizard() {
             <ChevronLeft className="w-5 h-5" />
           </button>
           <span className="text-xs font-bold text-text-muted tabular-nums">
-            {currentStep} of 5
+            {currentStep} of 3
           </span>
         </div>
         <div className="h-1 bg-bg-elevated rounded-full overflow-hidden">
           <motion.div
             className="h-full bg-accent-green"
-            initial={{ width: 0 }}
             animate={{ width: `${progressPct}%` }}
             transition={{ duration: 0.3 }}
           />
@@ -228,7 +202,8 @@ export function BetCreationWizard() {
 
       <div className="flex-1 overflow-y-auto px-6 pb-8">
         <AnimatePresence mode="wait">
-          {/* Step 1 — The Claim */}
+
+          {/* ─── Step 1 — The Claim ─── */}
           {currentStep === 1 && (
             <motion.div
               key="step1"
@@ -237,29 +212,15 @@ export function BetCreationWizard() {
               exit={{ opacity: 0, x: -20 }}
               className="space-y-6"
             >
-              <h2 className="text-[32px] font-extrabold text-white" style={{ letterSpacing: '-0.02em' }}>
-                What's the claim?
-              </h2>
-
-              <div className="flex gap-2 mb-4">
+              <div>
+                <h2 className="text-[32px] font-extrabold text-white" style={{ letterSpacing: '-0.02em' }}>
+                  What's the claim?
+                </h2>
                 <button
-                  onClick={() => setClaimMode('personal')}
-                  className={`flex-1 py-3 rounded-full font-semibold ${
-                    claimMode === 'personal' ? 'bg-accent-green text-white' : 'bg-bg-elevated text-text-muted'
-                  }`}
+                  onClick={() => navigate('/compete/create')}
+                  className="text-xs text-text-muted mt-1 underline underline-offset-2"
                 >
-                  Personal Resolution
-                </button>
-                <button
-                  onClick={() => {
-                    setClaimMode('challenge')
-                    navigate('/compete/create')
-                  }}
-                  className={`flex-1 py-3 rounded-full font-semibold ${
-                    claimMode === 'challenge' ? 'bg-accent-green text-white' : 'bg-bg-elevated text-text-muted'
-                  }`}
-                >
-                  Challenge Someone
+                  Create a competition instead →
                 </button>
               </div>
 
@@ -276,82 +237,19 @@ export function BetCreationWizard() {
                 </p>
               </div>
 
-              <div>
-                <p className="text-xs font-bold text-text-muted uppercase tracking-wide mb-2">Quick templates</p>
-                <div className="flex flex-wrap gap-2">
-                  {QUICK_TEMPLATES.map((t) => (
-                    <button
-                      key={t}
-                      onClick={() => updateWizardStep(1, { claim: t })}
-                      className="px-3 py-1.5 rounded-full bg-bg-elevated text-text-muted text-xs font-medium hover:bg-accent-green/20 hover:text-accent-green"
-                    >
-                      {t.slice(0, 30)}...
-                    </button>
-                  ))}
-                </div>
-              </div>
+              <button
+                onClick={() => setTemplatesOpen(true)}
+                className="flex items-center gap-1.5 text-accent-green font-bold text-sm"
+              >
+                ✨ Browse Templates
+              </button>
             </motion.div>
           )}
 
-          {/* Step 2 — Category + Type */}
+          {/* ─── Step 2 — Deadline + Group ─── */}
           {currentStep === 2 && (
             <motion.div
               key="step2"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-8"
-            >
-              <h2 className="text-[32px] font-extrabold text-white" style={{ letterSpacing: '-0.02em' }}>
-                Category & type
-              </h2>
-
-              <div>
-                <p className="text-xs font-bold text-text-muted uppercase mb-2">Category</p>
-                <div className="flex flex-wrap gap-2">
-                  {(Object.entries(BET_CATEGORIES) as [BetCategory, { label: string; emoji: string }][]).map(
-                    ([key, { label, emoji }]) => (
-                      <button
-                        key={key}
-                        onClick={() => updateWizardStep(2, { category: key })}
-                        className={`px-4 py-2 rounded-xl font-bold text-sm ${
-                          wizard.category === key ? 'bg-accent-green text-white' : 'bg-bg-elevated text-text-muted'
-                        }`}
-                      >
-                        {emoji} {label}
-                      </button>
-                    ),
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <p className="text-xs font-bold text-text-muted uppercase mb-2">Type</p>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    { id: 'long' as BetType, label: 'Long' },
-                    { id: 'quick' as BetType, label: 'Quick' },
-                    { id: 'competition' as BetType, label: 'Competition' },
-                  ].map(({ id, label }) => (
-                    <button
-                      key={id}
-                      onClick={() => updateWizardStep(2, { betType: id })}
-                      className={`px-4 py-2 rounded-xl font-bold text-sm ${
-                        wizard.betType === id ? 'bg-accent-green text-white' : 'bg-bg-elevated text-text-muted'
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {/* Step 3 — Deadline */}
-          {currentStep === 3 && (
-            <motion.div
-              key="step3"
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
@@ -361,54 +259,57 @@ export function BetCreationWizard() {
                 When's the deadline?
               </h2>
 
-              {wizard.betType === 'quick' ? (
-                <>
-                  <div className="space-y-4">
-                    <Slider
-                      value={[quickSliderValue]}
-                      onValueChange={([v]) => setQuickSliderValue(v ?? 0)}
-                      min={0}
-                      max={QUICK_SLIDER_STEPS}
-                      step={1}
-                      className="w-full"
-                    />
-                    <p className="text-center text-text-primary font-bold">
-                      {Math.round(QUICK_MIN_MINS + (quickSliderValue / QUICK_SLIDER_STEPS) * (QUICK_MAX_MINS - QUICK_MIN_MINS))} minutes
-                    </p>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <Calendar
-                    mode="single"
-                    selected={selectedDate}
-                    onSelect={setSelectedDate}
-                    disabled={(d) => d < new Date(new Date().setHours(0, 0, 0, 0))}
-                  />
-                  <div>
-                    <label className="text-xs font-bold text-text-muted block mb-2">Time</label>
-                    <Input
-                      type="time"
-                      value={selectedTime}
-                      onChange={(e) => setSelectedTime(e.target.value)}
-                      className="h-12"
-                    />
-                  </div>
-                </>
-              )}
+              <Calendar
+                mode="single"
+                selected={selectedDate}
+                onSelect={setSelectedDate}
+                disabled={(d) => d < new Date(new Date().setHours(0, 0, 0, 0))}
+              />
+
+              <div>
+                <label className="text-xs font-bold text-text-muted block mb-2">Time</label>
+                <Input
+                  type="time"
+                  value={selectedTime}
+                  onChange={(e) => setSelectedTime(e.target.value)}
+                  className="h-12"
+                />
+              </div>
 
               {computeDeadline() && (
                 <p className="text-accent-green font-bold text-sm">
-                  Expires {format(computeDeadline()!, 'EEEE, MMM d \'at\' h:mm a')}
+                  Expires {format(computeDeadline()!, "EEEE, MMM d 'at' h:mm a")}
                 </p>
               )}
+
+              <div>
+                <label className="text-xs font-bold text-text-muted block mb-2">Group</label>
+                <Select
+                  value={wizard.selectedGroup?.id ?? ''}
+                  onValueChange={(id) => {
+                    const g = groups.find((x) => x.id === id)
+                    updateWizardStep(2, { selectedGroup: g ?? null })
+                  }}
+                >
+                  <SelectTrigger className="h-12">
+                    <SelectValue placeholder="Select group" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {groups.map((g) => (
+                      <SelectItem key={g.id} value={g.id}>
+                        {g.avatar_emoji} {g.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </motion.div>
           )}
 
-          {/* Step 4 — Stakes */}
-          {currentStep === 4 && (
+          {/* ─── Step 3 — Stakes ─── */}
+          {currentStep === 3 && (
             <motion.div
-              key="step4"
+              key="step3"
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
@@ -422,7 +323,7 @@ export function BetCreationWizard() {
                 {(['money', 'punishment', 'both'] as const).map((t) => (
                   <button
                     key={t}
-                    onClick={() => updateWizardStep(4, { stakeType: t })}
+                    onClick={() => updateWizardStep(3, { stakeType: t })}
                     className={`flex-1 py-3 rounded-xl font-bold text-sm ${
                       wizard.stakeType === t ? 'bg-accent-green text-white' : 'bg-bg-elevated text-text-muted'
                     }`}
@@ -442,7 +343,7 @@ export function BetCreationWizard() {
                     </div>
                     <button
                       onClick={() =>
-                        updateWizardStep(4, {
+                        updateWizardStep(3, {
                           stakeMoney: Math.min(5000, (wizard.stakeMoney ?? 0) + 500),
                         })
                       }
@@ -452,7 +353,7 @@ export function BetCreationWizard() {
                     </button>
                     <button
                       onClick={() =>
-                        updateWizardStep(4, {
+                        updateWizardStep(3, {
                           stakeMoney: Math.max(0, (wizard.stakeMoney ?? 0) - 500),
                         })
                       }
@@ -465,7 +366,7 @@ export function BetCreationWizard() {
                     {STAKE_PRESETS.map((cents) => (
                       <button
                         key={cents}
-                        onClick={() => updateWizardStep(4, { stakeMoney: cents })}
+                        onClick={() => updateWizardStep(3, { stakeMoney: cents })}
                         className={`px-4 py-2 rounded-full font-bold text-sm ${
                           wizard.stakeMoney === cents ? 'bg-accent-green text-white' : 'bg-bg-elevated text-text-primary'
                         }`}
@@ -481,7 +382,7 @@ export function BetCreationWizard() {
                 <div className="space-y-4">
                   <div ref={emblaRef} className="overflow-hidden">
                     <div className="flex gap-4">
-                      {punishments.map((p, i) => (
+                      {punishments.map((p) => (
                         <div key={p.id} className="flex-[0_0_100%] min-w-0">
                           <PlayingCardPunishment
                             punishment={p.text}
@@ -500,7 +401,7 @@ export function BetCreationWizard() {
                         const idx = Math.floor(Math.random() * punishments.length)
                         setSelectedPunishmentIndex(idx)
                         emblaApi?.scrollTo(idx)
-                        updateWizardStep(4, { stakePunishment: punishments[idx], stakeCustomPunishment: null })
+                        updateWizardStep(3, { stakePunishment: punishments[idx], stakeCustomPunishment: null })
                       }}
                       className="flex-1 py-3 rounded-xl border-2 border-border-subtle text-text-primary font-bold flex items-center justify-center gap-2"
                     >
@@ -516,7 +417,7 @@ export function BetCreationWizard() {
                   </div>
                   {currentPunishment && (
                     <button
-                      onClick={() => updateWizardStep(4, { stakePunishment: currentPunishment, stakeCustomPunishment: null })}
+                      onClick={() => updateWizardStep(3, { stakePunishment: currentPunishment, stakeCustomPunishment: null })}
                       className="w-full py-2 rounded-xl bg-accent-green/20 text-accent-green font-bold text-sm"
                     >
                       Select this card
@@ -529,80 +430,52 @@ export function BetCreationWizard() {
                   )}
                 </div>
               )}
-            </motion.div>
-          )}
-
-          {/* Step 5 — Review */}
-          {currentStep === 5 && (
-            <motion.div
-              key="step5"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-6"
-            >
-              <h2 className="text-[32px] font-extrabold text-white" style={{ letterSpacing: '-0.02em' }}>
-                Review & launch
-              </h2>
-
-              <div className="bg-bg-card border border-border-subtle rounded-2xl p-6 space-y-3">
-                <p className="text-text-primary font-bold">{wizard.claim}</p>
-                <p className="text-xs text-text-muted">
-                  {BET_CATEGORIES[wizard.category!]?.emoji} {BET_CATEGORIES[wizard.category!]?.label} · {wizard.betType}
-                </p>
-                <p className="text-xs text-text-muted">
-                  Expires {wizard.deadline && format(new Date(wizard.deadline), 'EEEE, MMM d \'at\' h:mm a')}
-                </p>
-                <p className="text-xs text-text-muted">
-                  Stake: {wizard.stakeMoney ? formatMoney(wizard.stakeMoney) : wizard.stakeCustomPunishment || wizard.stakePunishment?.text || '—'}
-                </p>
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-text-muted block mb-2">Group</label>
-                <Select
-                  value={wizard.selectedGroup?.id ?? ''}
-                  onValueChange={(id) => {
-                    const g = groups.find((x) => x.id === id)
-                    updateWizardStep(5, { selectedGroup: g ?? null })
-                  }}
-                >
-                  <SelectTrigger className="h-12">
-                    <SelectValue placeholder="Select group" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {groups.map((g) => (
-                      <SelectItem key={g.id} value={g.id}>
-                        {g.avatar_emoji} {g.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
 
               {error && <p className="text-destructive text-sm">{error}</p>}
 
               <PrimaryButton
                 onClick={handleDropIt}
-                disabled={isLoading || !wizard.selectedGroup || showSuccess}
+                disabled={isLoading || !wizard.stakeType}
               >
-                {showSuccess ? '✓ Dropped!' : isLoading ? 'Creating...' : 'Drop It'}
+                {isLoading ? 'Creating...' : 'Drop It 🔥'}
               </PrimaryButton>
             </motion.div>
           )}
+
         </AnimatePresence>
       </div>
 
-      {/* Bottom CTA for steps 1-4 */}
-      {currentStep < 5 && (
+      {/* Bottom CTA for steps 1–2 */}
+      {currentStep < 3 && (
         <div className="px-6 pb-8 pt-4 border-t border-border-subtle bg-bg-primary shrink-0">
-          <PrimaryButton onClick={handleNext}>
-            {currentStep === 4 ? 'Continue' : 'Next'}
-          </PrimaryButton>
+          <PrimaryButton onClick={handleNext}>Next</PrimaryButton>
         </div>
       )}
 
-      {/* Custom punishment modal */}
+      {/* Browse Templates dialog */}
+      <Dialog open={templatesOpen} onOpenChange={setTemplatesOpen}>
+        <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>✨ Quick Templates</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 pt-2">
+            {QUICK_TEMPLATES.map((t) => (
+              <button
+                key={t}
+                onClick={() => {
+                  updateWizardStep(1, { claim: t })
+                  setTemplatesOpen(false)
+                }}
+                className="w-full text-left p-3 rounded-xl bg-bg-elevated text-text-primary text-sm hover:bg-accent-green/20 hover:text-accent-green transition-colors"
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Custom punishment dialog */}
       <Dialog open={customPunishmentOpen} onOpenChange={setCustomPunishmentOpen}>
         <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -701,12 +574,12 @@ export function BetCreationWizard() {
                       difficulty: customDifficulty,
                       is_community: customIsCommunity,
                     })
-                    updateWizardStep(4, { stakePunishment: card, stakeCustomPunishment: null })
+                    updateWizardStep(3, { stakePunishment: card, stakeCustomPunishment: null })
                   } catch {
-                    updateWizardStep(4, { stakeCustomPunishment: text, stakePunishment: null })
+                    updateWizardStep(3, { stakeCustomPunishment: text, stakePunishment: null })
                   }
                 } else {
-                  updateWizardStep(4, { stakeCustomPunishment: null, stakePunishment: null })
+                  updateWizardStep(3, { stakeCustomPunishment: null, stakePunishment: null })
                 }
                 setCustomPunishmentOpen(false)
                 setCustomPunishmentText('')
@@ -718,26 +591,29 @@ export function BetCreationWizard() {
         </DialogContent>
       </Dialog>
 
-      {/* Success overlay */}
-      <AnimatePresence>
-        {showSuccess && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-accent-green/90 flex items-center justify-center z-50"
-          >
-            <motion.div
-              initial={{ scale: 0.5, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ type: 'spring', damping: 15 }}
-              className="text-6xl font-black text-white"
-            >
-              ✓ Dropped!
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Fun Contract modal */}
+      {createdBet && (
+        <FunContractModal
+          open={contractOpen}
+          onClose={() => {
+            setContractOpen(false)
+            resetWizard()
+          }}
+          title={wizard.claim}
+          wager={{
+            money: wizard.stakeMoney,
+            punishment: wizard.stakeCustomPunishment ?? wizard.stakePunishment?.text ?? null,
+          }}
+          validUntil={createdBet.deadline}
+          participants={
+            profile
+              ? [{ id: profile.id, name: profile.display_name, avatarUrl: profile.avatar_url }]
+              : []
+          }
+          groupName={wizard.selectedGroup?.name}
+          detailPath={`/bet/${createdBet.id}`}
+        />
+      )}
     </div>
   )
 }

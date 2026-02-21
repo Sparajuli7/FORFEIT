@@ -261,8 +261,6 @@ const useBetStore = create<BetStore>()(
       // Validate required wizard fields
       if (
         !wizard.claim ||
-        !wizard.category ||
-        !wizard.betType ||
         !wizard.deadline ||
         !wizard.stakeType ||
         !wizard.selectedGroup
@@ -282,8 +280,8 @@ const useBetStore = create<BetStore>()(
         group_id: wizard.selectedGroup.id,
         claimant_id: userId,
         title: wizard.claim.trim().slice(0, 140),
-        category: wizard.category!,
-        bet_type: wizard.betType!,
+        category: wizard.category ?? 'wildcard',
+        bet_type: wizard.betType ?? 'long',
         deadline: wizard.deadline!,
         stake_type: wizard.stakeType!,
         stake_money: wizard.stakeMoney,
@@ -432,7 +430,7 @@ const useBetStore = create<BetStore>()(
 
     nextStep: () =>
       set((draft) => {
-        draft.currentStep = Math.min(draft.currentStep + 1, 5)
+        draft.currentStep = Math.min(draft.currentStep + 1, 3)
       }),
 
     prevStep: () =>
