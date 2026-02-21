@@ -217,21 +217,29 @@ export async function getOrCreateDMConversation(otherUserId: string): Promise<Co
   }
 
   // Create new DM conversation
-  const { data: conv, error: convErr } = await supabase
+  const convId = crypto.randomUUID()
+
+  const { error: convErr } = await supabase
     .from('conversations')
-    .insert({ type: 'dm' as const })
-    .select()
-    .single()
+    .insert({ id: convId, type: 'dm' as const })
 
-  if (convErr || !conv) throw convErr ?? new Error('Failed to create DM conversation')
+  if (convErr) throw convErr
 
-  // Add both participants
+  // Add both participants so RLS SELECT policy works
   const { error: partErr } = await supabase.from('conversation_participants').insert([
-    { conversation_id: conv.id, user_id: userId },
-    { conversation_id: conv.id, user_id: otherUserId },
+    { conversation_id: convId, user_id: userId },
+    { conversation_id: convId, user_id: otherUserId },
   ])
   if (partErr) throw partErr
 
+  // Now we can read it back
+  const { data: conv, error: readErr } = await supabase
+    .from('conversations')
+    .select('*')
+    .eq('id', convId)
+    .single()
+
+  if (readErr || !conv) throw readErr ?? new Error('Failed to read created DM conversation')
   return conv
 }
 
@@ -239,21 +247,30 @@ export async function createGroupConversation(
   groupId: string,
   memberIds: string[],
 ): Promise<Conversation> {
-  const { data: conv, error: convErr } = await supabase
+  const convId = crypto.randomUUID()
+
+  const { error: convErr } = await supabase
     .from('conversations')
-    .insert({ type: 'group' as const, group_id: groupId })
-    .select()
-    .single()
+    .insert({ id: convId, type: 'group' as const, group_id: groupId })
 
-  if (convErr || !conv) throw convErr ?? new Error('Failed to create group conversation')
+  if (convErr) throw convErr
 
+  // Add participants immediately so RLS SELECT policy works
   if (memberIds.length > 0) {
     const { error: partErr } = await supabase.from('conversation_participants').insert(
-      memberIds.map((uid) => ({ conversation_id: conv.id, user_id: uid }))
+      memberIds.map((uid) => ({ conversation_id: convId, user_id: uid }))
     )
     if (partErr) throw partErr
   }
 
+  // Now we can read it back (we're a participant)
+  const { data: conv, error: readErr } = await supabase
+    .from('conversations')
+    .select('*')
+    .eq('id', convId)
+    .single()
+
+  if (readErr || !conv) throw readErr ?? new Error('Failed to read created group conversation')
   return conv
 }
 
@@ -261,21 +278,30 @@ export async function createCompetitionConversation(
   betId: string,
   participantIds: string[],
 ): Promise<Conversation> {
-  const { data: conv, error: convErr } = await supabase
+  const convId = crypto.randomUUID()
+
+  const { error: convErr } = await supabase
     .from('conversations')
-    .insert({ type: 'competition' as const, bet_id: betId })
-    .select()
-    .single()
+    .insert({ id: convId, type: 'competition' as const, bet_id: betId })
 
-  if (convErr || !conv) throw convErr ?? new Error('Failed to create competition conversation')
+  if (convErr) throw convErr
 
+  // Add participants immediately so RLS SELECT policy works
   if (participantIds.length > 0) {
     const { error: partErr } = await supabase.from('conversation_participants').insert(
-      participantIds.map((uid) => ({ conversation_id: conv.id, user_id: uid }))
+      participantIds.map((uid) => ({ conversation_id: convId, user_id: uid }))
     )
     if (partErr) throw partErr
   }
 
+  // Now we can read it back (we're a participant)
+  const { data: conv, error: readErr } = await supabase
+    .from('conversations')
+    .select('*')
+    .eq('id', convId)
+    .single()
+
+  if (readErr || !conv) throw readErr ?? new Error('Failed to read created competition conversation')
   return conv
 }
 

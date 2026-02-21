@@ -63,6 +63,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+DROP TRIGGER IF EXISTS trg_update_conversation_last_message ON messages;
 CREATE TRIGGER trg_update_conversation_last_message
   AFTER INSERT ON messages
   FOR EACH ROW
@@ -86,49 +87,52 @@ RETURNS boolean AS $$
   );
 $$ LANGUAGE sql SECURITY DEFINER STABLE;
 
--- conversations: read if participant
+-- conversations policies
+DROP POLICY IF EXISTS "Users can read conversations they participate in" ON conversations;
 CREATE POLICY "Users can read conversations they participate in"
   ON conversations FOR SELECT
   USING (is_conversation_participant(id, auth.uid()));
 
--- conversations: insert (for creating DMs)
+DROP POLICY IF EXISTS "Authenticated users can create conversations" ON conversations;
 CREATE POLICY "Authenticated users can create conversations"
   ON conversations FOR INSERT
   WITH CHECK (auth.uid() IS NOT NULL);
 
--- conversations: update (for last_message_at trigger — via SECURITY DEFINER function)
+DROP POLICY IF EXISTS "Allow trigger updates on conversations" ON conversations;
 CREATE POLICY "Allow trigger updates on conversations"
   ON conversations FOR UPDATE
   USING (true)
   WITH CHECK (true);
 
--- conversation_participants: read others in same conversation
+-- conversation_participants policies
+DROP POLICY IF EXISTS "Users can read participants in their conversations" ON conversation_participants;
 CREATE POLICY "Users can read participants in their conversations"
   ON conversation_participants FOR SELECT
   USING (is_conversation_participant(conversation_id, auth.uid()));
 
--- conversation_participants: insert own row (for DMs) or via service
+DROP POLICY IF EXISTS "Users can join conversations" ON conversation_participants;
 CREATE POLICY "Users can join conversations"
   ON conversation_participants FOR INSERT
   WITH CHECK (auth.uid() IS NOT NULL);
 
--- conversation_participants: update own row (last_read_at)
+DROP POLICY IF EXISTS "Users can update their own participant row" ON conversation_participants;
 CREATE POLICY "Users can update their own participant row"
   ON conversation_participants FOR UPDATE
   USING (user_id = auth.uid())
   WITH CHECK (user_id = auth.uid());
 
--- conversation_participants: delete own row (leave conversation)
+DROP POLICY IF EXISTS "Users can leave conversations" ON conversation_participants;
 CREATE POLICY "Users can leave conversations"
   ON conversation_participants FOR DELETE
   USING (user_id = auth.uid());
 
--- messages: read if participant
+-- messages policies
+DROP POLICY IF EXISTS "Users can read messages in their conversations" ON messages;
 CREATE POLICY "Users can read messages in their conversations"
   ON messages FOR SELECT
   USING (is_conversation_participant(conversation_id, auth.uid()));
 
--- messages: insert if participant
+DROP POLICY IF EXISTS "Participants can send messages" ON messages;
 CREATE POLICY "Participants can send messages"
   ON messages FOR INSERT
   WITH CHECK (
@@ -137,7 +141,16 @@ CREATE POLICY "Participants can send messages"
   );
 
 -- --------------------------------------------------------------------------
--- 6. Enable Realtime
+-- 6. Enable Realtime (ignore errors if already added)
 -- --------------------------------------------------------------------------
-ALTER PUBLICATION supabase_realtime ADD TABLE messages;
-ALTER PUBLICATION supabase_realtime ADD TABLE conversation_participants;
+DO $$
+BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE messages;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE conversation_participants;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
