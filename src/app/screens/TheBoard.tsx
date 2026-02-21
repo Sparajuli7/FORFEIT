@@ -11,16 +11,6 @@ import { formatMoney } from '@/lib/utils/formatters'
 import { formatOdds } from '@/lib/utils/formatters'
 import { BET_CATEGORIES } from '@/lib/utils/constants'
 import type { BetWithSides } from '@/stores/betStore'
-import type { BetCategory, BetType } from '@/lib/database.types'
-
-const FILTER_CHIPS: { id: string; label: string; category?: BetCategory; type?: BetType }[] = [
-  { id: 'all', label: 'All' },
-  { id: 'fitness', label: '🏋️ Fitness', category: 'fitness' },
-  { id: 'money', label: '💰 Money', category: 'money' },
-  { id: 'social', label: '🎭 Social', category: 'social' },
-  { id: 'compete', label: '🏆 Compete', type: 'competition' },
-  { id: 'wildcard', label: 'Wildcard 🎲', category: 'wildcard' },
-]
 
 const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop'
 
@@ -37,12 +27,14 @@ function BoardBetCard({
   claimantName,
   claimantAvatar,
   onNavigate,
+  compact = false,
 }: {
   bet: BetWithSides
   groupName: string
   claimantName: string
   claimantAvatar: string
   onNavigate: (betId: string) => void
+  compact?: boolean
 }) {
   const countdown = useCountdown(bet.deadline)
   const sides = bet.bet_sides ?? []
@@ -51,13 +43,12 @@ function BoardBetCard({
   const { riderPct, doubterPct } = formatOdds(riderCount, doubterCount)
 
   const status = bet.status === 'proof_submitted' ? 'proof' : bet.status === 'active' ? 'active' : 'completed'
-  const showProofBadge = bet.status === 'proof_submitted'
 
   return (
     <BetCard
       groupName={groupName}
       category={BET_CATEGORIES[bet.category]?.label ?? bet.category.toUpperCase()}
-      countdown={showProofBadge ? '' : countdown.formatted}
+      countdown={status === 'proof' ? '' : countdown.formatted}
       claimText={bet.title}
       claimantName={claimantName}
       claimantAvatar={claimantAvatar}
@@ -67,7 +58,7 @@ function BoardBetCard({
       doubtersCount={doubterCount}
       stake={formatStake(bet)}
       status={status}
-      urgent={countdown.isUrgent && !countdown.isExpired}
+      compact={compact}
       onClick={() => onNavigate(bet.id)}
     />
   )
@@ -75,50 +66,30 @@ function BoardBetCard({
 
 export function TheBoard() {
   const navigate = useNavigate()
-  const user = useAuthStore((s) => s.user)
   const profile = useAuthStore((s) => s.profile)
 
   const groups = useGroupStore((s) => s.groups)
-  const activeGroup = useGroupStore((s) => s.activeGroup)
   const fetchGroups = useGroupStore((s) => s.fetchGroups)
-  const setActiveGroup = useGroupStore((s) => s.setActiveGroup)
 
   const bets = useBetStore((s) => s.bets)
-  const fetchBets = useBetStore((s) => s.fetchBets)
   const fetchBetsForGroupIds = useBetStore((s) => s.fetchBetsForGroupIds)
-  const setFilters = useBetStore((s) => s.setFilters)
-  const filters = useBetStore((s) => s.filters)
   const isLoading = useBetStore((s) => s.isLoading)
 
   const unreadCount = useNotificationStore((s) => s.unreadCount)
 
-  const [activeTab, setActiveTab] = useState<'my' | 'group'>('group')
-  const [activeFilterId, setActiveFilterId] = useState('all')
   const [notificationOpen, setNotificationOpen] = useState(false)
   const [claimantMap, setClaimantMap] = useState<Map<string, { display_name: string; avatar_url: string | null }>>(new Map())
-  const initialGroupSetRef = useRef(false)
-
-  /** null = "All Groups" feed; otherwise the selected single group */
-  const effectiveGroup = activeGroup
 
   useEffect(() => {
     fetchGroups()
   }, [fetchGroups])
 
+  const groupIds = useMemo(() => groups.map((g) => g.id), [groups])
   useEffect(() => {
-    if (groups.length > 0 && activeGroup === null && !initialGroupSetRef.current) {
-      setActiveGroup(groups[0])
-      initialGroupSetRef.current = true
+    if (groupIds.length > 0) {
+      fetchBetsForGroupIds(groupIds)
     }
-  }, [groups, activeGroup, setActiveGroup])
-
-  useEffect(() => {
-    if (effectiveGroup) {
-      fetchBets(effectiveGroup.id)
-    } else if (groups.length > 0 && initialGroupSetRef.current) {
-      fetchBetsForGroupIds(groups.map((g) => g.id))
-    }
-  }, [effectiveGroup?.id, groups, fetchBets, fetchBetsForGroupIds, filters])
+  }, [groupIds, fetchBetsForGroupIds])
 
 
   useEffect(() => {
@@ -127,68 +98,28 @@ export function TheBoard() {
     getProfilesByIds(ids).then(setClaimantMap)
   }, [bets])
 
-  useRealtime(
-    'bets',
-    () => {
-      if (effectiveGroup) fetchBets(effectiveGroup.id)
-      else if (groups.length > 0) fetchBetsForGroupIds(groups.map((g) => g.id))
-    },
-    { filter: effectiveGroup ? `group_id=eq.${effectiveGroup.id}` : undefined },
-  )
-
-  useRealtime('bet_sides', () => {
-    if (effectiveGroup) fetchBets(effectiveGroup.id)
-    else if (groups.length > 0) fetchBetsForGroupIds(groups.map((g) => g.id))
+  useRealtime('bets', () => {
+    if (groups.length > 0) fetchBetsForGroupIds(groups.map((g) => g.id))
   })
 
-  const filteredBets = useMemo(() => {
-    let list = bets
-    if (activeTab === 'my' && user) {
-      list = list.filter((b) => (b.bet_sides ?? []).some((s) => s.user_id === user.id))
-    }
-    return list
-  }, [bets, activeTab, user])
+  useRealtime('bet_sides', () => {
+    if (groups.length > 0) fetchBetsForGroupIds(groups.map((g) => g.id))
+  })
 
-  const activeBetCount = useMemo(
-    () => bets.filter((b) => b.status === 'active').length,
-    [bets],
-  )
+  /** Bets to show in horizontal strip: active + proof_submitted (yet to accept or currently in) */
+  const stripBets = useMemo(() => {
+    return bets.filter((b) => b.status === 'active' || b.status === 'proof_submitted')
+  }, [bets])
 
-  const handleFilterClick = (chip: (typeof FILTER_CHIPS)[number]) => {
-    setActiveFilterId(chip.id)
-    setFilters({
-      category: chip.category ?? null,
-      type: chip.type ?? null,
-    })
+  function formatGroupDate(iso: string) {
+    const d = new Date(iso)
+    const now = new Date()
+    const diffDays = Math.floor((now.getTime() - d.getTime()) / (24 * 60 * 60 * 1000))
+    if (diffDays === 0) return 'Today'
+    if (diffDays === 1) return 'Yesterday'
+    if (diffDays < 7) return d.toLocaleDateString('en-US', { weekday: 'short' })
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
   }
-
-  const [now, setNow] = useState(() =>
-    new Date().toLocaleString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    }),
-  )
-  useEffect(() => {
-    const id = setInterval(
-      () =>
-        setNow(
-          new Date().toLocaleString('en-US', {
-            weekday: 'short',
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric',
-            hour: 'numeric',
-            minute: '2-digit',
-          }),
-        ),
-      60_000,
-    )
-    return () => clearInterval(id)
-  }, [])
 
   if (groups.length === 0 && !isLoading) {
     return (
@@ -221,192 +152,126 @@ export function TheBoard() {
   }
 
   return (
-    <div className="h-full bg-bg-primary grain-texture overflow-y-auto pb-6">
-      {/* Header */}
-        <div className="px-6 pt-4 pb-4">
-        {/* Create / Join group — always visible when user has groups */}
-        <div className="flex items-center gap-2 mb-3 flex-wrap">
-          <span className="text-xs text-text-muted font-medium tabular-nums">
-            {groups.length} {groups.length === 1 ? 'group' : 'groups'}
-          </span>
-          <button
-            onClick={() => navigate('/group/create')}
-            className="px-3 py-1.5 rounded-full text-xs font-bold bg-accent-green/20 text-accent-green border border-accent-green/40"
-          >
-            + Create group
-          </button>
-          <button
-            onClick={() => navigate('/group/join')}
-            className="px-3 py-1.5 rounded-full text-xs font-bold bg-bg-elevated text-text-muted border border-border-subtle"
-          >
-            Join with code
-          </button>
-        </div>
+    <div className="h-full bg-bg-primary grain-texture overflow-y-auto pb-24">
+      {/* Top utility bar: settings, notifications, profile */}
+      <div className="flex items-center justify-end gap-2 px-4 py-3 border-b border-border-subtle">
+        <button
+          onClick={() => navigate('/settings')}
+          className="p-2 rounded-lg hover:bg-bg-elevated transition-colors"
+          aria-label="Settings"
+        >
+          <span className="text-lg">⚙️</span>
+        </button>
+        <button
+          onClick={() => setNotificationOpen(true)}
+          className="relative p-2 rounded-lg hover:bg-bg-elevated transition-colors"
+          aria-label="Notifications"
+        >
+          <Bell className="w-5 h-5 text-text-primary" />
+          {unreadCount > 0 && (
+            <div className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-text-muted text-bg-primary text-[10px] font-bold flex items-center justify-center">
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </div>
+          )}
+        </button>
+        <button
+          onClick={() => navigate('/profile')}
+          className="w-9 h-9 rounded-full overflow-hidden bg-bg-elevated border border-border-subtle"
+          aria-label="Profile"
+        >
+          {profile?.avatar_url ? (
+            <img src={profile.avatar_url} alt={profile.display_name} className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full bg-bg-elevated" />
+          )}
+        </button>
+      </div>
 
-        {/* Group switcher — scrollable chips, All Groups + one per group */}
-        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-3 mb-1">
-          <button
-            onClick={() => setActiveGroup(null)}
-            className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap shrink-0 ${
-              effectiveGroup === null
-                ? 'bg-accent-green/20 text-accent-green border border-accent-green/40'
-                : 'bg-bg-elevated text-text-muted'
-            }`}
-          >
-            All Groups
-          </button>
-          {groups.map((g) => (
-            <button
-              key={g.id}
-              onClick={() => setActiveGroup(g)}
-              className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap shrink-0 ${
-                effectiveGroup?.id === g.id
-                  ? 'bg-accent-green/20 text-accent-green border border-accent-green/40'
-                  : 'bg-bg-elevated text-text-muted'
-              }`}
-            >
-              {g.avatar_emoji} {g.name}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <h1 className="text-[11px] font-bold uppercase tracking-[0.1em] text-text-muted mb-1">
-              THE BOARD
-            </h1>
-            <p className="text-xs text-text-muted tabular-nums">{now}</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate('/settings')}
-              className="p-2 rounded-lg hover:bg-bg-elevated transition-colors"
-              aria-label="Settings"
-            >
-              <span className="text-lg">⚙️</span>
-            </button>
-            <button
-              onClick={() => setNotificationOpen(true)}
-              className="relative"
-              aria-label="Notifications"
-            >
-              <Bell className="w-5 h-5 text-text-primary" />
-              {unreadCount > 0 && (
-                <div className="absolute -top-1 -right-1 w-4 h-4 bg-live-indicator rounded-full text-[9px] font-black text-white flex items-center justify-center">
-                  {unreadCount > 9 ? '9+' : unreadCount}
-                </div>
-              )}
-            </button>
-            <button
-              onClick={() => navigate('/profile')}
-              className="w-9 h-9 rounded-full overflow-hidden bg-bg-elevated border border-border-subtle"
-              aria-label="Profile"
-            >
-              {profile?.avatar_url ? (
-                <img
-                  src={profile.avatar_url}
-                  alt={profile.display_name}
-                  className="w-full h-full object-cover"
+      {/* Horizontal scroll: bets (yet to accept + currently in) — compact cards */}
+      <div className="px-4 pt-4 pb-2">
+        <h2 className="text-[11px] font-bold uppercase tracking-[0.1em] text-text-muted mb-3">My Bets</h2>
+        <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2 -mx-4 px-4">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8 w-full">
+              <div className="w-8 h-8 border-2 border-accent-green border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : stripBets.length === 0 ? (
+            <div className="py-6 text-text-muted text-sm">No bets yet. Create one to get started!</div>
+          ) : (
+            stripBets.map((bet) => {
+              const claimant = claimantMap.get(bet.claimant_id)
+              const group = groups.find((g) => g.id === bet.group_id)
+              const groupName = group ? `${group.name} ${group.avatar_emoji}` : 'Group'
+              return (
+                <BoardBetCard
+                  key={bet.id}
+                  bet={bet}
+                  groupName={groupName}
+                  claimantName={claimant?.display_name ?? 'Anonymous'}
+                  claimantAvatar={claimant?.avatar_url ?? DEFAULT_AVATAR}
+                  onNavigate={(id) => navigate(`/bet/${id}`)}
+                  compact
                 />
-              ) : (
-                <div className="w-full h-full bg-gradient-to-br from-accent-green/50 via-gold/50 to-purple/50" />
-              )}
-            </button>
-          </div>
-        </div>
-
-        {/* Live indicator */}
-        <div className="flex items-center justify-center gap-2 mb-4">
-          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-live-indicator/10 border border-live-indicator/30 rounded-full">
-            <div className="w-2 h-2 rounded-full bg-live-indicator pulse-live" />
-            <span className="text-xs font-bold text-live-indicator uppercase tracking-wide">
-              LIVE · {activeBetCount} active
-            </span>
-          </div>
-        </div>
-
-        {/* Tabs */}
-        <div className="flex gap-2 mb-4">
-          <button
-            onClick={() => setActiveTab('my')}
-            className={`px-5 py-2 rounded-full font-bold text-sm ${
-              activeTab === 'my'
-                ? 'bg-accent-green text-white'
-                : 'bg-bg-elevated text-text-muted'
-            }`}
-          >
-            My Bets
-          </button>
-          <button
-            onClick={() => setActiveTab('group')}
-            className={`px-5 py-2 rounded-full font-bold text-sm ${
-              activeTab === 'group'
-                ? 'bg-accent-green text-white'
-                : 'bg-bg-elevated text-text-muted'
-            }`}
-          >
-            {effectiveGroup ? `${effectiveGroup.avatar_emoji} ${effectiveGroup.name}` : 'Group Feed'}
-          </button>
-        </div>
-
-        {/* Filters */}
-        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
-          {FILTER_CHIPS.map((chip) => (
-            <button
-              key={chip.id}
-              onClick={() => handleFilterClick(chip)}
-              className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap ${
-                activeFilterId === chip.id
-                  ? 'bg-accent-green/20 text-accent-green border border-accent-green/40'
-                  : 'bg-bg-elevated text-text-muted'
-              }`}
-            >
-              {chip.label}
-            </button>
-          ))}
+              )
+            })
+          )}
         </div>
       </div>
 
-      {/* Bet Cards */}
-      <div className="px-6 space-y-3 mb-6">
-        {isLoading ? (
-          <div className="flex justify-center py-12">
-            <div className="w-8 h-8 border-2 border-accent-green border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : filteredBets.length === 0 ? (
-          <div className="text-center py-12 text-text-muted text-sm">
-            No bets yet. Create one to get started!
-          </div>
-        ) : (
-          filteredBets.map((bet) => {
-            const claimant = claimantMap.get(bet.claimant_id)
-            const group = groups.find((g) => g.id === bet.group_id)
-            const groupName = group ? `${group.name} ${group.avatar_emoji}` : 'Group'
+      {/* Create group / Join with code */}
+      <div className="px-6 py-4 flex flex-col gap-3">
+        <button
+          onClick={() => navigate('/group/create')}
+          className="w-full h-12 rounded-xl bg-accent-green text-bg-primary font-bold flex items-center justify-center gap-2"
+        >
+          <span className="text-lg">+</span> Create group
+        </button>
+        <button
+          onClick={() => navigate('/group/join')}
+          className="w-full h-12 rounded-xl bg-bg-elevated border border-border-subtle text-text-primary font-bold"
+        >
+          Join with code
+        </button>
+      </div>
 
-            return (
-              <BoardBetCard
-                key={bet.id}
-                bet={bet}
-                groupName={groupName}
-                claimantName={claimant?.display_name ?? 'Anonymous'}
-                claimantAvatar={claimant?.avatar_url ?? DEFAULT_AVATAR}
-                onNavigate={(id) => navigate(`/bet/${id}`)}
-              />
-            )
-          })
-        )}
+      {/* Gmail-style list of groups */}
+      <div className="px-4 border-t border-border-subtle">
+        <h2 className="text-[11px] font-bold uppercase tracking-[0.1em] text-text-muted pt-4 pb-2 px-2">
+          Groups
+        </h2>
+        <div className="divide-y divide-border-subtle">
+          {groups.map((g) => (
+            <button
+              key={g.id}
+              onClick={() => navigate(`/group/${g.id}`)}
+              className="w-full flex items-center gap-3 py-3 px-2 text-left hover:bg-bg-elevated/50 active:bg-bg-elevated transition-colors"
+            >
+              <div className="flex-1 min-w-0">
+                <div className="font-semibold text-text-primary truncate">
+                  {g.avatar_emoji} {g.name}
+                </div>
+                <div className="text-xs text-text-muted truncate">
+                  Invite: {g.invite_code}
+                </div>
+              </div>
+              <span className="text-xs text-text-muted shrink-0 tabular-nums">
+                {formatGroupDate(g.created_at)}
+              </span>
+            </button>
+          ))}
+        </div>
       </div>
 
       <NotificationPanel open={notificationOpen} onOpenChange={setNotificationOpen} />
 
-      {/* FAB with Quick Bet label */}
-      <div className="fixed bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-3 z-10">
+      {/* Quick Bet — static, no glow */}
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 z-10">
         <span className="text-xs font-bold text-text-muted uppercase tracking-wide bg-bg-elevated px-3 py-1.5 rounded-full border border-border-subtle">
           Quick Bet
         </span>
         <button
           onClick={() => navigate('/bet/create')}
-          className="w-14 h-14 rounded-full bg-accent-green text-white flex items-center justify-center text-2xl font-bold glow-green btn-pressed shadow-xl"
+          className="w-14 h-14 rounded-full bg-accent-green text-bg-primary flex items-center justify-center text-2xl font-bold btn-pressed shadow-lg border border-accent-green/20"
         >
           +
         </button>
