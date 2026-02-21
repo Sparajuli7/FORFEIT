@@ -107,6 +107,41 @@ export function RecordScreen() {
       </div>
 
       <div className="px-6 py-5 space-y-8">
+        {/* ——— Player card CTA ——— */}
+        <button
+          onClick={() => navigate('/profile/card')}
+          className="w-full relative overflow-hidden rounded-2xl border border-white/10 p-4 text-left group active:scale-[0.98] transition-transform"
+          style={{
+            background: 'linear-gradient(135deg, #0d1a0d 0%, #0d0d0d 50%, #1a0d0d 100%)',
+          }}
+        >
+          {/* Shimmer hint */}
+          <div
+            className="absolute inset-0 opacity-0 group-active:opacity-100 pointer-events-none transition-opacity"
+            style={{
+              background: 'linear-gradient(90deg, transparent 30%, rgba(255,215,0,0.08) 50%, transparent 70%)',
+            }}
+          />
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-amber-400 mb-1">
+                ⚡ My Player Card
+              </p>
+              <p className="text-sm font-bold text-white">View &amp; share your trading card</p>
+              <p className="text-[11px] text-white/40 mt-0.5">Stats, records &amp; tier badge</p>
+            </div>
+            <div className="shrink-0 ml-3 flex flex-col items-center gap-1">
+              <div
+                className="w-14 h-20 rounded-lg border-2 border-amber-400/60 flex flex-col items-center justify-center gap-1"
+                style={{ background: 'linear-gradient(145deg, #1a1200, #0d0d0d)' }}
+              >
+                <span className="text-xl">{user?.user_metadata?.avatar_url ? '🃏' : '🃏'}</span>
+                <div className="text-[8px] font-black text-amber-400 uppercase tracking-widest">FORFEIT</div>
+              </div>
+            </div>
+          </div>
+        </button>
+
         {/* ——— My record ——— */}
         <section>
           <h2 className="text-[11px] font-bold uppercase tracking-wider text-text-muted mb-3">

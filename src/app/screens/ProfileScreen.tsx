@@ -183,6 +183,17 @@ function ProfileContent({
       {isOwnProfile ? (
         <div className="px-6 mt-8 pb-8 space-y-3">
           <button
+            onClick={() => navigate('/profile/card')}
+            className="w-full py-3 rounded-xl font-bold text-sm border flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
+            style={{
+              background: 'linear-gradient(135deg, #1a1200 0%, #0d0d0d 100%)',
+              borderColor: 'rgba(255,215,0,0.4)',
+              color: '#FFD700',
+            }}
+          >
+            🃏 My Player Card
+          </button>
+          <button
             onClick={() => navigate('/shame')}
             className="w-full py-3 rounded-xl bg-accent-green/20 text-accent-green font-bold text-sm border border-accent-green/40"
           >
