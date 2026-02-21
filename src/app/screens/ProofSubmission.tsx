@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router'
-import { Image, Video, FileText, X } from 'lucide-react'
+import { Camera, Image, Video, FileText, X, CheckCircle } from 'lucide-react'
 import { useBetStore } from '@/stores'
 import { useProofStore } from '@/stores'
 import type { ProofType } from '@/lib/database.types'
@@ -9,6 +9,8 @@ import { PrimaryButton } from '../components/PrimaryButton'
 interface UploadEntry {
   file: File
   type: 'screenshot' | 'video' | 'document'
+  /** Object URL for image previews — revoked on removal */
+  previewUrl?: string
 }
 
 interface ProofSubmissionProps {
@@ -31,6 +33,12 @@ export function ProofSubmission({ onSubmit, onBack }: ProofSubmissionProps) {
   const [submitted, setSubmitted] = useState(false)
   const [localError, setLocalError] = useState<string | null>(null)
 
+  // Refs for file inputs — programmatic clicks are more reliable than label wrapping on mobile
+  const photoInputRef = useRef<HTMLInputElement>(null)
+  const videoInputRef = useRef<HTMLInputElement>(null)
+  const docInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
+
   useEffect(() => {
     if (id) fetchBetDetail(id)
   }, [id, fetchBetDetail])
@@ -39,17 +47,41 @@ export function ProofSubmission({ onSubmit, onBack }: ProofSubmissionProps) {
     useProofStore.getState().clearError()
   }, [])
 
-  const addFiles = (e: React.ChangeEvent<HTMLInputElement>, type: UploadEntry['type']) => {
-    const files = e.target.files
-    if (!files?.length) return
-    setUploadFiles((prev) => [...prev, ...Array.from(files).map((file) => ({ file, type }))])
-    setLocalError(null)
-    e.target.value = ''
-  }
+  // Clean up object URLs on unmount
+  useEffect(() => {
+    return () => {
+      uploadFiles.forEach((u) => {
+        if (u.previewUrl) URL.revokeObjectURL(u.previewUrl)
+      })
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const removeFile = (idx: number) => {
-    setUploadFiles((prev) => prev.filter((_, i) => i !== idx))
-  }
+  const addFiles = useCallback((e: React.ChangeEvent<HTMLInputElement>, type: UploadEntry['type']) => {
+    const fileList = e.target.files
+    if (!fileList || fileList.length === 0) return
+
+    const newEntries: UploadEntry[] = Array.from(fileList).map((file) => {
+      const entry: UploadEntry = { file, type }
+      if (file.type.startsWith('image/')) {
+        entry.previewUrl = URL.createObjectURL(file)
+      }
+      return entry
+    })
+
+    setUploadFiles((prev) => [...prev, ...newEntries])
+    setLocalError(null)
+
+    // Reset input so the same file can be selected again if removed
+    e.target.value = ''
+  }, [])
+
+  const removeFile = useCallback((idx: number) => {
+    setUploadFiles((prev) => {
+      const removed = prev[idx]
+      if (removed?.previewUrl) URL.revokeObjectURL(removed.previewUrl)
+      return prev.filter((_, i) => i !== idx)
+    })
+  }, [])
 
   const handleSubmit = async () => {
     if (!id) return
@@ -100,10 +132,15 @@ export function ProofSubmission({ onSubmit, onBack }: ProofSubmissionProps) {
   const hasProof = uploadFiles.length > 0 || caption.trim().length > 0
   const error = localError || storeError
 
+  // Counts per type for badges
+  const photoCount = uploadFiles.filter((u) => u.type === 'screenshot').length
+  const videoCount = uploadFiles.filter((u) => u.type === 'video').length
+  const docCount = uploadFiles.filter((u) => u.type === 'document').length
+
   if (submitted) {
     return (
       <div className="h-full bg-bg-primary flex flex-col items-center justify-center">
-        <div className="text-6xl mb-4">&#10003;</div>
+        <CheckCircle className="w-16 h-16 text-accent-green mb-4" />
         <p className="text-accent-green font-bold text-xl">Proof submitted!</p>
       </div>
     )
@@ -120,89 +157,104 @@ export function ProofSubmission({ onSubmit, onBack }: ProofSubmissionProps) {
       </div>
 
       <div className="px-6 py-6 space-y-4">
-        {/* Upload buttons */}
+        {/* Upload buttons — use programmatic clicks for reliable mobile behavior */}
         <div>
           <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-text-muted mb-3">UPLOAD EVIDENCE</p>
           <div className="grid grid-cols-2 gap-3">
-            {/* Photos: pick from gallery. Input overlays card so tap opens picker on mobile */}
-            <label className="relative block bg-bg-card border border-border-subtle rounded-xl p-4 flex flex-col items-center gap-2 hover:border-accent-green transition-colors cursor-pointer min-h-[100px]">
-              <Image className="w-8 h-8 text-accent-green pointer-events-none" />
-              <span className="text-xs font-bold text-text-primary pointer-events-none">Photos</span>
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                onChange={(e) => addFiles(e, 'screenshot')}
-                aria-label="Upload photos"
-              />
-            </label>
+            {/* Photos from gallery */}
+            <UploadCard
+              icon={<Image className="w-8 h-8 text-accent-green" />}
+              label="Photos"
+              count={photoCount}
+              onClick={() => photoInputRef.current?.click()}
+            />
             {/* Video */}
-            <label className="relative block bg-bg-card border border-border-subtle rounded-xl p-4 flex flex-col items-center gap-2 hover:border-accent-green transition-colors cursor-pointer min-h-[100px]">
-              <Video className="w-8 h-8 text-accent-green pointer-events-none" />
-              <span className="text-xs font-bold text-text-primary pointer-events-none">Video</span>
-              <input
-                type="file"
-                accept="video/*"
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                onChange={(e) => addFiles(e, 'video')}
-                aria-label="Upload video"
-              />
-            </label>
+            <UploadCard
+              icon={<Video className="w-8 h-8 text-accent-green" />}
+              label="Video"
+              count={videoCount}
+              onClick={() => videoInputRef.current?.click()}
+            />
             {/* Document */}
-            <label className="relative block bg-bg-card border border-border-subtle rounded-xl p-4 flex flex-col items-center gap-2 hover:border-accent-green transition-colors cursor-pointer min-h-[100px]">
-              <FileText className="w-8 h-8 text-accent-green pointer-events-none" />
-              <span className="text-xs font-bold text-text-primary pointer-events-none">Document</span>
-              <input
-                type="file"
-                accept=".pdf,.doc,.docx,application/pdf"
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                onChange={(e) => addFiles(e, 'document')}
-                aria-label="Upload document"
-              />
-            </label>
-            {/* Take Photo: opens camera on mobile */}
-            <label className="relative block bg-bg-card border border-border-subtle rounded-xl p-4 flex flex-col items-center gap-2 hover:border-accent-green transition-colors cursor-pointer min-h-[100px]">
-              <Image className="w-8 h-8 text-accent-green pointer-events-none" />
-              <span className="text-xs font-bold text-text-primary pointer-events-none">Take Photo</span>
-              <input
-                type="file"
-                accept="image/*"
-                capture="environment"
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                onChange={(e) => addFiles(e, 'screenshot')}
-                aria-label="Take photo"
-              />
-            </label>
+            <UploadCard
+              icon={<FileText className="w-8 h-8 text-accent-green" />}
+              label="Document"
+              count={docCount}
+              onClick={() => docInputRef.current?.click()}
+            />
+            {/* Take Photo — opens native camera on mobile */}
+            <UploadCard
+              icon={<Camera className="w-8 h-8 text-accent-green" />}
+              label="Take Photo"
+              count={0}
+              onClick={() => cameraInputRef.current?.click()}
+            />
           </div>
+
+          {/* Hidden file inputs */}
+          <input
+            ref={photoInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={(e) => addFiles(e, 'screenshot')}
+          />
+          <input
+            ref={videoInputRef}
+            type="file"
+            accept="video/*"
+            className="hidden"
+            onChange={(e) => addFiles(e, 'video')}
+          />
+          <input
+            ref={docInputRef}
+            type="file"
+            accept=".pdf,.doc,.docx,.txt,.csv,.xls,.xlsx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+            className="hidden"
+            onChange={(e) => addFiles(e, 'document')}
+          />
+          <input
+            ref={cameraInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={(e) => addFiles(e, 'screenshot')}
+          />
         </div>
 
         {/* File previews */}
         {uploadFiles.length > 0 && (
-          <div className="flex gap-2 flex-wrap">
-            {uploadFiles.map((u, i) => (
-              <div key={i} className="relative w-20 h-20 rounded-lg overflow-hidden border border-border-subtle">
-                {u.file.type.startsWith('image/') ? (
-                  <img src={URL.createObjectURL(u.file)} alt="" className="w-full h-full object-cover" />
-                ) : u.file.type.startsWith('video/') ? (
-                  <div className="w-full h-full flex flex-col items-center justify-center bg-bg-elevated">
-                    <Video className="w-5 h-5 text-accent-green mb-1" />
-                    <span className="text-[10px] text-text-muted truncate max-w-full px-1">{u.file.name}</span>
-                  </div>
-                ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center bg-bg-elevated">
-                    <FileText className="w-5 h-5 text-accent-green mb-1" />
-                    <span className="text-[10px] text-text-muted truncate max-w-full px-1">{u.file.name}</span>
-                  </div>
-                )}
-                <button
-                  onClick={() => removeFile(i)}
-                  className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-accent-coral text-white flex items-center justify-center"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </div>
-            ))}
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-text-muted mb-2">
+              {uploadFiles.length} FILE{uploadFiles.length !== 1 ? 'S' : ''} SELECTED
+            </p>
+            <div className="flex gap-2 flex-wrap">
+              {uploadFiles.map((u, i) => (
+                <div key={i} className="relative w-20 h-20 rounded-lg overflow-hidden border border-accent-green/50 bg-bg-elevated">
+                  {u.previewUrl ? (
+                    <img src={u.previewUrl} alt="" className="w-full h-full object-cover" />
+                  ) : u.file.type.startsWith('video/') ? (
+                    <div className="w-full h-full flex flex-col items-center justify-center">
+                      <Video className="w-5 h-5 text-accent-green mb-1" />
+                      <span className="text-[10px] text-text-muted truncate max-w-full px-1">{u.file.name}</span>
+                    </div>
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center">
+                      <FileText className="w-5 h-5 text-accent-green mb-1" />
+                      <span className="text-[10px] text-text-muted truncate max-w-full px-1">{u.file.name}</span>
+                    </div>
+                  )}
+                  <button
+                    onClick={() => removeFile(i)}
+                    className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-accent-coral text-white flex items-center justify-center z-10"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -231,5 +283,34 @@ export function ProofSubmission({ onSubmit, onBack }: ProofSubmissionProps) {
         </PrimaryButton>
       </div>
     </div>
+  )
+}
+
+/** Tappable upload card with optional count badge */
+function UploadCard({
+  icon,
+  label,
+  count,
+  onClick,
+}: {
+  icon: React.ReactNode
+  label: string
+  count: number
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="relative bg-bg-card border border-border-subtle rounded-xl p-4 flex flex-col items-center gap-2 hover:border-accent-green active:scale-95 transition-all cursor-pointer min-h-[100px]"
+    >
+      {icon}
+      <span className="text-xs font-bold text-text-primary">{label}</span>
+      {count > 0 && (
+        <span className="absolute top-2 right-2 w-5 h-5 rounded-full bg-accent-green text-white text-[10px] font-bold flex items-center justify-center">
+          {count}
+        </span>
+      )}
+    </button>
   )
 }
