@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { supabase } from '@/lib/supabase'
 import { getLeaderboard } from '@/lib/api/competitions'
+import { createCompetitionConversation, getCompetitionConversation, addConversationParticipant } from '@/lib/api/chat'
 import type {
   Bet,
   BetInsert,
@@ -34,6 +35,7 @@ export interface CompetitionData {
   stakeType: StakeType
   stakeMoney?: number     // cents
   stakePunishmentId?: string
+  isPublic?: boolean      // defaults to true
 }
 
 interface CompetitionState {
@@ -117,6 +119,7 @@ const useCompetitionStore = create<CompetitionStore>()((set, get) => ({
       stake_money: data.stakeMoney ?? null,
       stake_punishment_id: data.stakePunishmentId ?? null,
       comp_metric: data.metric,
+      is_public: data.isPublic ?? true,
       status: 'active',
     }
 
@@ -144,6 +147,13 @@ const useCompetitionStore = create<CompetitionStore>()((set, get) => ({
       user_id: userId,
       score: 0,
     })
+
+    // Auto-create competition chat conversation
+    try {
+      await createCompetitionConversation(competition.id, [userId])
+    } catch {
+      // Non-fatal: competition still created successfully
+    }
 
     set((state) => ({
       competitions: [competition, ...state.competitions],
@@ -235,6 +245,16 @@ const useCompetitionStore = create<CompetitionStore>()((set, get) => ({
         user_id: userId,
         score: 0,
       })
+    }
+
+    // Add user to competition chat conversation
+    try {
+      const conv = await getCompetitionConversation(betId)
+      if (conv && userId) {
+        await addConversationParticipant(conv.id, userId)
+      }
+    } catch {
+      // Non-fatal
     }
 
     set({ isLoading: false })

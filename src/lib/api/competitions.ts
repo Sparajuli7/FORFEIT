@@ -26,7 +26,7 @@ export async function getCompetitionsForUser(): Promise<Bet[]> {
     .select('*')
     .eq('bet_type', 'competition')
     .in('group_id', groupIds)
-    .in('status', ['pending', 'active', 'proof_submitted', 'disputed', 'completed'])
+    .in('status', ['pending', 'active', 'proof_submitted', 'disputed', 'completed', 'voided'])
     .order('created_at', { ascending: false })
 
   if (error) throw error
@@ -47,6 +47,7 @@ export interface CompetitionData {
   stakeMoney?: number
   stakePunishmentId?: string
   stakeCustomPunishment?: string | null
+  isPublic?: boolean
 }
 
 export interface LeaderboardEntry {
@@ -71,6 +72,7 @@ export async function createCompetition(data: CompetitionData): Promise<Bet> {
     stake_punishment_id: data.stakePunishmentId ?? null,
     stake_custom_punishment: data.stakeCustomPunishment ?? null,
     comp_metric: data.metric,
+    is_public: data.isPublic ?? true,
     status: 'active',
   }
 
@@ -164,6 +166,15 @@ export async function submitScore(
       },
       { onConflict: 'bet_id,user_id' },
     )
+
+  if (error) throw error
+}
+
+export async function toggleCompetitionVisibility(betId: string, isPublic: boolean): Promise<void> {
+  const { error } = await supabase
+    .from('bets')
+    .update({ is_public: isPublic })
+    .eq('id', betId)
 
   if (error) throw error
 }

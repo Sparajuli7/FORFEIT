@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
-import { useAuthStore, useBetStore } from '@/stores'
+import { MessageCircle } from 'lucide-react'
+import { useAuthStore, useBetStore, useChatStore } from '@/stores'
 import { getMyBets } from '@/lib/api/bets'
 import { getProfilesByIds, getProfile as fetchProfile } from '@/lib/api/profiles'
 import { AvatarWithRepBadge } from '@/app/components/RepBadge'
@@ -200,12 +201,22 @@ function ProfileContent({
           </button>
         </div>
       ) : (
-        <div className="px-6 mt-8 pb-8">
+        <div className="px-6 mt-8 pb-8 space-y-3">
           <button
             onClick={() => navigate('/compete/create', { state: { opponentId: profile.id } })}
             className="w-full py-3 rounded-xl bg-accent-green text-white font-bold text-sm"
           >
             Challenge
+          </button>
+          <button
+            onClick={async () => {
+              const convId = await useChatStore.getState().getOrCreateDM(profile.id)
+              navigate(`/chat/${convId}`)
+            }}
+            className="w-full py-3 rounded-xl bg-bg-elevated text-text-primary font-bold text-sm border border-border-subtle flex items-center justify-center gap-2"
+          >
+            <MessageCircle className="w-4 h-4" />
+            Message
           </button>
         </div>
       )}
@@ -254,13 +265,23 @@ export function ProfileScreen({ activeScreen, userId }: ProfileScreenProps) {
   useEffect(() => {
     if (!targetUserId) return
     getMyBets(targetUserId).then((bets) => {
-      setRecentBets(bets)
-      const ids = [...new Set(bets.map((b) => b.claimant_id))]
+      // When viewing another user's profile, hide private competitions
+      // the viewer isn't a participant of
+      const filtered = isOwnProfile
+        ? bets
+        : bets.filter((b) => {
+            if (b.bet_type !== 'competition') return true
+            if (b.is_public) return true
+            // Private competition — only show if viewer is a participant
+            return b.bet_sides?.some((s: { user_id: string }) => s.user_id === currentUser?.id)
+          })
+      setRecentBets(filtered)
+      const ids = [...new Set(filtered.map((b) => b.claimant_id))]
       if (ids.length > 0) {
         getProfilesByIds(ids).then(setClaimantMap)
       }
     })
-  }, [targetUserId])
+  }, [targetUserId, isOwnProfile, currentUser?.id])
 
 
   if (loading && !profile) {

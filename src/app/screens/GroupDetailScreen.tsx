@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
-import { ChevronLeft, Copy, LogOut } from 'lucide-react'
-import { useGroupStore, useBetStore, useAuthStore } from '@/stores'
+import { ChevronLeft, Copy, LogOut, MessageCircle, ChevronRight } from 'lucide-react'
+import { useGroupStore, useBetStore, useAuthStore, useChatStore } from '@/stores'
 import { getGroupBets } from '@/lib/api/bets'
 import { getProfilesWithRepByIds } from '@/lib/api/profiles'
 import { AvatarWithRepBadge } from '@/app/components/RepBadge'
@@ -193,6 +193,25 @@ export function GroupDetailScreen() {
             })}
           </div>
         </div>
+
+        {/* Group Chat */}
+        <button
+          onClick={async () => {
+            if (!id) return
+            const convId = await useChatStore.getState().getOrCreateGroupChat(id)
+            navigate(`/chat/${convId}`)
+          }}
+          className="w-full flex items-center gap-3 bg-bg-card border border-border-subtle rounded-xl p-4 mb-6 hover:bg-bg-elevated transition-colors"
+        >
+          <div className="w-10 h-10 rounded-full bg-accent-green/20 flex items-center justify-center">
+            <MessageCircle className="w-5 h-5 text-accent-green" />
+          </div>
+          <div className="flex-1 text-left">
+            <p className="text-sm font-bold text-text-primary">Group Chat</p>
+            <p className="text-xs text-text-muted">Message your group</p>
+          </div>
+          <ChevronRight className="w-5 h-5 text-text-muted" />
+        </button>
 
         {/* Invite link */}
         <div className="bg-bg-card border border-border-subtle rounded-xl p-4 mb-6">

@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { supabase } from '@/lib/supabase'
 import type { Group, GroupMember, GroupInsert } from '@/lib/database.types'
+import { createGroupConversation, addConversationParticipant, getGroupConversation, removeConversationParticipant } from '@/lib/api/chat'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -120,6 +121,13 @@ const useGroupStore = create<GroupStore>()((set, get) => ({
       return null
     }
 
+    // Auto-create group chat conversation
+    try {
+      await createGroupConversation(group.id, [userId])
+    } catch {
+      // Non-fatal: group still created successfully
+    }
+
     set((state) => ({
       groups: [group, ...state.groups],
       activeGroup: group,
@@ -177,6 +185,16 @@ const useGroupStore = create<GroupStore>()((set, get) => ({
       return null
     }
 
+    // Add user to group chat conversation
+    try {
+      const conv = await getGroupConversation(group.id)
+      if (conv) {
+        await addConversationParticipant(conv.id, userId)
+      }
+    } catch {
+      // Non-fatal
+    }
+
     set((state) => ({
       groups: [...state.groups, group],
       activeGroup: group,
@@ -220,6 +238,16 @@ const useGroupStore = create<GroupStore>()((set, get) => ({
     if (error) {
       set({ error: error.message, isLoading: false })
       return
+    }
+
+    // Remove user from group chat conversation
+    try {
+      const conv = await getGroupConversation(groupId)
+      if (conv && userId) {
+        await removeConversationParticipant(conv.id, userId)
+      }
+    } catch {
+      // Non-fatal
     }
 
     set((state) => ({

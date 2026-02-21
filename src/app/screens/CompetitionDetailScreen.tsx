@@ -1,9 +1,9 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router'
-import { ChevronLeft } from 'lucide-react'
+import { ChevronLeft, MessageCircle, Globe, Lock } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { useCompetitionStore } from '@/stores'
-import { submitScore, uploadCompetitionProof } from '@/lib/api/competitions'
+import { useCompetitionStore, useChatStore } from '@/stores'
+import { submitScore, uploadCompetitionProof, toggleCompetitionVisibility } from '@/lib/api/competitions'
 import { useRealtimeSubscription } from '@/lib/hooks/useRealtime'
 import { AvatarWithRepBadge } from '@/app/components/RepBadge'
 import { PrimaryButton } from '@/app/components/PrimaryButton'
@@ -167,6 +167,60 @@ export function CompetitionDetailScreen() {
               />
             </div>
           </div>
+
+          {/* Competition Chat */}
+          <button
+            onClick={async () => {
+              if (!id) return
+              const convId = await useChatStore.getState().getOrCreateCompetitionChat(id)
+              navigate(`/chat/${convId}`)
+            }}
+            className="w-full flex items-center gap-3 bg-bg-card border border-border-subtle rounded-xl p-3 mb-3 hover:bg-bg-elevated transition-colors"
+          >
+            <div className="w-9 h-9 rounded-full bg-accent-green/20 flex items-center justify-center">
+              <MessageCircle className="w-4 h-4 text-accent-green" />
+            </div>
+            <p className="flex-1 text-sm font-bold text-text-primary text-left">Competition Chat</p>
+            <span className="text-xs text-text-muted">Talk trash &rarr;</span>
+          </button>
+
+          {/* Visibility toggle — creator only */}
+          {competition && user?.id === competition.claimant_id && (
+            <button
+              onClick={async () => {
+                if (!competition) return
+                const newValue = !competition.is_public
+                await toggleCompetitionVisibility(competition.id, newValue)
+                setCompetition({ ...competition, is_public: newValue })
+              }}
+              className="w-full flex items-center gap-3 bg-bg-card border border-border-subtle rounded-xl p-3 mb-6 hover:bg-bg-elevated transition-colors"
+            >
+              <div className={`w-9 h-9 rounded-full flex items-center justify-center ${competition.is_public ? 'bg-accent-green/20' : 'bg-accent-coral/20'}`}>
+                {competition.is_public
+                  ? <Globe className="w-4 h-4 text-accent-green" />
+                  : <Lock className="w-4 h-4 text-accent-coral" />}
+              </div>
+              <div className="flex-1 text-left">
+                <p className="text-sm font-bold text-text-primary">
+                  {competition.is_public ? 'Public' : 'Private'}
+                </p>
+                <p className="text-xs text-text-muted">
+                  {competition.is_public ? 'Visible on profiles' : 'Only participants can see'}
+                </p>
+              </div>
+              <div className={`relative w-11 h-6 rounded-full transition-colors ${competition.is_public ? 'bg-accent-green' : 'bg-bg-elevated'}`}>
+                <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${competition.is_public ? 'left-6' : 'left-1'}`} />
+              </div>
+            </button>
+          )}
+
+          {/* Visibility badge — non-creators */}
+          {competition && user?.id !== competition.claimant_id && !competition.is_public && (
+            <div className="flex items-center gap-2 mb-6 px-1">
+              <Lock className="w-3.5 h-3.5 text-accent-coral" />
+              <span className="text-xs text-accent-coral font-semibold">Private competition</span>
+            </div>
+          )}
 
           {leaderboard.length === 0 ? (
             <p className="text-text-muted text-sm">No scores yet. Be the first to submit!</p>

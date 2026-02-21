@@ -1,9 +1,9 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router'
-import { Bell } from 'lucide-react'
+import { Bell, MessageCircle } from 'lucide-react'
 import { BetCard } from '../components/BetCard'
 import { NotificationPanel } from '../components/NotificationPanel'
-import { useGroupStore, useBetStore, useAuthStore, useNotificationStore } from '@/stores'
+import { useGroupStore, useBetStore, useAuthStore, useNotificationStore, useChatStore } from '@/stores'
 import { useCountdown } from '@/lib/hooks/useCountdown'
 import { useRealtime } from '@/lib/hooks/useRealtime'
 import { getProfilesByIds } from '@/lib/api/profiles'
@@ -76,6 +76,7 @@ export function TheBoard() {
   const isLoading = useBetStore((s) => s.isLoading)
 
   const unreadCount = useNotificationStore((s) => s.unreadCount)
+  const chatUnreadCount = useChatStore((s) => s.totalUnreadCount)
 
   const [notificationOpen, setNotificationOpen] = useState(false)
   const [claimantMap, setClaimantMap] = useState<Map<string, { display_name: string; avatar_url: string | null }>>(new Map())
@@ -161,6 +162,18 @@ export function TheBoard() {
           aria-label="Settings"
         >
           <span className="text-lg">⚙️</span>
+        </button>
+        <button
+          onClick={() => navigate('/chat')}
+          className="relative p-2 rounded-lg hover:bg-bg-elevated transition-colors"
+          aria-label="Messages"
+        >
+          <MessageCircle className="w-5 h-5 text-text-primary" />
+          {chatUnreadCount > 0 && (
+            <div className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-accent-green text-bg-primary text-[10px] font-bold flex items-center justify-center">
+              {chatUnreadCount > 9 ? '9+' : chatUnreadCount}
+            </div>
+          )}
         </button>
         <button
           onClick={() => setNotificationOpen(true)}

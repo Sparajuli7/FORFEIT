@@ -45,6 +45,10 @@ export type NotificationType =
   | 'h2h_challenge'
   | 'general'
 
+export type ConversationType = 'group' | 'competition' | 'dm'
+
+export type MessageType = 'text' | 'image' | 'system'
+
 // ---------------------------------------------------------------------------
 // Row types — shape of a single row returned from Supabase
 // ---------------------------------------------------------------------------
@@ -100,6 +104,7 @@ export interface BetRow {
   status: BetStatus
   h2h_opponent_id: string | null
   comp_metric: string | null
+  is_public: boolean                // whether competition is publicly visible on profiles
   created_at: string
 }
 
@@ -190,6 +195,34 @@ export interface NotificationRow {
   created_at: string
 }
 
+export interface ConversationRow {
+  id: string
+  type: ConversationType
+  group_id: string | null
+  bet_id: string | null
+  created_at: string
+  last_message_at: string | null
+  last_message_preview: string | null
+}
+
+export interface ConversationParticipantRow {
+  id: string
+  conversation_id: string
+  user_id: string
+  joined_at: string
+  last_read_at: string | null
+}
+
+export interface MessageRow {
+  id: string
+  conversation_id: string
+  sender_id: string
+  content: string
+  type: MessageType
+  media_url: string | null
+  created_at: string
+}
+
 // ---------------------------------------------------------------------------
 // Insert types — required fields only (omit server-generated fields)
 // ---------------------------------------------------------------------------
@@ -202,7 +235,7 @@ export type GroupInsert = Omit<GroupRow, 'id' | 'created_at'>
 export type GroupMemberInsert = GroupMemberRow
 
 export type BetInsert = Omit<BetRow, 'id' | 'created_at'> &
-  Partial<Pick<BetRow, 'description' | 'stake_money' | 'stake_punishment_id' | 'stake_custom_punishment' | 'h2h_opponent_id' | 'comp_metric'>>
+  Partial<Pick<BetRow, 'description' | 'stake_money' | 'stake_punishment_id' | 'stake_custom_punishment' | 'h2h_opponent_id' | 'comp_metric' | 'is_public'>>
 
 export type BetSideInsert = Omit<BetSideRow, 'id' | 'joined_at'>
 
@@ -225,6 +258,14 @@ export type CompetitionScoreInsert = Omit<CompetitionScoreRow, 'id' | 'updated_a
 export type NotificationInsert = Omit<NotificationRow, 'id' | 'created_at'> &
   Partial<Pick<NotificationRow, 'read'>>
 
+export type ConversationInsert = Omit<ConversationRow, 'id' | 'created_at' | 'last_message_at' | 'last_message_preview'> &
+  Partial<Pick<ConversationRow, 'group_id' | 'bet_id'>>
+
+export type ConversationParticipantInsert = Omit<ConversationParticipantRow, 'id' | 'joined_at' | 'last_read_at'>
+
+export type MessageInsert = Omit<MessageRow, 'id' | 'created_at'> &
+  Partial<Pick<MessageRow, 'media_url'>>
+
 // ---------------------------------------------------------------------------
 // Update types — all fields optional except primary key
 // ---------------------------------------------------------------------------
@@ -242,6 +283,12 @@ export type HallOfShameUpdate = Partial<Omit<HallOfShameRow, 'id' | 'submitted_a
 export type CompetitionScoreUpdate = Partial<Omit<CompetitionScoreRow, 'id'>>
 
 export type NotificationUpdate = Partial<Omit<NotificationRow, 'id' | 'created_at'>>
+
+export type ConversationUpdate = Partial<Pick<ConversationRow, 'last_message_at' | 'last_message_preview'>>
+
+export type ConversationParticipantUpdate = Partial<Pick<ConversationParticipantRow, 'last_read_at'>>
+
+export type MessageUpdate = never
 
 // ---------------------------------------------------------------------------
 // Supabase Database generic — passed to createClient<Database>()
@@ -310,6 +357,21 @@ export interface Database {
         Insert: NotificationInsert
         Update: NotificationUpdate
       }
+      conversations: {
+        Row: ConversationRow
+        Insert: ConversationInsert
+        Update: ConversationUpdate
+      }
+      conversation_participants: {
+        Row: ConversationParticipantRow
+        Insert: ConversationParticipantInsert
+        Update: ConversationParticipantUpdate
+      }
+      messages: {
+        Row: MessageRow
+        Insert: MessageInsert
+        Update: MessageUpdate
+      }
     }
     Views: {
       [_ in never]: never
@@ -330,6 +392,8 @@ export interface Database {
       punishment_category: PunishmentCategory
       punishment_difficulty: PunishmentDifficulty
       notification_type: NotificationType
+      conversation_type: ConversationType
+      message_type: MessageType
     }
   }
 }
@@ -350,3 +414,6 @@ export type PunishmentCard = Database['public']['Tables']['punishment_cards']['R
 export type HallOfShameEntry = Database['public']['Tables']['hall_of_shame']['Row']
 export type CompetitionScore = Database['public']['Tables']['competition_scores']['Row']
 export type Notification = Database['public']['Tables']['notifications']['Row']
+export type Conversation = Database['public']['Tables']['conversations']['Row']
+export type ConversationParticipant = Database['public']['Tables']['conversation_participants']['Row']
+export type Message = Database['public']['Tables']['messages']['Row']

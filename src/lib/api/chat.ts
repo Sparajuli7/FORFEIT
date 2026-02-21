@@ -1,0 +1,416 @@
+import { supabase } from '@/lib/supabase'
+import type {
+  Conversation,
+  ConversationParticipant,
+  Message,
+  ConversationType,
+} from '@/lib/database.types'
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+async function getCurrentUserId(): Promise<string> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+  return user.id
+}
+
+// ---------------------------------------------------------------------------
+// Enriched types used by the store / screens
+// ---------------------------------------------------------------------------
+
+export interface ConversationWithMeta extends Conversation {
+  _unread: boolean
+  _displayName: string
+  _displayEmoji: string | null
+  _displayAvatar: string | null
+  _participantCount: number
+}
+
+export interface MessageWithSender extends Message {
+  _senderName: string
+  _senderAvatar: string | null
+}
+
+// ---------------------------------------------------------------------------
+// Conversation CRUD
+// ---------------------------------------------------------------------------
+
+export async function getUserConversations(): Promise<ConversationWithMeta[]> {
+  const userId = await getCurrentUserId()
+
+  // Get all conversations user participates in
+  const { data: participantRows, error: pErr } = await supabase
+    .from('conversation_participants')
+    .select('conversation_id, last_read_at')
+    .eq('user_id', userId)
+
+  if (pErr) throw pErr
+  if (!participantRows || participantRows.length === 0) return []
+
+  const convIds = participantRows.map((p) => p.conversation_id)
+  const readMap = new Map(participantRows.map((p) => [p.conversation_id, p.last_read_at]))
+
+  // Fetch the conversations
+  const { data: conversations, error: cErr } = await supabase
+    .from('conversations')
+    .select('*')
+    .in('id', convIds)
+    .order('last_message_at', { ascending: false, nullsFirst: false })
+
+  if (cErr) throw cErr
+  if (!conversations) return []
+
+  // Get participant counts per conversation
+  const { data: countRows } = await supabase
+    .from('conversation_participants')
+    .select('conversation_id')
+    .in('conversation_id', convIds)
+
+  const countMap = new Map<string, number>()
+  for (const row of countRows ?? []) {
+    countMap.set(row.conversation_id, (countMap.get(row.conversation_id) ?? 0) + 1)
+  }
+
+  // For group conversations, get group names
+  const groupIds = conversations.filter((c) => c.group_id).map((c) => c.group_id!)
+  let groupMap = new Map<string, { name: string; emoji: string }>()
+  if (groupIds.length > 0) {
+    const { data: groups } = await supabase
+      .from('groups')
+      .select('id, name, avatar_emoji')
+      .in('id', groupIds)
+    for (const g of groups ?? []) {
+      groupMap.set(g.id, { name: g.name, emoji: g.avatar_emoji })
+    }
+  }
+
+  // For competition conversations, get bet titles
+  const betIds = conversations.filter((c) => c.bet_id).map((c) => c.bet_id!)
+  let betMap = new Map<string, string>()
+  if (betIds.length > 0) {
+    const { data: bets } = await supabase
+      .from('bets')
+      .select('id, title')
+      .in('id', betIds)
+    for (const b of bets ?? []) {
+      betMap.set(b.id, b.title)
+    }
+  }
+
+  // For DM conversations, get the other user's profile
+  const dmConvs = conversations.filter((c) => c.type === 'dm')
+  let dmProfileMap = new Map<string, { name: string; avatar: string | null }>()
+  if (dmConvs.length > 0) {
+    const { data: dmParticipants } = await supabase
+      .from('conversation_participants')
+      .select('conversation_id, user_id')
+      .in('conversation_id', dmConvs.map((c) => c.id))
+      .neq('user_id', userId)
+
+    if (dmParticipants && dmParticipants.length > 0) {
+      const otherUserIds = dmParticipants.map((p) => p.user_id)
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, display_name, avatar_url')
+        .in('id', otherUserIds)
+
+      const profileLookup = new Map(
+        (profiles ?? []).map((p) => [p.id, { name: p.display_name, avatar: p.avatar_url }])
+      )
+
+      for (const p of dmParticipants) {
+        const profile = profileLookup.get(p.user_id)
+        if (profile) dmProfileMap.set(p.conversation_id, profile)
+      }
+    }
+  }
+
+  return conversations.map((conv) => {
+    const lastRead = readMap.get(conv.id)
+    const unread = conv.last_message_at != null && (lastRead == null || lastRead < conv.last_message_at)
+
+    let displayName = 'Chat'
+    let displayEmoji: string | null = null
+    let displayAvatar: string | null = null
+
+    if (conv.type === 'group' && conv.group_id) {
+      const group = groupMap.get(conv.group_id)
+      displayName = group?.name ?? 'Group Chat'
+      displayEmoji = group?.emoji ?? null
+    } else if (conv.type === 'competition' && conv.bet_id) {
+      displayName = betMap.get(conv.bet_id) ?? 'Competition Chat'
+      displayEmoji = '🏆'
+    } else if (conv.type === 'dm') {
+      const dmProfile = dmProfileMap.get(conv.id)
+      displayName = dmProfile?.name ?? 'Direct Message'
+      displayAvatar = dmProfile?.avatar ?? null
+    }
+
+    return {
+      ...conv,
+      _unread: unread,
+      _displayName: displayName,
+      _displayEmoji: displayEmoji,
+      _displayAvatar: displayAvatar,
+      _participantCount: countMap.get(conv.id) ?? 0,
+    }
+  })
+}
+
+export async function getGroupConversation(groupId: string): Promise<Conversation | null> {
+  const { data, error } = await supabase
+    .from('conversations')
+    .select('*')
+    .eq('group_id', groupId)
+    .single()
+
+  if (error) return null
+  return data
+}
+
+export async function getCompetitionConversation(betId: string): Promise<Conversation | null> {
+  const { data, error } = await supabase
+    .from('conversations')
+    .select('*')
+    .eq('bet_id', betId)
+    .single()
+
+  if (error) return null
+  return data
+}
+
+export async function getOrCreateDMConversation(otherUserId: string): Promise<Conversation> {
+  const userId = await getCurrentUserId()
+
+  // Find existing DM between these two users
+  const { data: myParticipations } = await supabase
+    .from('conversation_participants')
+    .select('conversation_id')
+    .eq('user_id', userId)
+
+  if (myParticipations && myParticipations.length > 0) {
+    const myConvIds = myParticipations.map((p) => p.conversation_id)
+
+    const { data: theirParticipations } = await supabase
+      .from('conversation_participants')
+      .select('conversation_id')
+      .eq('user_id', otherUserId)
+      .in('conversation_id', myConvIds)
+
+    if (theirParticipations && theirParticipations.length > 0) {
+      const sharedConvIds = theirParticipations.map((p) => p.conversation_id)
+
+      const { data: dmConv } = await supabase
+        .from('conversations')
+        .select('*')
+        .eq('type', 'dm')
+        .in('id', sharedConvIds)
+        .limit(1)
+        .single()
+
+      if (dmConv) return dmConv
+    }
+  }
+
+  // Create new DM conversation
+  const { data: conv, error: convErr } = await supabase
+    .from('conversations')
+    .insert({ type: 'dm' as const })
+    .select()
+    .single()
+
+  if (convErr || !conv) throw convErr ?? new Error('Failed to create DM conversation')
+
+  // Add both participants
+  const { error: partErr } = await supabase.from('conversation_participants').insert([
+    { conversation_id: conv.id, user_id: userId },
+    { conversation_id: conv.id, user_id: otherUserId },
+  ])
+  if (partErr) throw partErr
+
+  return conv
+}
+
+export async function createGroupConversation(
+  groupId: string,
+  memberIds: string[],
+): Promise<Conversation> {
+  const { data: conv, error: convErr } = await supabase
+    .from('conversations')
+    .insert({ type: 'group' as const, group_id: groupId })
+    .select()
+    .single()
+
+  if (convErr || !conv) throw convErr ?? new Error('Failed to create group conversation')
+
+  if (memberIds.length > 0) {
+    const { error: partErr } = await supabase.from('conversation_participants').insert(
+      memberIds.map((uid) => ({ conversation_id: conv.id, user_id: uid }))
+    )
+    if (partErr) throw partErr
+  }
+
+  return conv
+}
+
+export async function createCompetitionConversation(
+  betId: string,
+  participantIds: string[],
+): Promise<Conversation> {
+  const { data: conv, error: convErr } = await supabase
+    .from('conversations')
+    .insert({ type: 'competition' as const, bet_id: betId })
+    .select()
+    .single()
+
+  if (convErr || !conv) throw convErr ?? new Error('Failed to create competition conversation')
+
+  if (participantIds.length > 0) {
+    const { error: partErr } = await supabase.from('conversation_participants').insert(
+      participantIds.map((uid) => ({ conversation_id: conv.id, user_id: uid }))
+    )
+    if (partErr) throw partErr
+  }
+
+  return conv
+}
+
+export async function addConversationParticipant(
+  conversationId: string,
+  userId: string,
+): Promise<void> {
+  const { error } = await supabase.from('conversation_participants').insert({
+    conversation_id: conversationId,
+    user_id: userId,
+  })
+  // Ignore duplicate errors (user already a participant)
+  if (error && !error.message.includes('duplicate')) throw error
+}
+
+export async function removeConversationParticipant(
+  conversationId: string,
+  userId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from('conversation_participants')
+    .delete()
+    .eq('conversation_id', conversationId)
+    .eq('user_id', userId)
+
+  if (error) throw error
+}
+
+// ---------------------------------------------------------------------------
+// Messages
+// ---------------------------------------------------------------------------
+
+export async function getMessages(
+  conversationId: string,
+  limit = 50,
+  before?: string,
+): Promise<MessageWithSender[]> {
+  let query = supabase
+    .from('messages')
+    .select('*')
+    .eq('conversation_id', conversationId)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (before) {
+    query = query.lt('created_at', before)
+  }
+
+  const { data, error } = await query
+  if (error) throw error
+
+  const messages = data ?? []
+  if (messages.length === 0) return []
+
+  // Enrich with sender profiles
+  const senderIds = [...new Set(messages.map((m) => m.sender_id))]
+  const { data: profiles } = await supabase
+    .from('profiles')
+    .select('id, display_name, avatar_url')
+    .in('id', senderIds)
+
+  const profileMap = new Map(
+    (profiles ?? []).map((p) => [p.id, { name: p.display_name, avatar: p.avatar_url }])
+  )
+
+  return messages.map((m) => ({
+    ...m,
+    _senderName: profileMap.get(m.sender_id)?.name ?? 'Unknown',
+    _senderAvatar: profileMap.get(m.sender_id)?.avatar ?? null,
+  }))
+}
+
+export async function sendMessage(
+  conversationId: string,
+  content: string,
+  type: 'text' | 'image' | 'system' = 'text',
+  mediaUrl?: string,
+): Promise<Message> {
+  const userId = await getCurrentUserId()
+
+  const { data, error } = await supabase
+    .from('messages')
+    .insert({
+      conversation_id: conversationId,
+      sender_id: userId,
+      content,
+      type,
+      media_url: mediaUrl ?? null,
+    })
+    .select()
+    .single()
+
+  if (error || !data) throw error ?? new Error('Failed to send message')
+  return data
+}
+
+export async function markConversationRead(conversationId: string): Promise<void> {
+  const userId = await getCurrentUserId()
+
+  const { error } = await supabase
+    .from('conversation_participants')
+    .update({ last_read_at: new Date().toISOString() })
+    .eq('conversation_id', conversationId)
+    .eq('user_id', userId)
+
+  if (error) throw error
+}
+
+export async function getUnreadCount(): Promise<number> {
+  const userId = await getCurrentUserId()
+
+  const { data: participantRows, error } = await supabase
+    .from('conversation_participants')
+    .select('conversation_id, last_read_at')
+    .eq('user_id', userId)
+
+  if (error) throw error
+  if (!participantRows || participantRows.length === 0) return 0
+
+  const convIds = participantRows.map((p) => p.conversation_id)
+  const readMap = new Map(participantRows.map((p) => [p.conversation_id, p.last_read_at]))
+
+  const { data: conversations } = await supabase
+    .from('conversations')
+    .select('id, last_message_at')
+    .in('id', convIds)
+    .not('last_message_at', 'is', null)
+
+  let count = 0
+  for (const conv of conversations ?? []) {
+    const lastRead = readMap.get(conv.id)
+    if (conv.last_message_at && (lastRead == null || lastRead < conv.last_message_at)) {
+      count++
+    }
+  }
+
+  return count
+}

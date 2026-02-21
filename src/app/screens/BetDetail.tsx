@@ -435,7 +435,9 @@ export function BetDetail({ onBack }: BetDetailProps) {
                         onClick={async () => {
                           setVotingProofId(proof.id)
                           await voteOnProof(proof.id, 'confirm')
-                          if (id) fetchBetDetail(id)
+                          if (id) {
+                            await Promise.all([fetchBetDetail(id), fetchProofs(id)])
+                          }
                           setVotingProofId(null)
                         }}
                         className="py-3 rounded-2xl bg-accent-green text-bg-primary font-extrabold text-sm flex items-center justify-center gap-2 btn-pressed disabled:opacity-50"
@@ -451,7 +453,9 @@ export function BetDetail({ onBack }: BetDetailProps) {
                         onClick={async () => {
                           setVotingProofId(proof.id)
                           await voteOnProof(proof.id, 'dispute')
-                          if (id) fetchBetDetail(id)
+                          if (id) {
+                            await Promise.all([fetchBetDetail(id), fetchProofs(id)])
+                          }
                           setVotingProofId(null)
                         }}
                         className="py-3 rounded-2xl bg-accent-coral text-white font-extrabold text-sm flex items-center justify-center gap-2 btn-pressed disabled:opacity-50"

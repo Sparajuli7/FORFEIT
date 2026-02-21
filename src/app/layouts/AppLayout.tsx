@@ -2,6 +2,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router'
 import { LayoutGrid, Trophy, Skull, User } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useNotifications } from '@/lib/hooks/useNotifications'
+import { useChat } from '@/lib/hooks/useChat'
 
 interface NavItem {
   id: string
@@ -24,7 +25,7 @@ function resolveActiveTab(pathname: string): string {
       return item.id
     }
   }
-  if (pathname.startsWith('/bet') || pathname.startsWith('/group') || pathname.startsWith('/settings') || pathname.startsWith('/punishment')) {
+  if (pathname.startsWith('/bet') || pathname.startsWith('/group') || pathname.startsWith('/settings') || pathname.startsWith('/punishment') || pathname.startsWith('/chat')) {
     return 'home'
   }
   if (pathname === '/stats') return 'record'
@@ -38,6 +39,9 @@ export function AppLayout() {
 
   // Initialize global notification subscription (updates unreadCount, shows toast on new)
   useNotifications()
+
+  // Initialize global chat subscription (updates unreadCount, shows toast on new message)
+  useChat()
 
   return (
     <div className="h-full bg-bg-primary grain-texture flex flex-col overflow-hidden">

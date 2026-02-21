@@ -63,6 +63,8 @@ export function CompetitionCreateScreen() {
   const [stakeCustomPunishment, setStakeCustomPunishment] = useState<string | null>(null)
   const [punishments, setPunishments] = useState<{ id: string; text: string }[]>([])
 
+  const [isPublic, setIsPublic] = useState(true)
+
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -177,6 +179,7 @@ export function CompetitionCreateScreen() {
         stakeMoney: stakeType === 'money' || stakeType === 'both' ? stakeMoney : undefined,
         stakePunishmentId: stakePunishmentId ?? undefined,
         stakeCustomPunishment: stakeCustomPunishment,
+        isPublic,
       })
       navigate(`/compete/${comp.id}`)
     } catch (e) {
@@ -634,6 +637,23 @@ export function CompetitionCreateScreen() {
                     Group verified
                   </button>
                 </div>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-sm text-text-primary">Public competition</span>
+                  <p className="text-xs text-text-muted mt-0.5">
+                    {isPublic ? 'Visible on participant profiles' : 'Only participants can see this'}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setIsPublic(!isPublic)}
+                  className={`relative w-11 h-6 rounded-full transition-colors ${isPublic ? 'bg-accent-green' : 'bg-bg-elevated'}`}
+                >
+                  <span
+                    className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${isPublic ? 'left-6' : 'left-1'}`}
+                  />
+                </button>
               </div>
 
               <PrimaryButton onClick={() => setStep(5)}>Next</PrimaryButton>

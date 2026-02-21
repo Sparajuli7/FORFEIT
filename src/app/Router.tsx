@@ -32,6 +32,8 @@ import { CompetitionDetailScreen } from './screens/CompetitionDetailScreen'
 import { CompetitionCreateScreen } from './screens/CompetitionCreateScreen'
 import { PunishmentStatsScreen } from './screens/PunishmentStatsScreen'
 import { RematchScreen } from './screens/RematchScreen'
+import { ChatInboxScreen } from './screens/ChatInboxScreen'
+import { ChatConversationScreen } from './screens/ChatConversationScreen'
 
 // ---------------------------------------------------------------------------
 // Placeholder for screens not yet built
@@ -190,6 +192,10 @@ export function AppRouter() {
             <Route path="group/create" element={<GroupCreateScreen />} />
             <Route path="group/join" element={<GroupJoinScreen />} />
             <Route path="group/join/:code" element={<GroupJoinByCodeScreen />} />
+
+            {/* Chat */}
+            <Route path="chat" element={<ChatInboxScreen />} />
+            <Route path="chat/:conversationId" element={<ChatConversationScreen />} />
 
             {/* Settings & Punishments */}
             <Route path="settings" element={<SettingsScreen />} />

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
-import { Trophy } from 'lucide-react'
+import { Trophy, Lock } from 'lucide-react'
 import { getCompetitionsForUser, getLeaderboard } from '@/lib/api/competitions'
 import { formatMoney } from '@/lib/utils/formatters'
 import { BET_CATEGORIES } from '@/lib/utils/constants'
@@ -15,7 +15,7 @@ function getStatus(competition: Bet): 'OPEN' | 'LIVE' | 'ENDED' {
   const deadline = new Date(competition.deadline)
   const created = new Date(competition.created_at)
 
-  if (competition.status === 'completed' || deadline < now) return 'ENDED'
+  if (competition.status === 'completed' || competition.status === 'voided' || deadline < now) return 'ENDED'
   if (created <= now && deadline >= now) return 'LIVE'
   return 'OPEN'
 }
@@ -47,17 +47,23 @@ export function Competitions() {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    getCompetitionsForUser().then((data) => {
-      setCompetitions(data)
-      setIsLoading(false)
-    })
+    getCompetitionsForUser()
+      .then((data) => {
+        setCompetitions(data)
+      })
+      .catch((err) => {
+        console.warn('[Competitions] Failed to fetch:', err)
+      })
+      .finally(() => setIsLoading(false))
   }, [])
 
   useEffect(() => {
     competitions.forEach((c) => {
-      getLeaderboard(c.id).then((lb) => {
-        setLeaderboards((prev) => ({ ...prev, [c.id]: lb }))
-      })
+      getLeaderboard(c.id)
+        .then((lb) => {
+          setLeaderboards((prev) => ({ ...prev, [c.id]: lb }))
+        })
+        .catch(() => {})
     })
   }, [competitions])
 
@@ -127,7 +133,10 @@ export function Competitions() {
                       </span>
                     </div>
                   </div>
-                  <Trophy className="w-5 h-5 text-gold" />
+                  <div className="flex items-center gap-2">
+                    {!competition.is_public && <Lock className="w-4 h-4 text-accent-coral" />}
+                    <Trophy className="w-5 h-5 text-gold" />
+                  </div>
                 </div>
 
                 <h3 className="text-xl font-black text-text-primary mb-4">{competition.title}</h3>
