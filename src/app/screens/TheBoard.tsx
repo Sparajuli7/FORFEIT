@@ -1,7 +1,6 @@
-import { useEffect, useState, useMemo, useRef } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useNavigate } from 'react-router'
 import { Bell, MessageCircle } from 'lucide-react'
-import { BetCard } from '../components/BetCard'
 import { NotificationPanel } from '../components/NotificationPanel'
 import { useGroupStore, useBetStore, useAuthStore, useNotificationStore, useChatStore } from '@/stores'
 import { useCountdown } from '@/lib/hooks/useCountdown'
@@ -21,48 +20,168 @@ function formatStake(bet: BetWithSides): string {
   return '—'
 }
 
+// ---------------------------------------------------------------------------
+// Priority engine
+// ---------------------------------------------------------------------------
+
+interface BetPriority {
+  /** Lower = shown first */
+  level: number
+  label: string
+  labelColor: string
+  /** Rings the card border */
+  urgent: boolean
+}
+
+/**
+ * Priority order:
+ * 0  Proof needs your vote        (you're a doubter, status = proof_submitted)
+ * 1  Proof submitted – you posted (claimant waiting for verdict)
+ * 2  H2H contract needs acceptance (you're the named opponent, status = pending)
+ * 3  Disputed – needs attention
+ * 4  Expiring in < 6 h
+ * 5  Expiring in 6–24 h
+ * 6  You're the doubter (active)
+ * 7  You're the claimant (active)
+ * 8  You're a rider (active)
+ * 9  Everything else (not joined)
+ */
+function getBetPriority(bet: BetWithSides, userId: string | undefined): BetPriority {
+  const sides = bet.bet_sides ?? []
+  const mySide = sides.find((s) => s.user_id === userId)?.side ?? null
+  const isClaimant = bet.claimant_id === userId
+  const hoursLeft = (new Date(bet.deadline).getTime() - Date.now()) / (1000 * 60 * 60)
+
+  // Claimant submitted the proof — they can't vote, they wait
+  if (bet.status === 'proof_submitted' && isClaimant)
+    return { level: 1, label: '👀 Proof out', labelColor: 'text-amber-400', urgent: true }
+
+  // Any other participant (rider OR doubter) needs to vote
+  if (bet.status === 'proof_submitted' && mySide !== null)
+    return { level: 0, label: '🗳️ Vote now', labelColor: 'text-amber-400', urgent: true }
+
+  if (bet.status === 'pending' && bet.bet_type === 'h2h' && bet.h2h_opponent_id === userId)
+    return { level: 2, label: '✍️ Accept', labelColor: 'text-accent-green', urgent: true }
+
+  if (bet.status === 'disputed')
+    return { level: 3, label: '⚡ Disputed', labelColor: 'text-destructive', urgent: true }
+
+  if (bet.status === 'active' && hoursLeft > 0 && hoursLeft < 6)
+    return { level: 4, label: '🔥 < 6h left', labelColor: 'text-amber-400', urgent: true }
+
+  if (bet.status === 'active' && hoursLeft >= 6 && hoursLeft < 24)
+    return { level: 5, label: '⏰ Today', labelColor: 'text-amber-300', urgent: false }
+
+  if (mySide === 'doubter')
+    return { level: 6, label: '👎 Doubter', labelColor: 'text-accent-coral', urgent: false }
+
+  if (isClaimant)
+    return { level: 7, label: '🙋 Your bet', labelColor: 'text-text-muted', urgent: false }
+
+  if (mySide === 'rider')
+    return { level: 8, label: '🤝 Riding', labelColor: 'text-text-muted', urgent: false }
+
+  return { level: 9, label: '', labelColor: '', urgent: false }
+}
+
+// ---------------------------------------------------------------------------
+// Compact card with priority badge
+// ---------------------------------------------------------------------------
+
 function BoardBetCard({
   bet,
   groupName,
   claimantName,
   claimantAvatar,
+  userId,
   onNavigate,
-  compact = false,
 }: {
   bet: BetWithSides
   groupName: string
   claimantName: string
   claimantAvatar: string
+  userId: string | undefined
   onNavigate: (betId: string) => void
-  compact?: boolean
 }) {
   const countdown = useCountdown(bet.deadline)
   const sides = bet.bet_sides ?? []
   const riderCount = sides.filter((s) => s.side === 'rider').length
   const doubterCount = sides.filter((s) => s.side === 'doubter').length
   const { riderPct, doubterPct } = formatOdds(riderCount, doubterCount)
+  const priority = getBetPriority(bet, userId)
 
-  const status = bet.status === 'proof_submitted' ? 'proof' : bet.status === 'active' ? 'active' : 'completed'
+  const borderColor =
+    bet.status === 'proof_submitted' ? 'border-status-proof'
+    : bet.status === 'disputed'      ? 'border-status-disputed'
+    : 'border-status-active'
+
+  const ringClass = priority.urgent
+    ? 'ring-1 ring-amber-400/50'
+    : ''
+
+  // For level 0-6 show the priority label instead of the countdown; for 7+ show countdown
+  const rightSlot =
+    priority.level <= 6 && priority.label ? (
+      <span className={`text-[10px] font-black shrink-0 ${priority.labelColor}`}>
+        {priority.label}
+      </span>
+    ) : (
+      <span className="text-xs font-bold tabular-nums text-text-primary shrink-0">
+        {bet.status === 'proof_submitted' ? '👀' : countdown.formatted || '—'}
+      </span>
+    )
 
   return (
-    <BetCard
-      groupName={groupName}
-      category={BET_CATEGORIES[bet.category]?.label ?? bet.category.toUpperCase()}
-      countdown={status === 'proof' ? '' : countdown.formatted}
-      claimText={bet.title}
-      claimantName={claimantName}
-      claimantAvatar={claimantAvatar}
-      ridersPercent={riderPct}
-      doubtersPercent={doubterPct}
-      ridersCount={riderCount}
-      doubtersCount={doubterCount}
-      stake={formatStake(bet)}
-      status={status}
-      compact={compact}
+    <button
       onClick={() => onNavigate(bet.id)}
-    />
+      className={`shrink-0 w-[280px] text-left bg-bg-card rounded-xl border-l-status ${borderColor} border border-border-subtle ${ringClass} p-3 transition-all hover:shadow-md`}
+    >
+      {/* Top row: group chip + priority/countdown */}
+      <div className="flex items-center justify-between gap-2 mb-1.5">
+        <span className="text-[10px] font-bold px-2 py-0.5 bg-bg-elevated rounded-full uppercase tracking-wide truncate">
+          {groupName}
+        </span>
+        {rightSlot}
+      </div>
+
+      {/* Claim */}
+      <h3 className="text-sm font-bold text-text-primary line-clamp-2 leading-snug mb-2">
+        {bet.title}
+      </h3>
+
+      {/* Claimant */}
+      <div className="flex items-center gap-1.5 mb-2">
+        <div className="w-4 h-4 rounded-full bg-bg-elevated overflow-hidden">
+          <img src={claimantAvatar} alt={claimantName} className="w-full h-full object-cover" />
+        </div>
+        <span className="text-[11px] text-text-muted truncate">{claimantName}</span>
+      </div>
+
+      {/* Odds bar */}
+      <div className="h-1.5 overflow-hidden flex rounded-full mb-1.5">
+        <div className="bg-accent-green" style={{ width: `${riderPct}%` }} />
+        <div className="bg-accent-coral" style={{ width: `${doubterPct}%` }} />
+      </div>
+
+      {/* Bottom: stake + CTA */}
+      <div className="flex items-center justify-between mt-1">
+        <span className="text-[10px] font-bold bg-bg-elevated px-2 py-0.5 rounded-full">
+          {formatStake(bet)}
+        </span>
+        <span className={`text-[10px] font-bold uppercase tracking-wider ${priority.urgent ? priority.labelColor : 'text-accent-green'}`}>
+          {priority.level === 0 ? 'VOTE →'
+            : priority.level === 1 ? 'VIEW →'
+            : priority.level === 2 ? 'ACCEPT →'
+            : 'VIEW →'}
+        </span>
+      </div>
+    </button>
   )
 }
+
+// ---------------------------------------------------------------------------
+// TheBoard
+// ---------------------------------------------------------------------------
 
 export function TheBoard() {
   const navigate = useNavigate()
@@ -81,17 +200,12 @@ export function TheBoard() {
   const [notificationOpen, setNotificationOpen] = useState(false)
   const [claimantMap, setClaimantMap] = useState<Map<string, { display_name: string; avatar_url: string | null }>>(new Map())
 
-  useEffect(() => {
-    fetchGroups()
-  }, [fetchGroups])
+  useEffect(() => { fetchGroups() }, [fetchGroups])
 
   const groupIds = useMemo(() => groups.map((g) => g.id), [groups])
   useEffect(() => {
-    if (groupIds.length > 0) {
-      fetchBetsForGroupIds(groupIds)
-    }
+    if (groupIds.length > 0) fetchBetsForGroupIds(groupIds)
   }, [groupIds, fetchBetsForGroupIds])
-
 
   useEffect(() => {
     const ids = [...new Set(bets.map((b) => b.claimant_id))]
@@ -102,15 +216,31 @@ export function TheBoard() {
   useRealtime('bets', () => {
     if (groups.length > 0) fetchBetsForGroupIds(groups.map((g) => g.id))
   })
-
   useRealtime('bet_sides', () => {
     if (groups.length > 0) fetchBetsForGroupIds(groups.map((g) => g.id))
   })
 
-  /** Bets to show in horizontal strip: active + proof_submitted (yet to accept or currently in) */
+  /**
+   * Strip bets — include active, proof_submitted, pending (h2h awaiting), disputed.
+   * Sorted by priority level (ascending = highest priority first).
+   * Within the same priority level, original server order (newest first) is preserved.
+   */
+  const userId = profile?.id
   const stripBets = useMemo(() => {
-    return bets.filter((b) => b.status === 'active' || b.status === 'proof_submitted')
-  }, [bets])
+    const VISIBLE_STATUSES = new Set(['active', 'proof_submitted', 'pending', 'disputed'])
+    const filtered = bets.filter((b) => VISIBLE_STATUSES.has(b.status))
+    return [...filtered].sort((a, b) => {
+      const pa = getBetPriority(a, userId).level
+      const pb = getBetPriority(b, userId).level
+      return pa - pb
+    })
+  }, [bets, userId])
+
+  /** Count of bets that need immediate action from this user */
+  const actionCount = useMemo(
+    () => stripBets.filter((b) => getBetPriority(b, userId).level <= 3).length,
+    [stripBets, userId],
+  )
 
   function formatGroupDate(iso: string) {
     const d = new Date(iso)
@@ -154,7 +284,7 @@ export function TheBoard() {
 
   return (
     <div className="h-full bg-bg-primary grain-texture overflow-y-auto pb-24">
-      {/* Top utility bar: settings, notifications, profile */}
+      {/* Top utility bar */}
       <div className="flex items-center justify-end gap-2 px-4 py-3 border-b border-border-subtle">
         <button
           onClick={() => navigate('/settings')}
@@ -200,9 +330,17 @@ export function TheBoard() {
         </button>
       </div>
 
-      {/* Horizontal scroll: bets (yet to accept + currently in) — compact cards */}
+      {/* ── My Bets strip ── */}
       <div className="px-4 pt-4 pb-2">
-        <h2 className="text-[11px] font-bold uppercase tracking-[0.1em] text-text-muted mb-3">My Bets</h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-[11px] font-bold uppercase tracking-[0.1em] text-text-muted">My Bets</h2>
+          {actionCount > 0 && (
+            <span className="text-[10px] font-black text-amber-400 bg-amber-400/10 border border-amber-400/30 px-2 py-0.5 rounded-full animate-pulse">
+              {actionCount} need{actionCount === 1 ? 's' : ''} action
+            </span>
+          )}
+        </div>
+
         <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2 -mx-4 px-4">
           {isLoading ? (
             <div className="flex items-center justify-center py-8 w-full">
@@ -222,8 +360,8 @@ export function TheBoard() {
                   groupName={groupName}
                   claimantName={claimant?.display_name ?? 'Anonymous'}
                   claimantAvatar={claimant?.avatar_url ?? DEFAULT_AVATAR}
+                  userId={userId}
                   onNavigate={(id) => navigate(`/bet/${id}`)}
-                  compact
                 />
               )
             })
@@ -247,7 +385,7 @@ export function TheBoard() {
         </button>
       </div>
 
-      {/* Gmail-style list of groups */}
+      {/* Groups list */}
       <div className="px-4 border-t border-border-subtle">
         <h2 className="text-[11px] font-bold uppercase tracking-[0.1em] text-text-muted pt-4 pb-2 px-2">
           Groups
@@ -277,7 +415,7 @@ export function TheBoard() {
 
       <NotificationPanel open={notificationOpen} onOpenChange={setNotificationOpen} />
 
-      {/* Quick Bet — static, no glow */}
+      {/* Quick Bet FAB */}
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 z-10">
         <span className="text-xs font-bold text-text-muted uppercase tracking-wide bg-bg-elevated px-3 py-1.5 rounded-full border border-border-subtle">
           Quick Bet

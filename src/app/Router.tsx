@@ -31,6 +31,7 @@ import { SettingsScreen } from './screens/SettingsScreen'
 import { CompetitionDetailScreen } from './screens/CompetitionDetailScreen'
 import { CompetitionCreateScreen } from './screens/CompetitionCreateScreen'
 import { PunishmentStatsScreen } from './screens/PunishmentStatsScreen'
+import { PlayerCardScreen } from './screens/PlayerCardScreen'
 import { RematchScreen } from './screens/RematchScreen'
 import { ChatInboxScreen } from './screens/ChatInboxScreen'
 import { ChatConversationScreen } from './screens/ChatConversationScreen'
@@ -200,6 +201,9 @@ export function AppRouter() {
             {/* Settings & Punishments */}
             <Route path="settings" element={<SettingsScreen />} />
             <Route path="punishment/:id" element={<PunishmentStatsScreen />} />
+
+            {/* Player Card */}
+            <Route path="profile/card" element={<PlayerCardScreen />} />
           </Route>
         </Route>
 
