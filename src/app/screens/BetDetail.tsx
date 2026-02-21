@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router'
 import { ArrowLeft, Share2, Pencil, Check, X } from 'lucide-react'
 import { useBetStore } from '@/stores'
@@ -64,6 +64,22 @@ export function BetDetail({ onBack }: BetDetailProps) {
   const showSubmitProof = isClaimant && activeBet?.status === 'active'
 
   const [shareOpen, setShareOpen] = useState(false)
+  const [votingProofId, setVotingProofId] = useState<string | null>(null)
+  const prevStatusRef = useRef(activeBet?.status)
+
+  // Auto-navigate to outcome when bet resolves (e.g. after a majority vote)
+  useEffect(() => {
+    if (
+      prevStatusRef.current === 'proof_submitted' &&
+      (activeBet?.status === 'completed' || activeBet?.status === 'voided') &&
+      id
+    ) {
+      // Small delay so user sees the resolution before navigating
+      const timer = setTimeout(() => navigate(`/bet/${id}/outcome`), 1500)
+      return () => clearTimeout(timer)
+    }
+    prevStatusRef.current = activeBet?.status
+  }, [activeBet?.status, id, navigate])
 
   const claimantForShare = activeBet ? profileMap.get(activeBet.claimant_id) : null
   const handleShare = async () => {
@@ -118,7 +134,8 @@ export function BetDetail({ onBack }: BetDetailProps) {
   }
 
   const claimant = profileMap.get(activeBet.claimant_id)
-  const statusLabel = activeBet.status === 'proof_submitted' ? 'Proof Dropped' : activeBet.status === 'completed' ? 'Completed' : activeBet.status === 'voided' ? 'Voided' : 'Active'
+  const statusLabel = activeBet.status === 'proof_submitted' ? 'Vote Now' : activeBet.status === 'completed' ? 'Completed' : activeBet.status === 'voided' ? 'Voided' : activeBet.status === 'disputed' ? 'Disputed' : 'Active'
+  const statusColor = activeBet.status === 'proof_submitted' ? 'amber-400' : activeBet.status === 'completed' ? 'accent-green' : activeBet.status === 'voided' || activeBet.status === 'disputed' ? 'accent-coral' : 'accent-green'
 
   return (
     <div className="h-full bg-bg-primary overflow-y-auto pb-8">
@@ -127,9 +144,21 @@ export function BetDetail({ onBack }: BetDetailProps) {
         <button onClick={handleBack} className="w-10 h-10 flex items-center justify-center btn-pressed rounded-lg hover:bg-bg-elevated transition-colors">
           <ArrowLeft className="w-6 h-6 text-white" />
         </button>
-        <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-accent-green/20 border border-accent-green">
-          <div className="w-2 h-2 rounded-full bg-accent-green pulse-slow" />
-          <span className="text-xs font-semibold text-accent-green uppercase tracking-wider">{statusLabel}</span>
+        <div className={`flex items-center gap-2 px-3 py-1 rounded-full ${
+          statusColor === 'amber-400' ? 'bg-amber-500/20 border border-amber-500/40' :
+          statusColor === 'accent-coral' ? 'bg-accent-coral/20 border border-accent-coral' :
+          'bg-accent-green/20 border border-accent-green'
+        }`}>
+          <div className={`w-2 h-2 rounded-full ${
+            statusColor === 'amber-400' ? 'bg-amber-400' :
+            statusColor === 'accent-coral' ? 'bg-accent-coral' :
+            'bg-accent-green'
+          } pulse-slow`} />
+          <span className={`text-xs font-semibold uppercase tracking-wider ${
+            statusColor === 'amber-400' ? 'text-amber-400' :
+            statusColor === 'accent-coral' ? 'text-accent-coral' :
+            'text-accent-green'
+          }`}>{statusLabel}</span>
         </div>
         <button
           onClick={handleShare}
@@ -282,13 +311,29 @@ export function BetDetail({ onBack }: BetDetailProps) {
       )}
 
       {/* Proof with voting */}
-      {activeBet.status === 'proof_submitted' && proofs.length > 0 && (
+      {(activeBet.status === 'proof_submitted' || activeBet.status === 'completed' || activeBet.status === 'voided') && proofs.length > 0 && (
         <div className="px-6 mb-6">
-          <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-3">Proof</h3>
+          <div className="flex items-center gap-2 mb-4">
+            <h3 className="text-sm font-bold text-white uppercase tracking-wider">Proof Submitted</h3>
+            {activeBet.status === 'proof_submitted' && (
+              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                Awaiting Votes
+              </span>
+            )}
+            {activeBet.status === 'completed' && (
+              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-accent-green/20 text-accent-green border border-accent-green/30">
+                Resolved
+              </span>
+            )}
+          </div>
+
           {proofs.map((proof) => {
             const counts = getVoteCounts(proof.id)
             const myVote = votes.find((v) => v.proof_id === proof.id && v.user_id === user?.id)
-            const canVote = !myVote && user?.id !== proof.submitted_by
+            const isProofOwner = user?.id === proof.submitted_by
+            const canVote = !myVote && !isProofOwner && activeBet.status === 'proof_submitted'
+            const totalParticipants = activeBetSides.length
+            const majority = Math.floor(totalParticipants / 2) + 1
 
             // Build media items for the gallery
             const mediaItems: MediaItem[] = []
@@ -302,6 +347,7 @@ export function BetDetail({ onBack }: BetDetailProps) {
 
             return (
               <div key={proof.id} className="bg-bg-card rounded-2xl border border-border-subtle p-4 mb-4">
+                {/* Proof media */}
                 <MediaGallery items={mediaItems} caption={editingProofId === proof.id ? undefined : proof.caption} />
 
                 {/* Text-only proof (no media) */}
@@ -337,7 +383,7 @@ export function BetDetail({ onBack }: BetDetailProps) {
                       <X className="w-4 h-4 text-text-muted" />
                     </button>
                   </div>
-                ) : user?.id === proof.submitted_by ? (
+                ) : isProofOwner && activeBet.status === 'proof_submitted' ? (
                   <button
                     onClick={() => { setEditingProofId(proof.id); setEditCaption(proof.caption ?? '') }}
                     className="flex items-center gap-1 mt-2 text-xs text-text-muted hover:text-accent-green transition-colors"
@@ -347,35 +393,99 @@ export function BetDetail({ onBack }: BetDetailProps) {
                   </button>
                 ) : null}
 
-                <div className="flex items-center gap-2 mt-4 mb-4">
-                  <span className="text-xs text-text-muted">Confirm: {counts.confirm}</span>
-                  <span className="text-xs text-text-muted">Dispute: {counts.dispute}</span>
+                {/* Vote progress bar */}
+                <div className="mt-4">
+                  <div className="flex items-center justify-between text-xs mb-2">
+                    <span className="text-accent-green font-bold">
+                      {counts.confirm} Confirm{counts.confirm !== 1 ? 's' : ''}
+                    </span>
+                    <span className="text-text-muted">
+                      {counts.total} / {totalParticipants} voted
+                      {totalParticipants >= 2 && <> &middot; {majority} needed</>}
+                    </span>
+                    <span className="text-accent-coral font-bold">
+                      {counts.dispute} Dispute{counts.dispute !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                  <div className="h-2 bg-bg-elevated rounded-full overflow-hidden flex">
+                    {counts.total > 0 ? (
+                      <>
+                        <div
+                          className="h-full bg-accent-green transition-all duration-300"
+                          style={{ width: `${counts.confirmPct}%` }}
+                        />
+                        <div
+                          className="h-full bg-accent-coral transition-all duration-300"
+                          style={{ width: `${100 - counts.confirmPct}%` }}
+                        />
+                      </>
+                    ) : (
+                      <div className="h-full w-full bg-bg-elevated" />
+                    )}
+                  </div>
                 </div>
+
+                {/* Vote buttons */}
                 {canVote && (
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => voteOnProof(proof.id, 'confirm')}
-                      className="flex-1 py-2 rounded-xl bg-accent-green text-white font-bold text-sm"
-                    >
-                      Confirm
-                    </button>
-                    <button
-                      onClick={() => voteOnProof(proof.id, 'dispute')}
-                      className="flex-1 py-2 rounded-xl bg-accent-coral text-white font-bold text-sm"
-                    >
-                      Dispute
-                    </button>
+                  <div className="mt-4">
+                    <p className="text-xs text-text-muted text-center mb-3">Did they do it? Cast your vote.</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        disabled={votingProofId === proof.id}
+                        onClick={async () => {
+                          setVotingProofId(proof.id)
+                          await voteOnProof(proof.id, 'confirm')
+                          if (id) fetchBetDetail(id)
+                          setVotingProofId(null)
+                        }}
+                        className="py-3 rounded-2xl bg-accent-green text-bg-primary font-extrabold text-sm flex items-center justify-center gap-2 btn-pressed disabled:opacity-50"
+                      >
+                        {votingProofId === proof.id ? (
+                          <div className="w-4 h-4 border-2 border-bg-primary border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <>🤝 Confirm</>
+                        )}
+                      </button>
+                      <button
+                        disabled={votingProofId === proof.id}
+                        onClick={async () => {
+                          setVotingProofId(proof.id)
+                          await voteOnProof(proof.id, 'dispute')
+                          if (id) fetchBetDetail(id)
+                          setVotingProofId(null)
+                        }}
+                        className="py-3 rounded-2xl bg-accent-coral text-white font-extrabold text-sm flex items-center justify-center gap-2 btn-pressed disabled:opacity-50"
+                      >
+                        {votingProofId === proof.id ? (
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <>💀 Dispute</>
+                        )}
+                      </button>
+                    </div>
                   </div>
                 )}
+
+                {/* Already voted indicator */}
                 {myVote && (
-                  <p className="text-xs text-text-muted">You voted: {myVote.vote}</p>
+                  <div className="mt-3 flex items-center justify-center gap-2 py-2 rounded-xl bg-bg-elevated">
+                    <span className="text-sm">{myVote.vote === 'confirm' ? '🤝' : '💀'}</span>
+                    <span className="text-xs font-bold text-text-muted">
+                      You voted {myVote.vote === 'confirm' ? 'Confirm' : 'Dispute'}
+                    </span>
+                  </div>
+                )}
+
+                {/* Proof owner can't vote message */}
+                {isProofOwner && activeBet.status === 'proof_submitted' && (
+                  <p className="mt-3 text-xs text-text-muted text-center">Waiting for others to vote on your proof</p>
                 )}
               </div>
             )
           })}
 
-          {/* Resubmit proof — claimant only */}
-          {isClaimant && (
+          {/* Resubmit proof — claimant only, while still in proof_submitted */}
+          {isClaimant && activeBet.status === 'proof_submitted' && (
             <button
               onClick={() => navigate(`/bet/${id}/proof`)}
               className="w-full text-center text-sm font-bold text-text-muted hover:text-accent-green transition-colors mt-2"
