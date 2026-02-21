@@ -27,6 +27,7 @@ function resolveActiveTab(pathname: string): string {
   if (pathname.startsWith('/bet') || pathname.startsWith('/group') || pathname.startsWith('/settings') || pathname.startsWith('/punishment')) {
     return 'home'
   }
+  if (pathname === '/stats') return 'profile'
   return 'home'
 }
 

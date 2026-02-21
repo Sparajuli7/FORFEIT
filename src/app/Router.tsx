@@ -32,6 +32,7 @@ import { CompetitionDetailScreen } from './screens/CompetitionDetailScreen'
 import { CompetitionCreateScreen } from './screens/CompetitionCreateScreen'
 import { PunishmentStatsScreen } from './screens/PunishmentStatsScreen'
 import { RematchScreen } from './screens/RematchScreen'
+import { BetStatsScreen } from './screens/BetStatsScreen'
 
 // ---------------------------------------------------------------------------
 // Placeholder for screens not yet built
@@ -183,6 +184,7 @@ export function AppRouter() {
             <Route path="profile" element={<ProfileScreen />} />
             <Route path="profile/:id" element={<ProfileScreenWithId />} />
             <Route path="profile/edit" element={<ProfileEditScreen />} />
+            <Route path="stats" element={<BetStatsScreen />} />
 
             {/* Groups */}
             <Route path="group/:id" element={<GroupDetailScreen />} />
