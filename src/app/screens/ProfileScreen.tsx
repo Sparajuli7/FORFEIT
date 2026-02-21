@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { MessageCircle, Loader2 } from 'lucide-react'
 import { useAuthStore, useBetStore, useChatStore } from '@/stores'
