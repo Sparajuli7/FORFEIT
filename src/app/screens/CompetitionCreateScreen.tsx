@@ -4,7 +4,7 @@ import { ChevronLeft } from 'lucide-react'
 import { format } from 'date-fns'
 import { motion, AnimatePresence } from 'motion/react'
 import { createCompetition } from '@/lib/api/competitions'
-import { getGroupMembersWithProfiles } from '@/lib/api/groups'
+import { getGroupMembersWithProfiles, getAllGroupMembersForUser } from '@/lib/api/groups'
 import { getApprovedPunishments } from '@/lib/api/punishments'
 import { STAKE_PRESETS, COMPETITION_TEMPLATES } from '@/lib/utils/constants'
 import { formatMoney } from '@/lib/utils/formatters'
@@ -29,12 +29,13 @@ import {
 import { FunContractModal } from '../components/FunContractModal'
 import type { Competition } from '@/stores'
 
-const METRIC_TEMPLATES = [
-  { prefix: 'Who can ', suffix: ' the most?', placeholder: 'do push-ups' },
-  { prefix: 'Who can ', suffix: ' the fastest?', placeholder: 'run a mile' },
-  { prefix: 'Who can ', suffix: ' the least?', placeholder: 'eat takeout' },
-  { prefix: 'Most ', suffix: ' wins', placeholder: 'gym sessions' },
-  { prefix: 'Highest ', suffix: ' wins', placeholder: 'step count' },
+// Builds the challenge text from a COMPETITION_TEMPLATE entry
+const METRIC_STRUCTURES = [
+  (fill: string) => `Who can ${fill} the most?`,
+  (fill: string) => `Who can ${fill} the fastest?`,
+  (fill: string) => `Who can ${fill} the least?`,
+  (fill: string) => `Most ${fill} wins`,
+  (fill: string) => `Highest ${fill} wins`,
 ]
 
 export function CompetitionCreateScreen() {
@@ -44,16 +45,19 @@ export function CompetitionCreateScreen() {
 
   const [step, setStep] = useState(1)
 
-  // Step 1
+  // ── Step 1 ──────────────────────────────────────────────────────────────────
   const [title, setTitle] = useState('')
+  const [metric, setMetric] = useState('')          // freeform, user writes it
   const [templatesOpen, setTemplatesOpen] = useState(false)
 
-  // Step 2
-  const [metricTemplate, setMetricTemplate] = useState(0)
-  const [metricFill, setMetricFill] = useState('')
+  // ── Step 2 ──────────────────────────────────────────────────────────────────
+  const [participantSource, setParticipantSource] = useState<'groups' | 'friends'>('groups')
+  const [groupSelectMode, setGroupSelectMode] = useState<'whole' | 'individuals'>('individuals')
   const [selectedGroup, setSelectedGroup] = useState<{ id: string; name: string } | null>(null)
   const [groupMembers, setGroupMembers] = useState<GroupMemberWithProfile[]>([])
+  const [friendsList, setFriendsList] = useState<GroupMemberWithProfile[]>([])
   const [participants, setParticipants] = useState<GroupMemberWithProfile[]>([])
+  const [competitionGroupId, setCompetitionGroupId] = useState<string | null>(null)
 
   const [startDate, setStartDate] = useState<Date>(() => new Date())
   const [endDate, setEndDate] = useState<Date>(() => {
@@ -62,7 +66,7 @@ export function CompetitionCreateScreen() {
     return d
   })
 
-  // Step 3
+  // ── Step 3 ──────────────────────────────────────────────────────────────────
   const [scoringMethod, setScoringMethod] = useState<'self_reported' | 'group_verified'>('self_reported')
   const [stakeType, setStakeType] = useState<StakeType>('money')
   const [stakeMoney, setStakeMoney] = useState(2000)
@@ -80,10 +84,8 @@ export function CompetitionCreateScreen() {
   const [createdComp, setCreatedComp] = useState<Competition | null>(null)
   const [contractOpen, setContractOpen] = useState(false)
 
-  const metric =
-    METRIC_TEMPLATES[metricTemplate].prefix +
-    (metricFill || METRIC_TEMPLATES[metricTemplate].placeholder) +
-    METRIC_TEMPLATES[metricTemplate].suffix
+  // The group ID used when creating the competition
+  const resolvedGroupId = participantSource === 'friends' ? competitionGroupId : selectedGroup?.id
 
   const toDateString = (d: Date) => {
     const y = d.getFullYear()
@@ -94,30 +96,23 @@ export function CompetitionCreateScreen() {
   const todayStr = toDateString(new Date())
   const activeDays = Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
 
-  useEffect(() => {
-    fetchGroups()
-  }, [fetchGroups])
+  useEffect(() => { fetchGroups() }, [fetchGroups])
 
-  // Auto-select single group
-  useEffect(() => {
-    if (!selectedGroup && groups.length === 1) {
-      const g = groups[0]
-      setSelectedGroup({ id: g.id, name: g.name })
-    }
-  }, [groups, selectedGroup])
-
-  // When group changes, auto-add all members
+  // Load group members when group changes
   useEffect(() => {
     if (selectedGroup?.id) {
-      getGroupMembersWithProfiles(selectedGroup.id).then((members) => {
-        setGroupMembers(members)
-        setParticipants(members)
-      })
+      getGroupMembersWithProfiles(selectedGroup.id).then(setGroupMembers)
     } else {
       setGroupMembers([])
-      setParticipants([])
     }
   }, [selectedGroup?.id])
+
+  // Load friends when source switches to friends
+  useEffect(() => {
+    if (participantSource === 'friends') {
+      getAllGroupMembersForUser().then(setFriendsList)
+    }
+  }, [participantSource])
 
   useEffect(() => {
     getApprovedPunishments().then((p) =>
@@ -125,19 +120,48 @@ export function CompetitionCreateScreen() {
     )
   }, [])
 
+  // ── Participant helpers ──────────────────────────────────────────────────────
+  const toggleParticipant = (m: GroupMemberWithProfile) => {
+    setParticipants((prev) =>
+      prev.some((p) => p.user_id === m.user_id)
+        ? prev.filter((p) => p.user_id !== m.user_id)
+        : [...prev, m],
+    )
+  }
+
+  const addWholeGroup = () => {
+    if (!groupMembers.length) return
+    setParticipants((prev) => {
+      const existing = new Set(prev.map((p) => p.user_id))
+      return [...prev, ...groupMembers.filter((m) => !existing.has(m.user_id))]
+    })
+  }
+
+  const memberList = participantSource === 'groups' ? groupMembers : friendsList
+
+  // ── Navigation ───────────────────────────────────────────────────────────────
   const handleBack = () => {
     if (step === 1) navigate(-1)
     else setStep((s) => s - 1)
   }
 
   const handleStep1Next = () => {
-    if (!title.trim()) return
+    if (!title.trim() || !metric.trim()) return
+    setError(null)
     setStep(2)
   }
 
   const handleStep2Next = () => {
-    if (!selectedGroup) {
-      setError('Please select a group.')
+    if (participants.length === 0) {
+      setError('Add at least one participant.')
+      return
+    }
+    if (participantSource === 'friends' && !competitionGroupId) {
+      setError('Select a group to post this competition to.')
+      return
+    }
+    if (!resolvedGroupId) {
+      setError('Select a group.')
       return
     }
     const end = new Date(endDate)
@@ -151,27 +175,15 @@ export function CompetitionCreateScreen() {
   }
 
   const handleSubmit = async () => {
-    if (!title.trim()) {
-      setError('Please add a title.')
-      return
-    }
-    if (!selectedGroup) {
-      setError('Please select a group.')
-      return
-    }
+    if (!resolvedGroupId) { setError('Select a group.'); return }
     const end = new Date(endDate)
     end.setHours(23, 59, 59, 999)
-    if (end <= new Date()) {
-      setError('End date must be in the future.')
-      return
-    }
+    if (end <= new Date()) { setError('End date must be in the future.'); return }
     if ((stakeType === 'money' || stakeType === 'both') && (!stakeMoney || stakeMoney <= 0)) {
-      setError('Please set a money stake.')
-      return
+      setError('Please set a money stake.'); return
     }
     if ((stakeType === 'punishment' || stakeType === 'both') && !stakePunishmentId && !stakeCustomPunishment) {
-      setError('Please select a punishment.')
-      return
+      setError('Please select a punishment.'); return
     }
 
     setIsSubmitting(true)
@@ -179,9 +191,9 @@ export function CompetitionCreateScreen() {
     try {
       const comp = await createCompetition({
         title: title.trim(),
-        groupId: selectedGroup.id,
+        groupId: resolvedGroupId,
         category: 'fitness',
-        metric,
+        metric: metric.trim() || title.trim(),
         participantIds: participants.map((p) => p.user_id),
         startDate: startDate.toISOString(),
         deadline: end.toISOString(),
@@ -189,7 +201,7 @@ export function CompetitionCreateScreen() {
         stakeType,
         stakeMoney: stakeType === 'money' || stakeType === 'both' ? stakeMoney : undefined,
         stakePunishmentId: stakePunishmentId ?? undefined,
-        stakeCustomPunishment: stakeCustomPunishment,
+        stakeCustomPunishment,
         isPublic,
       })
       setCreatedComp(comp)
@@ -205,6 +217,7 @@ export function CompetitionCreateScreen() {
 
   return (
     <div className="h-full bg-bg-primary grain-texture flex flex-col">
+      {/* Header */}
       <div className="px-6 pt-8 pb-4 shrink-0">
         <div className="flex items-center justify-between mb-2">
           <button onClick={handleBack} className="text-text-primary p-1 -m-1">
@@ -224,18 +237,18 @@ export function CompetitionCreateScreen() {
       <div className="flex-1 overflow-y-auto px-6 pb-8">
         <AnimatePresence mode="wait">
 
-          {/* ─── Step 1 — Title ─── */}
+          {/* ─── Step 1 — Title + Challenge ─── */}
           {step === 1 && (
             <motion.div
               key="s1"
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
-              className="space-y-6"
+              className="space-y-5"
             >
               <div>
                 <h2 className="text-[32px] font-extrabold text-white" style={{ letterSpacing: '-0.02em' }}>
-                  Competition title
+                  Set the competition
                 </h2>
                 <button
                   onClick={() => navigate('/bet/create')}
@@ -245,29 +258,51 @@ export function CompetitionCreateScreen() {
                 </button>
               </div>
 
-              <Input
-                value={title}
-                onChange={(e) => setTitle(e.target.value.slice(0, 140))}
-                placeholder="e.g. Most Gym Sessions — February"
-                className="h-12 bg-bg-elevated"
-                maxLength={140}
-              />
-              <p className="text-xs text-text-muted -mt-4">{title.length}/140</p>
+              {/* Title */}
+              <div>
+                <label className="text-xs font-bold text-text-muted uppercase tracking-wider block mb-2">
+                  Competition name
+                </label>
+                <Input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value.slice(0, 80))}
+                  placeholder="e.g. Most Gym Sessions — February"
+                  className="h-12 bg-bg-elevated"
+                  maxLength={80}
+                />
+                <p className="text-right text-xs text-text-muted mt-1">{title.length}/80</p>
+              </div>
 
-              <button
-                onClick={() => setTemplatesOpen(true)}
-                className="flex items-center gap-1.5 text-accent-green font-bold text-sm"
-              >
-                ✨ Browse Templates
-              </button>
+              {/* Challenge — freeform */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-bold text-text-muted uppercase tracking-wider">
+                    The challenge
+                  </label>
+                  <button
+                    onClick={() => setTemplatesOpen(true)}
+                    className="text-xs font-bold text-accent-green flex items-center gap-1"
+                  >
+                    ✨ Browse structures
+                  </button>
+                </div>
+                <textarea
+                  value={metric}
+                  onChange={(e) => setMetric(e.target.value.slice(0, 200))}
+                  placeholder="Describe the challenge… e.g. Who can do the most gym sessions this month?"
+                  className="w-full h-28 rounded-xl bg-bg-elevated border border-border-subtle p-4 text-text-primary placeholder:text-text-muted resize-none text-sm"
+                  maxLength={200}
+                />
+                <p className="text-right text-xs text-text-muted mt-1">{metric.length}/200</p>
+              </div>
 
-              <PrimaryButton onClick={handleStep1Next} disabled={!title.trim()}>
+              <PrimaryButton onClick={handleStep1Next} disabled={!title.trim() || !metric.trim()}>
                 Next
               </PrimaryButton>
             </motion.div>
           )}
 
-          {/* ─── Step 2 — Metric + Group + Dates ─── */}
+          {/* ─── Step 2 — Participants + Dates ─── */}
           {step === 2 && (
             <motion.div
               key="s2"
@@ -277,159 +312,251 @@ export function CompetitionCreateScreen() {
               className="space-y-6"
             >
               <h2 className="text-[32px] font-extrabold text-white" style={{ letterSpacing: '-0.02em' }}>
-                Set the challenge
+                Who's competing?
               </h2>
 
-              {/* Metric structure chips */}
+              {/* Source toggle */}
               <div>
-                <p className="text-xs font-bold text-text-muted uppercase mb-2">Structure</p>
-                <div className="flex flex-wrap gap-2">
-                  {METRIC_TEMPLATES.map((t, i) => (
+                <p className="text-xs font-bold text-text-muted uppercase mb-2">Add from</p>
+                <div className="flex gap-2">
+                  {(['groups', 'friends'] as const).map((src) => (
                     <button
-                      key={i}
-                      onClick={() => setMetricTemplate(i)}
-                      className={`px-3 py-2 rounded-xl text-xs font-bold ${
-                        metricTemplate === i ? 'bg-accent-green text-white' : 'bg-bg-elevated text-text-muted'
+                      key={src}
+                      onClick={() => {
+                        setParticipantSource(src)
+                        setParticipants([])
+                      }}
+                      className={`flex-1 py-3 rounded-xl font-bold text-sm ${
+                        participantSource === src ? 'bg-accent-green text-white' : 'bg-bg-elevated text-text-muted'
                       }`}
                     >
-                      {t.prefix.trim()}…{t.suffix}
+                      {src === 'groups' ? 'Within groups' : 'List of friends'}
                     </button>
                   ))}
                 </div>
               </div>
 
-              {/* Metric fill */}
-              <div>
-                <label className="text-xs font-bold text-text-muted block mb-2">Metric</label>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-text-muted text-sm">{METRIC_TEMPLATES[metricTemplate].prefix}</span>
-                  <Input
-                    value={metricFill}
-                    onChange={(e) => setMetricFill(e.target.value)}
-                    placeholder={METRIC_TEMPLATES[metricTemplate].placeholder}
-                    className="flex-1 min-w-[120px] h-10"
-                  />
-                  <span className="text-text-muted text-sm">{METRIC_TEMPLATES[metricTemplate].suffix}</span>
-                </div>
-              </div>
+              {/* ── Groups path ── */}
+              {participantSource === 'groups' && (
+                <>
+                  {/* Group dropdown */}
+                  <div>
+                    <label className="text-xs font-bold text-text-muted block mb-2">Group</label>
+                    <Select
+                      value={selectedGroup?.id ?? ''}
+                      onValueChange={(id) => {
+                        const g = groups.find((x) => x.id === id)
+                        setSelectedGroup(g ? { id: g.id, name: g.name } : null)
+                        setParticipants([])
+                      }}
+                    >
+                      <SelectTrigger className="h-12">
+                        <SelectValue placeholder="Select group" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {groups.map((g) => (
+                          <SelectItem key={g.id} value={g.id}>
+                            {g.avatar_emoji} {g.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-              {/* Group selector */}
-              <div>
-                <label className="text-xs font-bold text-text-muted block mb-2">Group</label>
-                <Select
-                  value={selectedGroup?.id ?? ''}
-                  onValueChange={(id) => {
-                    const g = groups.find((x) => x.id === id)
-                    setSelectedGroup(g ? { id: g.id, name: g.name } : null)
-                  }}
-                >
-                  <SelectTrigger className="h-12">
-                    <SelectValue placeholder="Select group" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {groups.map((g) => (
-                      <SelectItem key={g.id} value={g.id}>
-                        {g.avatar_emoji} {g.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  {/* Select mode */}
+                  {selectedGroup && (
+                    <div>
+                      <p className="text-xs font-bold text-text-muted uppercase mb-2">Select by</p>
+                      <div className="flex gap-2">
+                        {(['whole', 'individuals'] as const).map((mode) => (
+                          <button
+                            key={mode}
+                            onClick={() => {
+                              setGroupSelectMode(mode)
+                              setParticipants([])
+                            }}
+                            className={`flex-1 py-3 rounded-xl font-bold text-sm ${
+                              groupSelectMode === mode ? 'bg-accent-green text-white' : 'bg-bg-elevated text-text-muted'
+                            }`}
+                          >
+                            {mode === 'whole' ? 'Whole group' : 'Individual members'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
-                {/* Avatar cluster + member count */}
-                {participants.length > 0 && (
-                  <div className="flex items-center gap-2 mt-2">
-                    <div className="flex -space-x-2">
-                      {participants.slice(0, 4).map((p) => (
-                        <div
-                          key={p.user_id}
-                          className="w-8 h-8 rounded-full border-2 border-bg-primary overflow-hidden bg-bg-elevated"
-                        >
-                          <img
-                            src={p.profile.avatar_url ?? ''}
-                            alt=""
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                      ))}
-                      {participants.length > 4 && (
-                        <div className="w-8 h-8 rounded-full border-2 border-bg-primary bg-bg-elevated flex items-center justify-center text-[10px] font-bold text-text-muted">
-                          +{participants.length - 4}
-                        </div>
+                  {/* Whole group */}
+                  {selectedGroup && groupSelectMode === 'whole' && (
+                    <div>
+                      <button
+                        onClick={addWholeGroup}
+                        disabled={groupMembers.length === 0}
+                        className="w-full py-3 rounded-xl font-bold text-sm bg-accent-green/20 text-accent-green border border-accent-green/40 disabled:opacity-50"
+                      >
+                        Add whole group{groupMembers.length > 0 ? ` (${groupMembers.length} members)` : ''}
+                      </button>
+                      {participants.length > 0 && (
+                        <p className="text-xs text-accent-green mt-2 font-medium">
+                          ✓ {participants.length} member{participants.length !== 1 ? 's' : ''} added
+                        </p>
                       )}
                     </div>
-                    <span className="text-sm text-text-muted">
-                      {participants.length} member{participants.length !== 1 ? 's' : ''} added
+                  )}
+
+                  {/* Individual members */}
+                  {selectedGroup && groupSelectMode === 'individuals' && (
+                    <div>
+                      <p className="text-xs font-bold text-text-muted uppercase mb-2">
+                        Select members ({participants.length} selected)
+                      </p>
+                      <div className="space-y-2 max-h-56 overflow-y-auto">
+                        {groupMembers.map((m) => {
+                          const selected = participants.some((p) => p.user_id === m.user_id)
+                          return (
+                            <button
+                              key={m.user_id}
+                              onClick={() => toggleParticipant(m)}
+                              className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-colors ${
+                                selected ? 'border-accent-green bg-accent-green/10' : 'border-border-subtle bg-bg-card'
+                              }`}
+                            >
+                              <div className="w-10 h-10 rounded-full overflow-hidden bg-bg-elevated shrink-0">
+                                <img src={m.profile.avatar_url ?? ''} alt="" className="w-full h-full object-cover" />
+                              </div>
+                              <span className="font-bold text-text-primary text-sm">{m.profile.display_name}</span>
+                              {selected && <span className="text-accent-green ml-auto text-sm">✓</span>}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* ── Friends path ── */}
+              {participantSource === 'friends' && (
+                <>
+                  {/* Post to group */}
+                  <div>
+                    <label className="text-xs font-bold text-text-muted block mb-2">Post competition to group</label>
+                    <Select
+                      value={competitionGroupId ?? ''}
+                      onValueChange={(id) => setCompetitionGroupId(id || null)}
+                    >
+                      <SelectTrigger className="h-12">
+                        <SelectValue placeholder="Select group" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {groups.map((g) => (
+                          <SelectItem key={g.id} value={g.id}>
+                            {g.avatar_emoji} {g.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Friends list */}
+                  <div>
+                    <p className="text-xs font-bold text-text-muted uppercase mb-2">
+                      Select friends ({participants.length} selected)
+                    </p>
+                    <div className="space-y-2 max-h-56 overflow-y-auto">
+                      {friendsList.map((m) => {
+                        const selected = participants.some((p) => p.user_id === m.user_id)
+                        return (
+                          <button
+                            key={m.user_id}
+                            onClick={() => toggleParticipant(m)}
+                            className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-colors ${
+                              selected ? 'border-accent-green bg-accent-green/10' : 'border-border-subtle bg-bg-card'
+                            }`}
+                          >
+                            <div className="w-10 h-10 rounded-full overflow-hidden bg-bg-elevated shrink-0">
+                              <img src={m.profile.avatar_url ?? ''} alt="" className="w-full h-full object-cover" />
+                            </div>
+                            <span className="font-bold text-text-primary text-sm">{m.profile.display_name}</span>
+                            {selected && <span className="text-accent-green ml-auto text-sm">✓</span>}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* ── Dates ── */}
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs font-bold text-text-muted uppercase block mb-2">Start date</label>
+                  <input
+                    type="date"
+                    value={toDateString(startDate)}
+                    min={todayStr}
+                    onChange={(e) => {
+                      const d = new Date(e.target.value + 'T00:00:00')
+                      if (isNaN(d.getTime())) return
+                      setStartDate(d)
+                      if (d >= endDate) {
+                        const newEnd = new Date(d)
+                        newEnd.setDate(newEnd.getDate() + 7)
+                        setEndDate(newEnd)
+                      }
+                    }}
+                    className="w-full h-12 px-4 rounded-xl bg-bg-elevated text-text-primary border border-border-subtle text-sm font-bold appearance-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-text-muted uppercase block mb-2">End date</label>
+                  <input
+                    type="date"
+                    value={toDateString(endDate)}
+                    min={toDateString(new Date(startDate.getTime() + 86400000))}
+                    onChange={(e) => {
+                      const d = new Date(e.target.value + 'T00:00:00')
+                      if (isNaN(d.getTime())) return
+                      setEndDate(d)
+                    }}
+                    className="w-full h-12 px-4 rounded-xl bg-bg-elevated text-text-primary border border-border-subtle text-sm font-bold appearance-none"
+                  />
+                </div>
+
+                {/* Duration summary */}
+                <div className="bg-bg-card rounded-xl border border-border-subtle p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-text-muted">From</p>
+                      <p className="text-sm font-bold text-text-primary">{format(startDate, 'MMM d, yyyy')}</p>
+                    </div>
+                    <span className="text-text-muted">→</span>
+                    <div className="text-right">
+                      <p className="text-xs text-text-muted">To</p>
+                      <p className="text-sm font-bold text-text-primary">{format(endDate, 'MMM d, yyyy')}</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-border-subtle text-center">
+                    <span className="text-sm font-bold text-accent-green">
+                      {(() => {
+                        const days = activeDays
+                        if (days < 7) return `${days} day${days !== 1 ? 's' : ''}`
+                        const weeks = Math.floor(days / 7)
+                        const remaining = days % 7
+                        return `${weeks} week${weeks !== 1 ? 's' : ''}${remaining > 0 ? ` ${remaining} day${remaining !== 1 ? 's' : ''}` : ''}`
+                      })()}
                     </span>
                   </div>
-                )}
-              </div>
-
-              {/* Start date */}
-              <div>
-                <label className="text-xs font-bold text-text-muted uppercase block mb-2">Start date</label>
-                <input
-                  type="date"
-                  value={toDateString(startDate)}
-                  min={todayStr}
-                  onChange={(e) => {
-                    const d = new Date(e.target.value + 'T00:00:00')
-                    if (isNaN(d.getTime())) return
-                    setStartDate(d)
-                    if (d >= endDate) {
-                      const newEnd = new Date(d)
-                      newEnd.setDate(newEnd.getDate() + 7)
-                      setEndDate(newEnd)
-                    }
-                  }}
-                  className="w-full h-12 px-4 rounded-xl bg-bg-elevated text-text-primary border border-border-subtle text-sm font-bold appearance-none"
-                />
-              </div>
-
-              {/* End date */}
-              <div>
-                <label className="text-xs font-bold text-text-muted uppercase block mb-2">End date</label>
-                <input
-                  type="date"
-                  value={toDateString(endDate)}
-                  min={toDateString(new Date(startDate.getTime() + 86400000))}
-                  onChange={(e) => {
-                    const d = new Date(e.target.value + 'T00:00:00')
-                    if (isNaN(d.getTime())) return
-                    setEndDate(d)
-                  }}
-                  className="w-full h-12 px-4 rounded-xl bg-bg-elevated text-text-primary border border-border-subtle text-sm font-bold appearance-none"
-                />
-              </div>
-
-              {/* Duration summary */}
-              <div className="bg-bg-card rounded-xl border border-border-subtle p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-text-muted">From</p>
-                    <p className="text-sm font-bold text-text-primary">{format(startDate, 'MMM d, yyyy')}</p>
-                  </div>
-                  <span className="text-text-muted">→</span>
-                  <div className="text-right">
-                    <p className="text-xs text-text-muted">To</p>
-                    <p className="text-sm font-bold text-text-primary">{format(endDate, 'MMM d, yyyy')}</p>
-                  </div>
-                </div>
-                <div className="mt-3 pt-3 border-t border-border-subtle text-center">
-                  <span className="text-sm font-bold text-accent-green">
-                    {(() => {
-                      const days = activeDays
-                      if (days < 7) return `${days} day${days !== 1 ? 's' : ''}`
-                      const weeks = Math.floor(days / 7)
-                      const remaining = days % 7
-                      return `${weeks} week${weeks !== 1 ? 's' : ''}${remaining > 0 ? ` ${remaining} day${remaining !== 1 ? 's' : ''}` : ''}`
-                    })()}
-                  </span>
                 </div>
               </div>
 
               {error && <p className="text-destructive text-sm">{error}</p>}
 
-              <PrimaryButton onClick={handleStep2Next} disabled={!selectedGroup}>
+              <PrimaryButton
+                onClick={handleStep2Next}
+                disabled={participants.length === 0 || (participantSource === 'friends' && !competitionGroupId)}
+              >
                 Next
               </PrimaryButton>
             </motion.div>
@@ -561,32 +688,39 @@ export function CompetitionCreateScreen() {
         </AnimatePresence>
       </div>
 
-      {/* Competition Templates dialog */}
+      {/* ─── Challenge structure templates dialog ─── */}
       <Dialog open={templatesOpen} onOpenChange={setTemplatesOpen}>
         <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>✨ Competition Templates</DialogTitle>
+            <DialogTitle>✨ Challenge structures</DialogTitle>
           </DialogHeader>
-          <div className="space-y-2 pt-2">
-            {COMPETITION_TEMPLATES.map((t) => (
-              <button
-                key={t.title}
-                onClick={() => {
-                  setTitle(t.title)
-                  setMetricTemplate(t.metricTemplateIdx)
-                  setMetricFill(t.fill)
-                  setTemplatesOpen(false)
-                }}
-                className="w-full text-left p-3 rounded-xl bg-bg-elevated text-text-primary text-sm hover:bg-accent-green/20 hover:text-accent-green transition-colors"
-              >
-                {t.title}
-              </button>
-            ))}
+          <p className="text-xs text-text-muted -mt-2 mb-3">
+            Pick a starting format — then edit it to fit your competition.
+          </p>
+          <div className="space-y-2">
+            {COMPETITION_TEMPLATES.map((t) => {
+              const challengeText = METRIC_STRUCTURES[t.metricTemplateIdx]?.(t.fill) ?? t.fill
+              return (
+                <button
+                  key={t.title}
+                  onClick={() => {
+                    setMetric(challengeText)
+                    setTemplatesOpen(false)
+                  }}
+                  className="w-full text-left p-3 rounded-xl bg-bg-elevated hover:bg-accent-green/20 hover:text-accent-green transition-colors group"
+                >
+                  <p className="font-bold text-sm text-text-primary group-hover:text-accent-green">
+                    {challengeText}
+                  </p>
+                  <p className="text-xs text-text-muted mt-0.5">{t.title}</p>
+                </button>
+              )
+            })}
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Custom punishment dialog */}
+      {/* ─── Custom punishment dialog ─── */}
       <Dialog open={customPunishmentOpen} onOpenChange={setCustomPunishmentOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -618,13 +752,11 @@ export function CompetitionCreateScreen() {
         </DialogContent>
       </Dialog>
 
-      {/* Fun Contract modal */}
+      {/* ─── Fun Contract modal ─── */}
       {createdComp && (
         <FunContractModal
           open={contractOpen}
-          onClose={() => {
-            setContractOpen(false)
-          }}
+          onClose={() => setContractOpen(false)}
           title={title}
           wager={{
             money: stakeType === 'money' || stakeType === 'both' ? stakeMoney : null,
@@ -638,7 +770,11 @@ export function CompetitionCreateScreen() {
             name: m.profile.display_name,
             avatarUrl: m.profile.avatar_url,
           }))}
-          groupName={selectedGroup?.name}
+          groupName={
+            participantSource === 'groups'
+              ? selectedGroup?.name
+              : groups.find((g) => g.id === competitionGroupId)?.name
+          }
           detailPath={`/compete/${createdComp.id}`}
         />
       )}
