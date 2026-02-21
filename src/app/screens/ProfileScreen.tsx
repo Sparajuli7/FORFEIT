@@ -181,10 +181,10 @@ function ProfileContent({
       {isOwnProfile ? (
         <div className="px-6 mt-8 pb-8 space-y-3">
           <button
-            onClick={() => navigate('/stats')}
+            onClick={() => navigate('/shame')}
             className="w-full py-3 rounded-xl bg-accent-green/20 text-accent-green font-bold text-sm border border-accent-green/40"
           >
-            Bet stats — wins, losses & money
+            Record — wins, losses & Hall of Shame
           </button>
           <button
             onClick={() => navigate('/profile/edit')}

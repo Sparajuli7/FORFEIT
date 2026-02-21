@@ -15,7 +15,7 @@ import { OutcomeReveal } from './screens/OutcomeReveal'
 import { OutcomeWin } from './screens/OutcomeWin'
 import { OutcomeForfeit } from './screens/OutcomeForfeit'
 import { Competitions } from './screens/Competitions'
-import { HallOfShame } from './screens/HallOfShame'
+import { RecordScreen } from './screens/RecordScreen'
 import { ProfileScreen } from './screens/ProfileScreen'
 import { SignUpScreen } from './screens/SignUpScreen'
 import { LoginScreen } from './screens/LoginScreen'
@@ -32,7 +32,6 @@ import { CompetitionDetailScreen } from './screens/CompetitionDetailScreen'
 import { CompetitionCreateScreen } from './screens/CompetitionCreateScreen'
 import { PunishmentStatsScreen } from './screens/PunishmentStatsScreen'
 import { RematchScreen } from './screens/RematchScreen'
-import { BetStatsScreen } from './screens/BetStatsScreen'
 
 // ---------------------------------------------------------------------------
 // Placeholder for screens not yet built
@@ -177,14 +176,14 @@ export function AppRouter() {
             <Route path="compete/:id" element={<CompetitionDetailScreen />} />
             <Route path="compete/create" element={<CompetitionCreateScreen />} />
 
-            {/* Hall of Shame */}
-            <Route path="shame" element={<HallOfShame />} />
+            {/* Record (stats + Hall of Shame) */}
+            <Route path="shame" element={<RecordScreen />} />
+            <Route path="stats" element={<Navigate to="/shame" replace />} />
 
             {/* Profile */}
             <Route path="profile" element={<ProfileScreen />} />
             <Route path="profile/:id" element={<ProfileScreenWithId />} />
             <Route path="profile/edit" element={<ProfileEditScreen />} />
-            <Route path="stats" element={<BetStatsScreen />} />
 
             {/* Groups */}
             <Route path="group/:id" element={<GroupDetailScreen />} />

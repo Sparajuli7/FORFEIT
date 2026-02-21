@@ -14,7 +14,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { id: 'home', label: 'Home', path: '/home', icon: LayoutGrid },
   { id: 'compete', label: 'Competition', path: '/compete', icon: Trophy, boost: true },
-  { id: 'shame', label: 'Shame', path: '/shame', icon: Skull },
+  { id: 'record', label: 'Record', path: '/shame', icon: Skull },
   { id: 'profile', label: 'Profile', path: '/profile', icon: User },
 ]
 
@@ -27,7 +27,7 @@ function resolveActiveTab(pathname: string): string {
   if (pathname.startsWith('/bet') || pathname.startsWith('/group') || pathname.startsWith('/settings') || pathname.startsWith('/punishment')) {
     return 'home'
   }
-  if (pathname === '/stats') return 'profile'
+  if (pathname === '/stats') return 'record'
   return 'home'
 }
 
