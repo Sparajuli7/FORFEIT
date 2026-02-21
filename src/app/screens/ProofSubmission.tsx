@@ -39,6 +39,12 @@ export function ProofSubmission({ onSubmit, onBack }: ProofSubmissionProps) {
   const docInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
 
+  // Camera viewfinder state
+  const [cameraOpen, setCameraOpen] = useState(false)
+  const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment')
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+
   useEffect(() => {
     if (id) fetchBetDetail(id)
   }, [id, fetchBetDetail])
@@ -81,6 +87,70 @@ export function ProofSubmission({ onSubmit, onBack }: ProofSubmissionProps) {
       if (removed?.previewUrl) URL.revokeObjectURL(removed.previewUrl)
       return prev.filter((_, i) => i !== idx)
     })
+  }, [])
+
+  const openCamera = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode },
+      })
+      streamRef.current = stream
+      setCameraOpen(true)
+      // Attach stream after state update triggers render
+      requestAnimationFrame(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream
+          videoRef.current.play()
+        }
+      })
+    } catch {
+      // Camera not available — fall back to file input
+      cameraInputRef.current?.click()
+    }
+  }, [facingMode])
+
+  const closeCamera = useCallback(() => {
+    streamRef.current?.getTracks().forEach((t) => t.stop())
+    streamRef.current = null
+    setCameraOpen(false)
+  }, [])
+
+  const capturePhoto = useCallback(() => {
+    const video = videoRef.current
+    if (!video) return
+    const canvas = document.createElement('canvas')
+    canvas.width = video.videoWidth
+    canvas.height = video.videoHeight
+    canvas.getContext('2d')!.drawImage(video, 0, 0)
+    canvas.toBlob((blob) => {
+      if (!blob) return
+      const file = new File([blob], `photo_${Date.now()}.jpg`, { type: 'image/jpeg' })
+      const previewUrl = URL.createObjectURL(blob)
+      setUploadFiles((prev) => [...prev, { file, type: 'screenshot', previewUrl }])
+      setLocalError(null)
+      closeCamera()
+    }, 'image/jpeg', 0.9)
+  }, [closeCamera])
+
+  const flipCamera = useCallback(() => {
+    const next = facingMode === 'environment' ? 'user' : 'environment'
+    setFacingMode(next)
+    // Restart stream with new facing mode
+    streamRef.current?.getTracks().forEach((t) => t.stop())
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: next } }).then((stream) => {
+      streamRef.current = stream
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream
+        videoRef.current.play()
+      }
+    }).catch(() => {})
+  }, [facingMode])
+
+  // Cleanup camera on unmount
+  useEffect(() => {
+    return () => {
+      streamRef.current?.getTracks().forEach((t) => t.stop())
+    }
   }, [])
 
   const handleSubmit = async () => {
@@ -182,12 +252,12 @@ export function ProofSubmission({ onSubmit, onBack }: ProofSubmissionProps) {
               count={docCount}
               onClick={() => docInputRef.current?.click()}
             />
-            {/* Take Photo — opens native camera on mobile */}
+            {/* Take Photo — opens camera viewfinder */}
             <UploadCard
               icon={<Camera className="w-8 h-8 text-accent-green" />}
               label="Take Photo"
               count={0}
-              onClick={() => cameraInputRef.current?.click()}
+              onClick={openCamera}
             />
           </div>
 
@@ -282,6 +352,46 @@ export function ProofSubmission({ onSubmit, onBack }: ProofSubmissionProps) {
           {isSubmitting ? 'Submitting...' : 'SUBMIT PROOF'}
         </PrimaryButton>
       </div>
+
+      {/* Camera viewfinder overlay */}
+      {cameraOpen && (
+        <div className="fixed inset-0 z-50 bg-black flex flex-col">
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            className="flex-1 object-cover w-full"
+            style={{ transform: facingMode === 'user' ? 'scaleX(-1)' : undefined }}
+          />
+          <div className="absolute top-safe top-4 right-4 flex gap-3 z-10">
+            <button
+              onClick={flipCamera}
+              className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center"
+              aria-label="Flip camera"
+            >
+              <span className="text-white text-lg">🔄</span>
+            </button>
+            <button
+              onClick={closeCamera}
+              className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center"
+              aria-label="Close camera"
+            >
+              <X className="w-5 h-5 text-white" />
+            </button>
+          </div>
+          <div className="absolute bottom-8 left-0 right-0 flex justify-center pb-safe">
+            <button
+              onClick={capturePhoto}
+              className="w-18 h-18 rounded-full border-4 border-white bg-white/30 backdrop-blur-sm flex items-center justify-center active:scale-90 transition-transform"
+              style={{ width: 72, height: 72 }}
+              aria-label="Take photo"
+            >
+              <div className="w-14 h-14 rounded-full bg-white" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
