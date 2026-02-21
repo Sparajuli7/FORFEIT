@@ -16,7 +16,6 @@ import { ShareSheet } from '../components/ShareSheet'
 import { MediaGallery } from '../components/MediaGallery'
 import type { MediaItem } from '../components/MediaGallery'
 import { getBetShareUrl, getBetShareText, shareWithNative } from '@/lib/share'
-import { isParticipantInBet } from '@/lib/api/bets'
 
 const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop'
 
@@ -110,10 +109,6 @@ export function BetDetail({ onBack }: BetDetailProps) {
   useRealtime('bet_sides', () => id && fetchBetDetail(id), { filter: id ? `bet_id=eq.${id}` : undefined })
   useRealtime('proofs', () => id && fetchProofs(id), { filter: id ? `bet_id=eq.${id}` : undefined })
   useRealtime('proof_votes', () => id && fetchProofs(id))
-
-  const isParticipant = activeBet ? isParticipantInBet(activeBet, activeBetSides, user?.id) : false
-  const canStartRematch =
-    isParticipant && activeBet && (activeBet.status === 'completed' || activeBet.status === 'voided')
 
   const handleBack = () => (onBack ? onBack() : navigate(-1))
 
@@ -501,20 +496,18 @@ export function BetDetail({ onBack }: BetDetailProps) {
         </div>
       )}
 
-      {/* Outcome link + Rematch (loser only) */}
+      {/* Outcome link + Rematch (visible to everyone who can view the bet; only participants can complete rematch) */}
       {(activeBet.status === 'completed' || activeBet.status === 'voided') && (
         <div className="px-6 mb-6 space-y-3">
           <PrimaryButton onClick={() => navigate(`/bet/${id}/outcome`)} className="w-full">
             View Outcome
           </PrimaryButton>
-          {canStartRematch && (
-            <button
-              onClick={() => navigate(`/bet/${id}/rematch`)}
-              className="w-full py-3 rounded-xl border border-accent-green text-accent-green font-bold text-sm"
-            >
-              Rematch — same people, higher stakes
-            </button>
-          )}
+          <button
+            onClick={() => navigate(`/bet/${id}/rematch`)}
+            className="w-full py-3 rounded-xl border border-accent-green text-accent-green font-bold text-sm"
+          >
+            Rematch — same people, higher stakes
+          </button>
         </div>
       )}
 
