@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router'
-import { ArrowLeft, Share2, Pencil, Check, X } from 'lucide-react'
-import { useBetStore } from '@/stores'
+import { ArrowLeft, Share2, Pencil, Check, X, MessageCircle } from 'lucide-react'
+import { useBetStore, useChatStore } from '@/stores'
 import { useProofStore } from '@/stores'
 import { useAuthStore } from '@/stores'
 import { useCountdown } from '@/lib/hooks/useCountdown'
@@ -65,6 +65,7 @@ export function BetDetail({ onBack }: BetDetailProps) {
 
   const [shareOpen, setShareOpen] = useState(false)
   const [votingProofId, setVotingProofId] = useState<string | null>(null)
+  const [openingChat, setOpeningChat] = useState(false)
   const prevStatusRef = useRef(activeBet?.status)
 
   // Auto-navigate to outcome when bet resolves (e.g. after a majority vote)
@@ -234,6 +235,38 @@ export function BetDetail({ onBack }: BetDetailProps) {
           doubtersCount={doubters.length}
         />
       </div>
+
+      {/* Bet Chat */}
+      {mySide && (
+        <div className="px-6 mb-6">
+          <button
+            disabled={openingChat}
+            onClick={async () => {
+              if (!id || openingChat) return
+              setOpeningChat(true)
+              try {
+                const convId = await useChatStore.getState().getOrCreateCompetitionChat(id)
+                navigate(`/chat/${convId}`)
+              } catch (e) {
+                console.error('Failed to open bet chat:', e)
+              } finally {
+                setOpeningChat(false)
+              }
+            }}
+            className="w-full flex items-center gap-3 bg-bg-card border border-border-subtle rounded-xl p-3 hover:bg-bg-elevated transition-colors"
+          >
+            <div className="w-9 h-9 rounded-full bg-accent-green/20 flex items-center justify-center">
+              {openingChat ? (
+                <div className="w-4 h-4 border-2 border-accent-green border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <MessageCircle className="w-4 h-4 text-accent-green" />
+              )}
+            </div>
+            <p className="flex-1 text-sm font-bold text-text-primary text-left">Bet Chat</p>
+            <span className="text-xs text-text-muted">Talk trash &rarr;</span>
+          </button>
+        </div>
+      )}
 
       {/* Sides with avatars */}
       <div className="px-6 mb-8">
