@@ -31,6 +31,7 @@ import { SettingsScreen } from './screens/SettingsScreen'
 import { CompetitionDetailScreen } from './screens/CompetitionDetailScreen'
 import { CompetitionCreateScreen } from './screens/CompetitionCreateScreen'
 import { PunishmentStatsScreen } from './screens/PunishmentStatsScreen'
+import { RematchScreen } from './screens/RematchScreen'
 
 // ---------------------------------------------------------------------------
 // Placeholder for screens not yet built
@@ -168,6 +169,7 @@ export function AppRouter() {
             <Route path="bet/:id/proof" element={<ProofSubmissionRoute />} />
             <Route path="bet/:id/shame-proof" element={<ShameProofSubmission />} />
             <Route path="bet/:id/outcome" element={<OutcomeRevealRoute />} />
+            <Route path="bet/:id/rematch" element={<RematchScreen />} />
 
             {/* Competition (merged with former H2H) */}
             <Route path="compete" element={<Competitions />} />

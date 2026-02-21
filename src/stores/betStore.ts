@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import { supabase } from '@/lib/supabase'
+import { createRematchBet as createRematchBetApi, type RematchStakeOption } from '@/lib/api/bets'
 import type {
   Bet,
   BetSideEntry,
@@ -83,6 +84,8 @@ interface BetActions {
   fetchBetDetail: (betId: string) => Promise<void>
   /** Persist the bet wizard state to Supabase. Requires wizard to be complete. */
   createBet: () => Promise<Bet | null>
+  /** Create a rematch of a completed bet (loser only). Same claim & timeframe, escalated stakes. */
+  createRematchBet: (originalBetId: string, stakeOption: RematchStakeOption) => Promise<Bet | null>
   joinBet: (betId: string, side: BetSide) => Promise<void>
   setFilters: (filters: Partial<BetFilters>) => void
   clearFilters: () => void
@@ -314,6 +317,28 @@ const useBetStore = create<BetStore>()(
       })
 
       return data
+    },
+
+    createRematchBet: async (originalBetId, stakeOption) => {
+      set((draft) => {
+        draft.isLoading = true
+        draft.error = null
+      })
+      try {
+        const newBet = await createRematchBetApi(originalBetId, stakeOption)
+        set((draft) => {
+          draft.bets.unshift({ ...newBet, bet_sides: [] })
+          draft.isLoading = false
+        })
+        return newBet
+      } catch (e) {
+        const message = e instanceof Error ? e.message : 'Rematch failed.'
+        set((draft) => {
+          draft.error = message
+          draft.isLoading = false
+        })
+        return null
+      }
     },
 
     joinBet: async (betId, side) => {

@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router'
 import { motion } from 'motion/react'
 import { getBetOutcomeWithDetails } from '@/lib/api/outcomes'
+import { isParticipantInBet } from '@/lib/api/bets'
 import { getProfilesByIds } from '@/lib/api/profiles'
+import { useAuthStore } from '@/stores'
 import { formatMoney } from '@/lib/utils/formatters'
 import type { BetOutcomeDetails } from '@/lib/api/outcomes'
 import type { OutcomeResult } from '@/lib/database.types'
@@ -21,6 +23,7 @@ type ProfileMap = Map<string, { display_name: string; avatar_url: string | null 
 export function OutcomeReveal({ onShare, onBack }: OutcomeRevealProps) {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const user = useAuthStore((s) => s.user)
   const [data, setData] = useState<BetOutcomeDetails | null>(null)
   const [profiles, setProfiles] = useState<ProfileMap>(new Map())
   const [loading, setLoading] = useState(true)
@@ -110,6 +113,7 @@ export function OutcomeReveal({ onShare, onBack }: OutcomeRevealProps) {
   const loserIds = result === 'claimant_succeeded' ? doubters.map((d) => d.user_id) : [bet.claimant_id, ...riders.map((r) => r.user_id)]
   const winnerNames = winnerIds.map((id) => profiles.get(id)?.display_name ?? 'Unknown')
   const loserNames = loserIds.map((id) => profiles.get(id)?.display_name ?? 'Unknown')
+  const isParticipant = isParticipantInBet(bet, betSides, user?.id)
   const resolvedDate = new Date(outcome.resolved_at).toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
@@ -233,6 +237,15 @@ export function OutcomeReveal({ onShare, onBack }: OutcomeRevealProps) {
           <PrimaryButton onClick={handleShare} variant="primary">
             Share Result 🏆
           </PrimaryButton>
+          {isParticipant && id && (
+            <PrimaryButton
+              onClick={() => navigate(`/bet/${id}/rematch`)}
+              variant="ghost"
+              className="border border-accent-green text-accent-green"
+            >
+              Rematch — same people, higher stakes
+            </PrimaryButton>
+          )}
           <PrimaryButton onClick={handleBack} variant="ghost">
             Back to Group
           </PrimaryButton>
@@ -315,6 +328,15 @@ export function OutcomeReveal({ onShare, onBack }: OutcomeRevealProps) {
           <PrimaryButton onClick={handleSubmitPunishmentProof} variant="danger">
             SUBMIT PUNISHMENT PROOF
           </PrimaryButton>
+          {isParticipant && id && (
+            <PrimaryButton
+              onClick={() => navigate(`/bet/${id}/rematch`)}
+              variant="ghost"
+              className="border border-accent-green text-accent-green w-full"
+            >
+              Rematch — same people, higher stakes
+            </PrimaryButton>
+          )}
           <button
             onClick={handleDispute}
             className="w-full text-xs text-text-muted font-medium btn-pressed"
@@ -358,6 +380,15 @@ export function OutcomeReveal({ onShare, onBack }: OutcomeRevealProps) {
       </div>
 
       <div className="w-full space-y-3">
+        {isParticipant && id && (
+          <PrimaryButton
+            onClick={() => navigate(`/bet/${id}/rematch`)}
+            variant="ghost"
+            className="border border-accent-green text-accent-green w-full"
+          >
+            Rematch — same people, higher stakes
+          </PrimaryButton>
+        )}
         <PrimaryButton onClick={handleShare} variant="ghost">
           Share Result
         </PrimaryButton>
