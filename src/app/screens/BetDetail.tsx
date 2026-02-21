@@ -511,6 +511,16 @@ export function BetDetail({ onBack }: BetDetailProps) {
         </div>
       )}
 
+      {/* Remix — use this challenge as a template (for all bets the user can see) */}
+      <div className="px-6 mb-6">
+        <button
+          onClick={() => navigate('/bet/create', { state: { templateBetId: id } })}
+          className="w-full py-3 rounded-xl border border-border-subtle text-text-muted hover:text-text-primary hover:border-accent-green/50 font-bold text-sm transition-colors"
+        >
+          Remix — use as template & pick who to invite
+        </button>
+      </div>
+
       {/* Stake */}
       <div className="px-6 mb-6">
         <div className="bg-bg-card rounded-2xl border border-border-subtle p-4 text-center">

@@ -91,6 +91,8 @@ interface BetActions {
   clearFilters: () => void
   // Wizard
   resetWizard: () => void
+  /** Prefill wizard from an existing bet (for Remix / use as template). Step set to 1. */
+  loadWizardFromTemplate: (bet: Pick<Bet, 'title' | 'category' | 'bet_type' | 'deadline' | 'stake_type' | 'stake_money' | 'stake_punishment_id' | 'stake_custom_punishment' | 'group_id'>, group: Group | null) => void
   updateWizardStep: (step: number, data: Partial<WizardFields>) => void
   nextStep: () => void
   prevStep: () => void
@@ -404,6 +406,22 @@ const useBetStore = create<BetStore>()(
       set((draft) => {
         draft.currentStep = 1
         draft.wizard = { ...WIZARD_DEFAULTS }
+      }),
+
+    loadWizardFromTemplate: (bet, group) =>
+      set((draft) => {
+        draft.currentStep = 1
+        draft.wizard = {
+          claim: bet.title,
+          category: bet.category,
+          betType: bet.bet_type,
+          deadline: bet.deadline,
+          stakeType: bet.stake_type,
+          stakeMoney: bet.stake_money,
+          stakePunishment: null,
+          stakeCustomPunishment: bet.stake_custom_punishment,
+          selectedGroup: group,
+        }
       }),
 
     updateWizardStep: (step, data) =>

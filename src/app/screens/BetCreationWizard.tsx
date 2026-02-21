@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router'
+import { useState, useEffect, useRef } from 'react'
+import { useNavigate, useLocation } from 'react-router'
 import { ChevronLeft, Shuffle } from 'lucide-react'
 import { format } from 'date-fns'
 import { motion, AnimatePresence } from 'motion/react'
@@ -30,6 +30,7 @@ import {
 import { Input } from '../components/ui/input'
 import type { BetCategory, BetType, PunishmentCard, PunishmentDifficulty, PunishmentCategory } from '@/lib/database.types'
 import { createPunishment } from '@/lib/api/punishments'
+import { getBetDetail } from '@/lib/api/bets'
 
 function detectCategory(text: string): BetCategory | null {
   const lower = text.toLowerCase()
@@ -52,11 +53,14 @@ export function BetCreationWizard() {
   const prevStep = useBetStore((s) => s.prevStep)
   const createBet = useBetStore((s) => s.createBet)
   const resetWizard = useBetStore((s) => s.resetWizard)
+  const loadWizardFromTemplate = useBetStore((s) => s.loadWizardFromTemplate)
   const error = useBetStore((s) => s.error)
   const isLoading = useBetStore((s) => s.isLoading)
 
   const groups = useGroupStore((s) => s.groups)
   const fetchGroups = useGroupStore((s) => s.fetchGroups)
+  const location = useLocation()
+  const templateAppliedRef = useRef(false)
 
   const [claimMode, setClaimMode] = useState<'personal' | 'challenge'>('personal')
   const [quickSliderValue, setQuickSliderValue] = useState(8)
@@ -88,6 +92,18 @@ export function BetCreationWizard() {
   useEffect(() => {
     fetchGroups()
   }, [fetchGroups])
+
+  const templateBetId = (location.state as { templateBetId?: string } | null)?.templateBetId
+  useEffect(() => {
+    if (!templateBetId || templateAppliedRef.current) return
+    templateAppliedRef.current = true
+    getBetDetail(templateBetId)
+      .then((bet) => {
+        const group = groups.find((g) => g.id === bet.group_id) ?? null
+        loadWizardFromTemplate(bet, group)
+      })
+      .catch(() => {})
+  }, [templateBetId, groups, loadWizardFromTemplate])
 
   useEffect(() => {
     if (currentStep === 5 && !wizard.selectedGroup && groups.length === 1) {
