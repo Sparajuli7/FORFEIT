@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
-import { MessageCircle, Loader2 } from 'lucide-react'
+import { MessageCircle, Loader2, Archive } from 'lucide-react'
 import { useAuthStore, useBetStore, useChatStore } from '@/stores'
 import { getMyBets } from '@/lib/api/bets'
 import { getProfilesByIds, getProfile as fetchProfile } from '@/lib/api/profiles'
@@ -194,17 +194,27 @@ function ProfileContent({
             🃏 My Player Card
           </button>
           <button
-            onClick={() => navigate('/shame')}
+            onClick={() => navigate('/journal')}
             className="w-full py-3 rounded-xl bg-accent-green/20 text-accent-green font-bold text-sm border border-accent-green/40"
           >
-            Record — wins, losses & Hall of Shame
+            Journal — groups &amp; bet history
           </button>
-          <button
-            onClick={() => navigate('/profile/edit')}
-            className="w-full py-3 rounded-xl bg-bg-elevated text-text-primary font-bold text-sm border border-border-subtle"
-          >
-            Edit Profile
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={() => navigate('/profile/edit')}
+              className="flex-1 py-3 rounded-xl bg-bg-elevated text-text-primary font-bold text-sm border border-border-subtle"
+            >
+              Edit Profile
+            </button>
+            <button
+              onClick={() => navigate('/archive')}
+              className="py-3 px-4 rounded-xl bg-bg-elevated text-text-muted font-bold text-sm border border-border-subtle flex items-center gap-2 hover:text-text-primary transition-colors"
+              aria-label="Archive"
+            >
+              <Archive className="w-4 h-4" />
+              Archive
+            </button>
+          </div>
           <button
             onClick={() => navigate('/settings')}
             className="w-full py-3 rounded-xl bg-bg-elevated text-text-primary font-bold text-sm border border-border-subtle"

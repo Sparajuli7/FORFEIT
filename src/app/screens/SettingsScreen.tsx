@@ -174,25 +174,21 @@ export function SettingsScreen() {
             </div>
           </div>
 
-          {/* Theme toggle */}
-          <div className="bg-bg-card border border-border-subtle rounded-xl p-4">
-            <p className="text-xs font-bold uppercase tracking-wider text-text-muted mb-3">
-              Theme
+          {/* Theme toggle — compact icon row */}
+          <div className="bg-bg-card border border-border-subtle rounded-xl px-4 py-3 flex items-center justify-between">
+            <p className="text-sm font-medium text-text-primary">
+              {theme === 'dark' ? 'Dark Mode' : 'Light Mode'}
             </p>
             <button
               onClick={toggleTheme}
-              className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-bg-elevated hover:bg-bg-elevated/80 transition-colors"
+              aria-label="Toggle theme"
+              className="w-9 h-9 flex items-center justify-center rounded-full bg-bg-elevated hover:bg-bg-elevated/80 transition-colors"
             >
-              <span className="text-text-primary font-medium">
-                {theme === 'dark' ? 'Dark Mode' : 'Light Mode'}
-              </span>
-              <div className="flex items-center gap-2">
-                {theme === 'dark' ? (
-                  <Moon className="w-5 h-5 text-accent-green" />
-                ) : (
-                  <Sun className="w-5 h-5 text-accent-green" />
-                )}
-              </div>
+              {theme === 'dark' ? (
+                <Moon className="w-5 h-5 text-accent-green" />
+              ) : (
+                <Sun className="w-5 h-5 text-accent-green" />
+              )}
             </button>
           </div>
 

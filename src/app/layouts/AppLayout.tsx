@@ -1,5 +1,5 @@
 import { Outlet, useNavigate, useLocation } from 'react-router'
-import { LayoutGrid, Trophy, Skull, User } from 'lucide-react'
+import { LayoutGrid, Trophy, BookOpen, User } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useNotifications } from '@/lib/hooks/useNotifications'
 import { useChat } from '@/lib/hooks/useChat'
@@ -15,7 +15,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { id: 'home', label: 'Home', path: '/home', icon: LayoutGrid },
   { id: 'compete', label: 'Competition', path: '/compete', icon: Trophy, boost: true },
-  { id: 'record', label: 'Record', path: '/shame', icon: Skull },
+  { id: 'journal', label: 'Journal', path: '/journal', icon: BookOpen },
   { id: 'profile', label: 'Profile', path: '/profile', icon: User },
 ]
 
@@ -28,7 +28,9 @@ function resolveActiveTab(pathname: string): string {
   if (pathname.startsWith('/bet') || pathname.startsWith('/group') || pathname.startsWith('/settings') || pathname.startsWith('/punishment') || pathname.startsWith('/chat')) {
     return 'home'
   }
-  if (pathname === '/stats') return 'record'
+  if (pathname === '/shame' || pathname === '/stats' || pathname === '/archive') {
+    return 'journal'
+  }
   return 'home'
 }
 

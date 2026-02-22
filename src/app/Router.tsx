@@ -35,6 +35,8 @@ import { PlayerCardScreen } from './screens/PlayerCardScreen'
 import { RematchScreen } from './screens/RematchScreen'
 import { ChatInboxScreen } from './screens/ChatInboxScreen'
 import { ChatConversationScreen } from './screens/ChatConversationScreen'
+import { JournalScreen } from './screens/JournalScreen'
+import { ArchiveScreen } from './screens/ArchiveScreen'
 
 // ---------------------------------------------------------------------------
 // Placeholder for screens not yet built
@@ -179,7 +181,13 @@ export function AppRouter() {
             <Route path="compete/:id" element={<CompetitionDetailScreen />} />
             <Route path="compete/create" element={<CompetitionCreateScreen />} />
 
-            {/* Record (stats + Hall of Shame) */}
+            {/* Journal (replaces Record in nav) */}
+            <Route path="journal" element={<JournalScreen />} />
+
+            {/* Archive */}
+            <Route path="archive" element={<ArchiveScreen />} />
+
+            {/* Record / Hall of Shame (kept accessible, not in main nav) */}
             <Route path="shame" element={<RecordScreen />} />
             <Route path="stats" element={<Navigate to="/shame" replace />} />
 
