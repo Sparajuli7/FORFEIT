@@ -66,12 +66,14 @@ export function MessageBubble({ message, isOwn, showSender }: MessageBubbleProps
             <img
               src={message.media_url}
               alt="Shared image"
-              className="rounded-lg max-w-full max-h-48 object-cover mb-1"
+              className="rounded-lg max-w-full max-h-60 object-cover"
             />
           )}
-          <p className={`text-sm ${isOwn ? 'text-text-primary' : 'text-text-primary'}`}>
-            {message.content}
-          </p>
+          {message.content && !(message.type === 'image' && message.content === '📷 Photo') && (
+            <p className={`text-sm ${message.type === 'image' ? 'mt-1' : ''} text-text-primary`}>
+              {message.content}
+            </p>
+          )}
         </div>
 
         <p className={`text-[10px] text-text-muted mt-0.5 px-1 ${isOwn ? 'text-right' : ''}`}>

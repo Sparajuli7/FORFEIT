@@ -1,9 +1,10 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useCallback, useState } from 'react'
 import { useParams, useNavigate } from 'react-router'
 import { ChevronLeft, Users } from 'lucide-react'
 import { useChatStore, useAuthStore } from '@/stores'
 import { MessageBubble, formatDateSeparator } from '@/app/components/MessageBubble'
 import { ChatInput } from '@/app/components/ChatInput'
+import { uploadChatImage } from '@/lib/api/chat'
 import type { MessageWithSender } from '@/lib/api/chat'
 
 function isSameDay(a: string, b: string): boolean {
@@ -37,6 +38,7 @@ export function ChatConversationScreen() {
   const unsubscribeFromConversation = useChatStore((s) => s.unsubscribeFromConversation)
   const clearActiveConversation = useChatStore((s) => s.clearActiveConversation)
 
+  const [isUploading, setIsUploading] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const isInitialLoad = useRef(true)
 
@@ -90,14 +92,31 @@ export function ChatConversationScreen() {
     }
   }, [hasMoreMessages, isLoading, loadMoreMessages])
 
-  const handleSend = (content: string) => {
-    sendMessage(content)
-    // Scroll to bottom after sending
+  const scrollToBottom = () => {
     requestAnimationFrame(() => {
       if (scrollRef.current) {
         scrollRef.current.scrollTop = scrollRef.current.scrollHeight
       }
     })
+  }
+
+  const handleSend = (content: string) => {
+    sendMessage(content)
+    scrollToBottom()
+  }
+
+  const handleSendImage = async (file: File, caption: string) => {
+    if (!conversationId) return
+    setIsUploading(true)
+    try {
+      const mediaUrl = await uploadChatImage(conversationId, file)
+      sendMessage(caption || '📷 Photo', 'image', mediaUrl)
+      scrollToBottom()
+    } catch (e) {
+      console.error('Failed to upload image:', e)
+    } finally {
+      setIsUploading(false)
+    }
   }
 
   // Display name for the conversation
@@ -196,7 +215,7 @@ export function ChatConversationScreen() {
       </div>
 
       {/* Input */}
-      <ChatInput onSend={handleSend} />
+      <ChatInput onSend={handleSend} onSendImage={handleSendImage} isUploading={isUploading} />
     </div>
   )
 }

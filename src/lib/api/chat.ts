@@ -374,6 +374,23 @@ export async function getMessages(
   }))
 }
 
+export async function uploadChatImage(
+  conversationId: string,
+  file: File,
+): Promise<string> {
+  const userId = await getCurrentUserId()
+  const ext = file.name.split('.').pop()?.toLowerCase() ?? 'jpg'
+  const path = `chat/${conversationId}/${userId}/${Date.now()}.${ext}`
+
+  const { error } = await supabase.storage
+    .from('proofs')
+    .upload(path, file, { upsert: true, contentType: file.type })
+  if (error) throw error
+
+  const { data } = supabase.storage.from('proofs').getPublicUrl(path)
+  return data.publicUrl
+}
+
 export async function sendMessage(
   conversationId: string,
   content: string,
