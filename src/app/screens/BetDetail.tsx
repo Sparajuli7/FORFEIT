@@ -15,10 +15,16 @@ import { PrimaryButton } from '../components/PrimaryButton'
 import { ShareSheet } from '../components/ShareSheet'
 import { MediaGallery } from '../components/MediaGallery'
 import type { MediaItem } from '../components/MediaGallery'
-import { getBetShareUrl, getBetShareText, shareWithNative } from '@/lib/share'
+import { getBetShareUrl, getBetShareText, shareWithNative, getProofShareText } from '@/lib/share'
 import { AddToCalendar } from '../components/AddToCalendar'
 import type { CalendarEvent } from '@/lib/utils/calendar'
 import { formatDeadline } from '@/lib/utils/calendar'
+import { ProofCard } from '../components/ProofCard'
+import type { ProofCardFrame } from '../components/ProofCard'
+import {
+  Dialog,
+  DialogContent,
+} from '../components/ui/dialog'
 
 const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop'
 
@@ -69,6 +75,7 @@ export function BetDetail({ onBack }: BetDetailProps) {
   const [shareOpen, setShareOpen] = useState(false)
   const [votingProofId, setVotingProofId] = useState<string | null>(null)
   const [openingChat, setOpeningChat] = useState(false)
+  const [proofShareUrl, setProofShareUrl] = useState<string | null>(null)
   const prevStatusRef = useRef(activeBet?.status)
 
   // Auto-navigate to outcome when bet resolves (e.g. after a majority vote)
@@ -392,10 +399,25 @@ export function BetDetail({ onBack }: BetDetailProps) {
             if (proof.video_url) mediaItems.push({ url: proof.video_url, type: 'video', label: 'Video' })
             if (proof.document_url) mediaItems.push({ url: proof.document_url, type: 'document', label: 'Document' })
 
+            const firstImageUrl = mediaItems.find((m) => m.type === 'image')?.url ?? null
+            const proofFrame: ProofCardFrame =
+              activeBet.status === 'completed' ? 'winner' : 'default'
+
             return (
               <div key={proof.id} className="bg-bg-card rounded-2xl border border-border-subtle p-4 mb-4">
                 {/* Proof media */}
                 <MediaGallery items={mediaItems} caption={editingProofId === proof.id ? undefined : proof.caption} />
+
+                {/* Share proof as framed card */}
+                {firstImageUrl && (
+                  <button
+                    onClick={() => setProofShareUrl(firstImageUrl)}
+                    className="flex items-center gap-1.5 mt-2 text-xs font-semibold text-accent-green hover:text-accent-green/80 transition-colors"
+                  >
+                    <Share2 className="w-3 h-3" />
+                    Share proof
+                  </button>
+                )}
 
                 {/* Text-only proof (no media) */}
                 {mediaItems.length === 0 && proof.caption && editingProofId !== proof.id && (
@@ -581,6 +603,28 @@ export function BetDetail({ onBack }: BetDetailProps) {
       </div>
 
       {error && <p className="px-6 text-destructive text-sm">{error}</p>}
+
+      {/* Proof share dialog with framed ProofCard */}
+      <Dialog open={!!proofShareUrl} onOpenChange={(open) => !open && setProofShareUrl(null)}>
+        <DialogContent className="bg-bg-primary border-border-subtle max-w-sm">
+          {proofShareUrl && (
+            <ProofCard
+              imageUrl={proofShareUrl}
+              betTitle={activeBet.title}
+              personName={claimant?.display_name ?? 'Anonymous'}
+              avatarUrl={claimant?.avatar_url}
+              frame={activeBet.status === 'completed' ? 'winner' : 'default'}
+              betId={id}
+              caption={getProofShareText({
+                betTitle: activeBet.title,
+                personName: claimant?.display_name ?? 'Anonymous',
+                result: activeBet.status === 'completed' ? 'won' : 'proof',
+              })}
+              subtitle={`Stake: ${formatStake(activeBet)}`}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

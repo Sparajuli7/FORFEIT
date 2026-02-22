@@ -1,0 +1,214 @@
+import { forwardRef, useState } from 'react'
+import { Share2, Download } from 'lucide-react'
+import { ShareSheet } from './ShareSheet'
+import { getBetShareUrl, shareWithNative, fetchImageAsFile } from '@/lib/share'
+import { captureElementAsImage, shareImage, downloadImage } from '@/lib/utils/imageExport'
+
+export type ProofCardFrame = 'default' | 'winner' | 'forfeit' | 'shame'
+
+interface ProofCardProps {
+  /** The proof image URL to display inside the frame. */
+  imageUrl: string
+  /** Bet title — shown as the caption. */
+  betTitle: string
+  /** Claimant / person in the proof. */
+  personName: string
+  /** Optional avatar URL. */
+  avatarUrl?: string | null
+  /** Result badge: winner, forfeit, shame, or none. */
+  frame?: ProofCardFrame
+  /** Optional bet ID for share link. */
+  betId?: string
+  /** Optional caption text override. */
+  caption?: string
+  /** Optional extra text shown below the caption (e.g. stake). */
+  subtitle?: string
+}
+
+const FRAME_CONFIG: Record<
+  ProofCardFrame,
+  { badge: string; badgeColor: string; borderColor: string; bgGradient: string }
+> = {
+  default: {
+    badge: 'PROOF',
+    badgeColor: 'text-accent-green',
+    borderColor: 'border-accent-green/40',
+    bgGradient: 'from-accent-green/10 to-transparent',
+  },
+  winner: {
+    badge: 'WINNER',
+    badgeColor: 'text-gold',
+    borderColor: 'border-gold/50',
+    bgGradient: 'from-gold/10 to-transparent',
+  },
+  forfeit: {
+    badge: 'FORFEIT',
+    badgeColor: 'text-accent-coral',
+    borderColor: 'border-accent-coral/40',
+    bgGradient: 'from-accent-coral/10 to-transparent',
+  },
+  shame: {
+    badge: 'HALL OF SHAME',
+    badgeColor: 'text-accent-coral',
+    borderColor: 'border-accent-coral/40',
+    bgGradient: 'from-accent-coral/10 to-transparent',
+  },
+}
+
+/**
+ * ProofCard — shareable, framed proof image template with FORFEIT branding.
+ * Designed for image capture (html-to-image) and social sharing.
+ * Use `ref` to capture the card as a PNG image.
+ */
+export const ProofCard = forwardRef<HTMLDivElement, ProofCardProps>(
+  function ProofCard(
+    {
+      imageUrl,
+      betTitle,
+      personName,
+      avatarUrl,
+      frame = 'default',
+      betId,
+      caption,
+      subtitle,
+    },
+    ref,
+  ) {
+    const [shareOpen, setShareOpen] = useState(false)
+    const [saving, setSaving] = useState(false)
+    const cardRef = (ref as React.RefObject<HTMLDivElement>) ?? { current: null }
+
+    const config = FRAME_CONFIG[frame]
+    const shareUrl = betId ? getBetShareUrl(betId) : ''
+    const shareText = caption
+      ? `${caption} — FORFEIT 🎲`
+      : `${config.badge}: "${betTitle}" by ${personName} — FORFEIT 🎲`
+
+    const handleShare = async (e: React.MouseEvent) => {
+      e.stopPropagation()
+      // Try to share the proof image directly via native share
+      const file = await fetchImageAsFile(imageUrl, 'forfeit-proof.jpg')
+      const files = file ? [file] : []
+      const usedNative = await shareWithNative({
+        title: `FORFEIT ${config.badge}`,
+        text: shareText,
+        url: shareUrl,
+        files,
+      })
+      if (!usedNative) setShareOpen(true)
+    }
+
+    const handleSave = async (e: React.MouseEvent) => {
+      e.stopPropagation()
+      if (saving) return
+      setSaving(true)
+      try {
+        if (cardRef.current) {
+          const blob = await captureElementAsImage(cardRef.current, { scale: 2 })
+          const shared = await shareImage(blob, 'forfeit-proof.png', shareText)
+          if (!shared) downloadImage(blob, 'forfeit-proof.png')
+        }
+      } catch {
+        /* ignore capture errors */
+      } finally {
+        setSaving(false)
+      }
+    }
+
+    return (
+      <>
+        {/* Capturable card */}
+        <div
+          ref={ref}
+          className={`relative rounded-2xl overflow-hidden border-2 ${config.borderColor} bg-bg-card`}
+        >
+          {/* Proof image */}
+          <div className="relative aspect-[3/4] bg-bg-elevated">
+            <img
+              src={imageUrl}
+              alt="Proof"
+              className="w-full h-full object-cover"
+              crossOrigin="anonymous"
+            />
+            {/* Top-left FORFEIT branding */}
+            <div className="absolute top-3 left-3">
+              <span className="text-xs font-black tracking-[0.15em] text-white/80 drop-shadow-lg">
+                FORFEIT
+              </span>
+            </div>
+            {/* Top-right badge */}
+            <div className="absolute top-3 right-3">
+              <span
+                className={`px-2 py-1 rounded-full text-[10px] font-black tracking-wider uppercase bg-black/60 backdrop-blur-sm ${config.badgeColor}`}
+              >
+                {config.badge}
+              </span>
+            </div>
+          </div>
+
+          {/* Bottom info bar */}
+          <div className={`bg-gradient-to-b ${config.bgGradient} bg-bg-card px-4 py-3`}>
+            <div className="flex items-center gap-3">
+              {/* Avatar */}
+              <div className="w-8 h-8 rounded-full bg-bg-elevated overflow-hidden shrink-0">
+                {avatarUrl ? (
+                  <img
+                    src={avatarUrl}
+                    alt={personName}
+                    className="w-full h-full object-cover"
+                    crossOrigin="anonymous"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-xs font-bold text-text-muted">
+                    {personName[0]?.toUpperCase()}
+                  </div>
+                )}
+              </div>
+              {/* Text */}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-text-primary truncate">{personName}</p>
+                <p className="text-xs text-text-muted truncate">
+                  {caption ?? `"${betTitle}"`}
+                </p>
+                {subtitle && (
+                  <p className="text-[10px] text-text-muted truncate mt-0.5">
+                    {subtitle}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Action buttons — not part of captured image */}
+        <div className="flex items-center justify-center gap-3 mt-3">
+          <button
+            onClick={handleShare}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-bg-elevated border border-border-subtle text-text-primary text-sm font-semibold hover:bg-bg-card transition-colors"
+          >
+            <Share2 className="w-4 h-4" />
+            Share
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-bg-elevated border border-border-subtle text-text-primary text-sm font-semibold hover:bg-bg-card transition-colors disabled:opacity-50"
+          >
+            <Download className="w-4 h-4" />
+            {saving ? 'Saving...' : 'Save'}
+          </button>
+        </div>
+
+        <ShareSheet
+          open={shareOpen}
+          onOpenChange={setShareOpen}
+          title={`Share ${config.badge.toLowerCase()}`}
+          text={shareText}
+          url={shareUrl}
+          imageUrl={imageUrl}
+          caption={caption ?? betTitle}
+        />
+      </>
+    )
+  },
+)

@@ -45,8 +45,11 @@ export function AppLayout() {
 
   return (
     <div className="h-full bg-bg-primary grain-texture flex flex-col overflow-hidden">
-      {/* Top Navigation */}
-      <nav className="shrink-0 h-16 bg-bg-primary border-b border-border-subtle flex items-center justify-around pt-safe">
+      <div className="flex-1 overflow-y-auto min-h-0">
+        <Outlet />
+      </div>
+      {/* Bottom Navigation */}
+      <nav className="shrink-0 h-16 bg-bg-primary border-t border-border-subtle flex items-center justify-around pb-safe">
         {NAV_ITEMS.map((item) => {
           const isActive = activeTab === item.id
           const Icon = item.icon
@@ -77,9 +80,6 @@ export function AppLayout() {
           )
         })}
       </nav>
-      <div className="flex-1 overflow-y-auto min-h-0">
-        <Outlet />
-      </div>
     </div>
   )
 }

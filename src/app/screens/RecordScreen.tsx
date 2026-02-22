@@ -15,7 +15,12 @@ import type { BetStatsForUser as BetStatsType, UserBetResult } from '@/lib/api/s
 import type { ShamePostEnriched } from '@/stores/shameStore'
 import type { ProfileWithRep } from '@/lib/api/profiles'
 import { ShareSheet } from '@/app/components/ShareSheet'
-import { getRecordShareText, getBetShareUrl, shareWithNative } from '@/lib/share'
+import { getRecordShareText, getBetShareUrl, shareWithNative, getProofShareText } from '@/lib/share'
+import { ProofCard } from '@/app/components/ProofCard'
+import {
+  Dialog,
+  DialogContent,
+} from '@/app/components/ui/dialog'
 
 function ResultBadge({ result }: { result: UserBetResult }) {
   if (result === 'won')
@@ -50,6 +55,13 @@ export function RecordScreen() {
   const [stats, setStats] = useState<BetStatsType | null>(null)
   const [statsLoading, setStatsLoading] = useState(true)
   const [shareOpen, setShareOpen] = useState(false)
+  const [shameProofShare, setShameProofShare] = useState<{
+    imageUrl: string
+    betTitle: string
+    personName: string
+    avatarUrl: string | null
+    betId: string
+  } | null>(null)
 
   const shamePosts = useShameStore((s) => s.shamePosts)
   const punishmentLeaderboard = useShameStore((s) => s.punishmentLeaderboard)
@@ -318,6 +330,16 @@ export function RecordScreen() {
                     currentUserId={user?.id}
                     onReact={(emoji) => reactToPost(post.id, emoji)}
                     onTap={() => navigate(`/bet/${post.bet_id}`)}
+                    onShareProof={(imageUrl) => {
+                      const p = profileMap.get(post.submitted_by)
+                      setShameProofShare({
+                        imageUrl,
+                        betTitle: post._betTitle ?? 'Bet',
+                        personName: p?.display_name ?? 'Unknown',
+                        avatarUrl: p?.avatar_url ?? null,
+                        betId: post.bet_id,
+                      })
+                    }}
                   />
                 ))}
               </div>
@@ -329,6 +351,27 @@ export function RecordScreen() {
           <p className="text-text-muted text-sm text-center py-4">Create or join a group to see Hall of Shame.</p>
         )}
       </div>
+
+      {/* Proof share dialog for shame posts */}
+      <Dialog open={!!shameProofShare} onOpenChange={(open) => !open && setShameProofShare(null)}>
+        <DialogContent className="bg-bg-primary border-border-subtle max-w-sm">
+          {shameProofShare && (
+            <ProofCard
+              imageUrl={shameProofShare.imageUrl}
+              betTitle={shameProofShare.betTitle}
+              personName={shameProofShare.personName}
+              avatarUrl={shameProofShare.avatarUrl}
+              frame="shame"
+              betId={shameProofShare.betId}
+              caption={getProofShareText({
+                betTitle: shameProofShare.betTitle,
+                personName: shameProofShare.personName,
+                result: 'shame',
+              })}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -339,12 +382,14 @@ function ShameCardCompact({
   currentUserId,
   onReact,
   onTap,
+  onShareProof,
 }: {
   post: ShamePostEnriched
   profile: ProfileWithRep | undefined
   currentUserId: string | undefined
   onReact: (emoji: string) => void
   onTap: () => void
+  onShareProof?: (imageUrl: string) => void
 }) {
   const confirmed = post._outcomeResult === 'claimant_failed'
   const reactionCounts = getReactionCounts(post.reactions)
@@ -355,6 +400,7 @@ function ShameCardCompact({
     post.screenshot_urls.forEach((url, i) => items.push({ url, type: 'image', label: `Screenshot ${i + 1}` }))
   }
   if (post.video_url) items.push({ url: post.video_url, type: 'video', label: 'Video' })
+  const firstImageUrl = items.find((m) => m.type === 'image')?.url ?? null
 
   return (
     <button
@@ -401,6 +447,18 @@ function ShameCardCompact({
             </button>
           )
         })}
+        {firstImageUrl && onShareProof && (
+          <>
+            <span className="flex-1" />
+            <button
+              onClick={() => onShareProof(firstImageUrl)}
+              className="flex items-center gap-1 text-text-muted hover:text-accent-green transition-colors"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              <span className="text-xs font-bold">Share</span>
+            </button>
+          </>
+        )}
       </div>
     </button>
   )

@@ -76,6 +76,19 @@ export function getPunishmentShareText(params: {
   return `📜 FORFEIT RECEIPT: ${params.loserName} owes ${params.punishment} for losing "${params.betTitle}". No refunds. 😤`
 }
 
+/** Build share text for a proof image. */
+export function getProofShareText(params: {
+  betTitle: string
+  personName: string
+  result?: 'won' | 'lost' | 'proof' | 'shame'
+}): string {
+  const { betTitle, personName, result } = params
+  if (result === 'won') return `🏆 PROOF: ${personName} won "${betTitle}" on FORFEIT! 🎲`
+  if (result === 'lost') return `😬 PROOF: ${personName} lost "${betTitle}" on FORFEIT! 🎲`
+  if (result === 'shame') return `😂 HALL OF SHAME: ${personName} completed their punishment for "${betTitle}" on FORFEIT!`
+  return `📸 PROOF: ${personName} submitted proof for "${betTitle}" on FORFEIT! 🎲`
+}
+
 /** Build share text for shame proof submission. */
 export function getShameShareText(params: {
   loserName: string
