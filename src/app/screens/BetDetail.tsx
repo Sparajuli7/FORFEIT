@@ -8,8 +8,6 @@ import { useCountdown } from '@/lib/hooks/useCountdown'
 import { useRealtime } from '@/lib/hooks/useRealtime'
 import { getProfilesByIds } from '@/lib/api/profiles'
 import { formatMoney } from '@/lib/utils/formatters'
-import { formatOdds } from '@/lib/utils/formatters'
-import { OddsBar } from '../components/OddsBar'
 import { PrimaryButton } from '../components/PrimaryButton'
 import { ShareSheet } from '../components/ShareSheet'
 import { MediaGallery } from '../components/MediaGallery'
@@ -65,7 +63,9 @@ export function BetDetail({ onBack }: BetDetailProps) {
   const countdown = useCountdown(activeBet?.deadline ?? new Date().toISOString())
   const riders = activeBetSides.filter((s) => s.side === 'rider')
   const doubters = activeBetSides.filter((s) => s.side === 'doubter')
-  const { riderPct, doubterPct } = formatOdds(riders.length, doubters.length)
+  const totalSides = riders.length + doubters.length
+  const riderPct = totalSides > 0 ? Math.round((riders.length / totalSides) * 100) : 50
+  const doubterPct = 100 - riderPct
   const mySide = activeBetSides.find((s) => s.user_id === user?.id)?.side ?? null
   const isClaimant = activeBet?.claimant_id === user?.id
   const canJoin = !mySide && (activeBet?.status === 'pending' || activeBet?.status === 'active')
@@ -170,13 +170,43 @@ export function BetDetail({ onBack }: BetDetailProps) {
             'text-accent-green'
           }`}>{statusLabel}</span>
         </div>
-        <button
-          onClick={handleShare}
-          className="w-10 h-10 flex items-center justify-center btn-pressed rounded-lg hover:bg-bg-elevated transition-colors"
-          aria-label="Share"
-        >
-          <Share2 className="w-5 h-5 text-white" />
-        </button>
+        <div className="flex items-center gap-1">
+          {mySide && (
+            <button
+              disabled={openingChat}
+              onClick={async () => {
+                if (!id || openingChat) return
+                setOpeningChat(true)
+                try {
+                  const convId = await useChatStore.getState().getOrCreateCompetitionChat(id)
+                  navigate(`/chat/${convId}`)
+                } catch (e) {
+                  console.error('Failed to open bet chat:', e)
+                } finally {
+                  setOpeningChat(false)
+                }
+              }}
+              className="relative w-10 h-10 flex items-center justify-center btn-pressed rounded-lg hover:bg-bg-elevated transition-colors"
+              aria-label="Chat"
+            >
+              {openingChat ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <MessageCircle className="w-5 h-5 text-white" />
+              )}
+              {useChatStore.getState().conversations.some((c) => c.bet_id === id && c._unread) && (
+                <div className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-accent-coral border-2 border-bg-primary" />
+              )}
+            </button>
+          )}
+          <button
+            onClick={handleShare}
+            className="w-10 h-10 flex items-center justify-center btn-pressed rounded-lg hover:bg-bg-elevated transition-colors"
+            aria-label="Share"
+          >
+            <Share2 className="w-5 h-5 text-white" />
+          </button>
+        </div>
       </div>
 
       <ShareSheet
@@ -249,49 +279,20 @@ export function BetDetail({ onBack }: BetDetailProps) {
         )}
       </div>
 
-      {/* Odds */}
+      {/* Odds bar + Sides */}
       <div className="px-6 mb-8">
-        <OddsBar
-          ridersPercent={riderPct}
-          doubtersPercent={doubterPct}
-          ridersCount={riders.length}
-          doubtersCount={doubters.length}
-        />
-      </div>
-
-      {/* Bet Chat */}
-      {mySide && (
-        <div className="px-6 mb-6">
-          <button
-            disabled={openingChat}
-            onClick={async () => {
-              if (!id || openingChat) return
-              setOpeningChat(true)
-              try {
-                const convId = await useChatStore.getState().getOrCreateCompetitionChat(id)
-                navigate(`/chat/${convId}`)
-              } catch (e) {
-                console.error('Failed to open bet chat:', e)
-              } finally {
-                setOpeningChat(false)
-              }
-            }}
-            className="w-full flex items-center gap-3 bg-bg-card border border-border-subtle rounded-xl p-3 hover:bg-bg-elevated transition-colors"
-          >
-            <div className="w-9 h-9 rounded-full bg-accent-green/20 flex items-center justify-center">
-              {openingChat ? (
-                <div className="w-4 h-4 border-2 border-accent-green border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <MessageCircle className="w-4 h-4 text-accent-green" />
-              )}
-            </div>
-            <p className="flex-1 text-sm font-bold text-text-primary text-left">Chat</p>
-          </button>
+        {/* Slim odds bar */}
+        <div className="mb-4">
+          <div className="flex items-center justify-between text-xs font-bold mb-1.5">
+            <span className="text-accent-green">{riderPct}% Riders ({riders.length})</span>
+            <span className="text-accent-coral">{doubterPct}% Doubters ({doubters.length})</span>
+          </div>
+          <div className="h-2 overflow-hidden flex rounded-full">
+            <div className="bg-accent-green" style={{ width: `${riderPct}%` }} />
+            <div className="bg-accent-coral" style={{ width: `${doubterPct}%` }} />
+          </div>
         </div>
-      )}
 
-      {/* Sides with avatars */}
-      <div className="px-6 mb-8">
         <div className="grid grid-cols-2 gap-4">
           <div className="bg-bg-card rounded-2xl border border-border-subtle p-4">
             <div className="flex items-center gap-2 mb-3">
