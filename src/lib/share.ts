@@ -119,6 +119,8 @@ export interface SharePayload {
   title?: string
   text: string
   url: string
+  /** Optional image files to attach (proof photos). Used in native share. */
+  files?: File[]
 }
 
 /** Whether the Web Share API is available (e.g. mobile share sheet). */
@@ -128,21 +130,65 @@ export function canUseNativeShare(): boolean {
 
 /**
  * Share using the native share sheet when available (best UX on mobile).
+ * Attaches image files when provided and supported by the browser.
  * Returns true if native share was used, false if caller should show fallback (e.g. ShareSheet).
  */
 export async function shareWithNative(payload: SharePayload): Promise<boolean> {
   if (!canUseNativeShare()) return false
   try {
-    await navigator.share({
+    const shareData: ShareData = {
       title: payload.title ?? 'FORFEIT',
       text: payload.text,
       url: payload.url,
-    })
+    }
+    // Attach files (proof images) if the browser supports it
+    if (payload.files?.length && navigator.canShare?.({ files: payload.files })) {
+      shareData.files = payload.files
+    }
+    await navigator.share(shareData)
     return true
   } catch (e) {
     if ((e as Error).name === 'AbortError') return true
     return false
   }
+}
+
+/**
+ * Fetch a remote image URL and return it as a File for native sharing.
+ * Returns null if fetch fails or URL is falsy.
+ */
+export async function fetchImageAsFile(
+  imageUrl: string | null | undefined,
+  filename = 'proof.jpg',
+): Promise<File | null> {
+  if (!imageUrl) return null
+  try {
+    const res = await fetch(imageUrl)
+    if (!res.ok) return null
+    const blob = await res.blob()
+    return new File([blob], filename, { type: blob.type || 'image/jpeg' })
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Collect the best shareable proof image from proof media URLs.
+ * Fetches one image (front > back > first screenshot) to keep shares fast.
+ */
+export async function getProofShareFiles(proof: {
+  front_camera_url?: string | null
+  back_camera_url?: string | null
+  screenshot_urls?: string[] | null
+}): Promise<File[]> {
+  const url =
+    proof.front_camera_url ??
+    proof.back_camera_url ??
+    proof.screenshot_urls?.[0] ??
+    null
+  if (!url) return []
+  const file = await fetchImageAsFile(url, 'forfeit-proof.jpg')
+  return file ? [file] : []
 }
 
 /** Copy text to clipboard. Returns true on success. */

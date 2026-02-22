@@ -11,7 +11,7 @@ import type { OutcomeResult } from '@/lib/database.types'
 import { PrimaryButton } from '../components/PrimaryButton'
 import { PunishmentReceipt } from '../components/PunishmentReceipt'
 import { ShareSheet } from '../components/ShareSheet'
-import { getBetShareUrl, getOutcomeShareText, shareWithNative } from '@/lib/share'
+import { getBetShareUrl, getOutcomeShareText, shareWithNative, getProofShareFiles } from '@/lib/share'
 import { Download } from 'lucide-react'
 import { captureElementAsImage, shareImage } from '@/lib/utils/imageExport'
 
@@ -73,7 +73,11 @@ export function OutcomeReveal({ onShare, onBack }: OutcomeRevealProps) {
       doubterNames,
     })
     const url = getBetShareUrl(id)
-    const usedNative = await shareWithNative({ title: 'Share result', text, url })
+    // Attach proof image to native share if available
+    const proofFiles = data.proofs.length > 0
+      ? await getProofShareFiles(data.proofs[0])
+      : []
+    const usedNative = await shareWithNative({ title: 'Share result', text, url, files: proofFiles })
     if (usedNative) {
       onShare?.() ?? navigate('/home')
     } else {
@@ -143,6 +147,15 @@ export function OutcomeReveal({ onShare, onBack }: OutcomeRevealProps) {
   })
   const outcomeShareUrl = id ? getBetShareUrl(id) : ''
 
+  // Get first proof image URL for share preview
+  const firstProof = data.proofs[0]
+  const proofImageUrl =
+    firstProof?.front_camera_url ??
+    firstProof?.back_camera_url ??
+    firstProof?.screenshot_urls?.[0] ??
+    null
+  const proofCaption = firstProof?.caption ?? bet.title
+
   const shareSheet = (
     <ShareSheet
       open={shareSheetOpen}
@@ -150,6 +163,8 @@ export function OutcomeReveal({ onShare, onBack }: OutcomeRevealProps) {
       title="Share result"
       text={outcomeShareText}
       url={outcomeShareUrl}
+      imageUrl={proofImageUrl}
+      caption={proofCaption}
       onShared={handleSharedDone}
     />
   )

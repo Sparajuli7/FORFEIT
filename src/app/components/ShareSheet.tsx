@@ -19,6 +19,10 @@ export interface ShareSheetProps {
   title?: string
   text: string
   url: string
+  /** Optional proof/media image URL to show as preview in the share dialog. */
+  imageUrl?: string | null
+  /** Caption to display alongside the image preview (e.g. bet title). */
+  caption?: string
   onCopied?: () => void
   /** Called when user completes any share action (X, Facebook, or copy). */
   onShared?: () => void
@@ -30,6 +34,8 @@ export function ShareSheet({
   title = 'Share',
   text,
   url,
+  imageUrl,
+  caption,
   onCopied,
   onShared,
 }: ShareSheetProps) {
@@ -75,6 +81,21 @@ export function ShareSheet({
         <DialogHeader>
           <DialogTitle className="text-text-primary">{title}</DialogTitle>
         </DialogHeader>
+
+        {/* Proof/media preview */}
+        {imageUrl && (
+          <div className="rounded-xl overflow-hidden border border-border-subtle bg-bg-elevated">
+            <img
+              src={imageUrl}
+              alt="Proof"
+              className="w-full max-h-48 object-cover"
+            />
+            {caption && (
+              <p className="px-3 py-2 text-xs text-text-muted truncate">{caption}</p>
+            )}
+          </div>
+        )}
+
         <div className="grid gap-2 pt-2">
           <button type="button" onClick={handleTwitter} className={btnClass}>
             <span className="text-xl" aria-hidden>𝕏</span>

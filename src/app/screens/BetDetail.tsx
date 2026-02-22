@@ -18,6 +18,7 @@ import type { MediaItem } from '../components/MediaGallery'
 import { getBetShareUrl, getBetShareText, shareWithNative } from '@/lib/share'
 import { AddToCalendar } from '../components/AddToCalendar'
 import type { CalendarEvent } from '@/lib/utils/calendar'
+import { formatDeadline } from '@/lib/utils/calendar'
 
 const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop'
 
@@ -231,7 +232,7 @@ export function BetDetail({ onBack }: BetDetailProps) {
             <AddToCalendar
               event={{
                 title: `FORFEIT: ${activeBet.title}`,
-                description: `Bet deadline for "${activeBet.title}"${claimant?.display_name ? ` by ${claimant.display_name}` : ''}. Stake: ${formatStake(activeBet)}.\n\n${getBetShareUrl(id!)}`,
+                description: `DEADLINE: ${formatDeadline(new Date(activeBet.deadline))}\n\nBet: "${activeBet.title}"${claimant?.display_name ? `\nBy: ${claimant.display_name}` : ''}\nStake: ${formatStake(activeBet)}\n\n${getBetShareUrl(id!)}`,
                 startDate: new Date(activeBet.deadline),
               } satisfies CalendarEvent}
             />

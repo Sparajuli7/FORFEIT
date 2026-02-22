@@ -213,10 +213,23 @@ export function ShameProofSubmission() {
     const shareText = getShameShareText({ loserName, betTitle })
     const shareUrl = id ? getBetShareUrl(id) : ''
 
+    // Get proof image files that the user just uploaded for native sharing
+    const proofImageFiles = uploadFiles
+      .filter((u) => u.file.type.startsWith('image/'))
+      .slice(0, 1) // share the first image
+      .map((u) => u.file)
+
+    // First image preview for fallback ShareSheet
+    const firstPreviewUrl = uploadFiles.find((u) => u.previewUrl)?.previewUrl ?? null
+
     const handleShareAfterSubmit = async () => {
-      const usedNative = await shareWithNative({ title: 'Punishment Complete', text: shareText, url: shareUrl })
+      const usedNative = await shareWithNative({
+        title: 'Punishment Complete',
+        text: shareText,
+        url: shareUrl,
+        files: proofImageFiles,
+      })
       if (!usedNative) {
-        // fallback: open share sheet inline
         window.open(
           `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText + ' ' + shareUrl)}`,
           '_blank',
@@ -229,10 +242,23 @@ export function ShameProofSubmission() {
     return (
       <div className="h-full bg-bg-primary flex flex-col items-center justify-center px-6">
         <CheckCircle className="w-16 h-16 text-accent-green mb-4" />
-        <p className="text-accent-green font-bold text-xl mb-6">Punishment proof submitted!</p>
+        <p className="text-accent-green font-bold text-xl mb-2">Punishment proof submitted!</p>
+
+        {/* Show the proof image they just uploaded */}
+        {firstPreviewUrl && (
+          <div className="w-full max-w-xs rounded-xl overflow-hidden border border-border-subtle mb-4">
+            <img src={firstPreviewUrl} alt="Your proof" className="w-full max-h-40 object-cover" />
+            {caption.trim() && (
+              <p className="px-3 py-2 text-xs text-text-muted truncate">{caption}</p>
+            )}
+          </div>
+        )}
+
+        <p className="text-text-muted text-sm mb-6 text-center">Post it to social media and let everyone see.</p>
+
         <PrimaryButton onClick={handleShareAfterSubmit} className="w-full mb-3">
           <Share2 className="w-4 h-4 mr-2" />
-          Share to Hall of Shame
+          Share Proof
         </PrimaryButton>
         <button
           onClick={() => navigate('/shame')}

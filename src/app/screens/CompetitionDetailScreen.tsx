@@ -18,6 +18,7 @@ import type { Bet } from '@/lib/database.types'
 import { format } from 'date-fns'
 import { useAuthStore } from '@/stores'
 import { AddToCalendar } from '@/app/components/AddToCalendar'
+import { formatDeadline } from '@/lib/utils/calendar'
 import { ShareSheet } from '@/app/components/ShareSheet'
 import { getCompetitionShareUrl, getCompetitionShareText, shareWithNative } from '@/lib/share'
 
@@ -197,7 +198,7 @@ export function CompetitionDetailScreen() {
               <AddToCalendar
                 event={{
                   title: `FORFEIT: ${competition.title}`,
-                  description: `Competition "${competition.title}" — ${competition.comp_metric ?? 'Score'}.\n\n${getCompetitionShareUrl(id!)}`,
+                  description: `ENDS: ${formatDeadline(new Date(competition.deadline))}\n\nCompetition: "${competition.title}"\nMetric: ${competition.comp_metric ?? 'Score'}\n\n${getCompetitionShareUrl(id!)}`,
                   startDate: new Date(competition.created_at),
                   endDate: new Date(competition.deadline),
                 }}

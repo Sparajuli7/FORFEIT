@@ -37,6 +37,18 @@ function escapeICS(text: string): string {
     .replace(/\n/g, '\\n')
 }
 
+/** Format a date as a human-readable deadline string, e.g. "Sat, Mar 15, 2026 at 6:00 PM". */
+export function formatDeadline(date: Date): string {
+  return date.toLocaleString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
+
 /** Generate a valid RFC 5545 .ics file string. */
 export function generateICSFile(event: CalendarEvent): string {
   const start = event.startDate
