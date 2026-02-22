@@ -283,7 +283,9 @@ export function TheBoard() {
   }
 
   return (
-    <div className="h-full bg-bg-primary grain-texture overflow-y-auto pb-24">
+    <div className="relative h-full bg-bg-primary grain-texture flex flex-col overflow-hidden">
+      {/* Scrollable content */}
+      <div className="flex-1 overflow-y-auto pb-24">
       {/* Top utility bar */}
       <div className="flex items-center justify-end gap-2 px-4 py-3 border-b border-border-subtle">
         <button
@@ -414,15 +416,17 @@ export function TheBoard() {
       </div>
 
       <NotificationPanel open={notificationOpen} onOpenChange={setNotificationOpen} />
+      </div>{/* end scrollable content */}
 
-      {/* Quick Bet FAB */}
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 z-10">
-        <span className="text-xs font-bold text-text-muted uppercase tracking-wide bg-bg-elevated px-3 py-1.5 rounded-full border border-border-subtle">
+      {/* Quick Bet FAB — absolute inside phone frame, bottom-right */}
+      <div className="absolute bottom-5 right-4 z-20 flex flex-col items-end gap-2 pointer-events-none">
+        <span className="pointer-events-auto text-[10px] font-bold text-text-muted uppercase tracking-wider bg-bg-card px-2.5 py-1 rounded-full border border-border-subtle shadow-sm">
           Quick Bet
         </span>
         <button
           onClick={() => navigate('/bet/create')}
-          className="w-14 h-14 rounded-full bg-accent-green text-bg-primary flex items-center justify-center text-2xl font-bold btn-pressed shadow-lg border border-accent-green/20"
+          className="pointer-events-auto w-14 h-14 rounded-full bg-accent-green text-bg-primary flex items-center justify-center text-2xl font-black shadow-[0_4px_20px_rgba(0,230,118,0.5)] active:scale-95 transition-transform"
+          aria-label="Create bet"
         >
           +
         </button>
