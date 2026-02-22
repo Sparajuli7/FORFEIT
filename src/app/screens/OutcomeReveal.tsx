@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router'
 import { motion } from 'motion/react'
 import { getBetOutcomeWithDetails } from '@/lib/api/outcomes'
@@ -12,6 +12,8 @@ import { PrimaryButton } from '../components/PrimaryButton'
 import { PunishmentReceipt } from '../components/PunishmentReceipt'
 import { ShareSheet } from '../components/ShareSheet'
 import { getBetShareUrl, getOutcomeShareText, shareWithNative } from '@/lib/share'
+import { Download } from 'lucide-react'
+import { captureElementAsImage, shareImage } from '@/lib/utils/imageExport'
 
 interface OutcomeRevealProps {
   onShare?: () => void
@@ -29,6 +31,8 @@ export function OutcomeReveal({ onShare, onBack }: OutcomeRevealProps) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [shareSheetOpen, setShareSheetOpen] = useState(false)
+  const [savingImage, setSavingImage] = useState(false)
+  const receiptRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!id) return
@@ -84,6 +88,16 @@ export function OutcomeReveal({ onShare, onBack }: OutcomeRevealProps) {
   const handleBack = () => (onBack ? onBack() : navigate(-1))
   const handleSubmitPunishmentProof = () => id && navigate(`/bet/${id}/shame-proof`)
   const handleDispute = () => navigate('/home')
+
+  const handleSaveReceipt = async () => {
+    if (!receiptRef.current || savingImage) return
+    setSavingImage(true)
+    try {
+      const blob = await captureElementAsImage(receiptRef.current, { scale: 2 })
+      await shareImage(blob, 'forfeit-receipt.png', outcomeShareText ?? 'FORFEIT Punishment Receipt')
+    } catch { /* ignore */ }
+    finally { setSavingImage(false) }
+  }
 
   if (loading) {
     return (
@@ -315,11 +329,13 @@ export function OutcomeReveal({ onShare, onBack }: OutcomeRevealProps) {
             transition={{ delay: 0.3, duration: 0.3 }}
           >
             <PunishmentReceipt
+              ref={receiptRef}
               betTitle={bet.title}
               loserName={claimantName}
               punishment={punishmentText ?? 'Complete the stake'}
               winnerNames={winnerNames}
               issuedDate={resolvedDate}
+              betId={id}
             />
           </motion.div>
         </div>
@@ -327,6 +343,11 @@ export function OutcomeReveal({ onShare, onBack }: OutcomeRevealProps) {
         <div className="w-full space-y-3">
           <PrimaryButton onClick={handleSubmitPunishmentProof} variant="danger">
             SUBMIT PUNISHMENT PROOF
+          </PrimaryButton>
+          <PrimaryButton onClick={handleSaveReceipt} variant="ghost" disabled={savingImage}>
+            {savingImage ? 'Saving...' : (
+              <><Download className="w-4 h-4 mr-2" />Save Receipt as Image</>
+            )}
           </PrimaryButton>
           {isParticipant && id && (
             <PrimaryButton

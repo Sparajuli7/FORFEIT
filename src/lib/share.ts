@@ -1,15 +1,29 @@
 /**
- * Social sharing: Web Share API + fallback intent URLs for X (Twitter) and Facebook.
- * Use for sharing bets, challenges, and results.
+ * Social sharing: Web Share API + fallback intent URLs for X (Twitter),
+ * Facebook, WhatsApp, and SMS.
+ * Use for sharing bets, challenges, results, and stats.
  */
 
 const APP_ORIGIN =
   typeof window !== 'undefined' ? window.location.origin : ''
 
+// ---------------------------------------------------------------------------
+// URL builders
+// ---------------------------------------------------------------------------
+
 /** Build full URL for a bet (for sharing). */
 export function getBetShareUrl(betId: string): string {
   return `${APP_ORIGIN}/bet/${betId}`
 }
+
+/** Build full URL for a competition. */
+export function getCompetitionShareUrl(compId: string): string {
+  return `${APP_ORIGIN}/compete/${compId}`
+}
+
+// ---------------------------------------------------------------------------
+// Share text builders
+// ---------------------------------------------------------------------------
 
 /** Build share text for a bet or challenge. */
 export function getBetShareText(title: string, claimantName?: string): string {
@@ -35,6 +49,45 @@ export function getOutcomeShareText(params: {
   return `🤝 NO CONTEST: "${title}" was voided. Bet on your friends in FORFEIT 🎲`
 }
 
+/** Build share text for personal stats / record. */
+export function getRecordShareText(params: {
+  wins: number
+  losses: number
+  winRate: number
+}): string {
+  return `I'm ${params.wins}W-${params.losses}L on FORFEIT with a ${params.winRate}% win rate. Think you can beat that? 🎯`
+}
+
+/** Build share text for a competition leaderboard. */
+export function getCompetitionShareText(params: {
+  title: string
+  rank?: number
+}): string {
+  const rankStr = params.rank ? ` — I'm ranked #${params.rank}!` : ''
+  return `🏆 ${params.title} competition on FORFEIT${rankStr} Join and compete 🎲`
+}
+
+/** Build share text for a punishment receipt. */
+export function getPunishmentShareText(params: {
+  loserName: string
+  punishment: string
+  betTitle: string
+}): string {
+  return `📜 FORFEIT RECEIPT: ${params.loserName} owes ${params.punishment} for losing "${params.betTitle}". No refunds. 😤`
+}
+
+/** Build share text for shame proof submission. */
+export function getShameShareText(params: {
+  loserName: string
+  betTitle: string
+}): string {
+  return `😂 ${params.loserName} just completed their punishment for losing "${params.betTitle}" on FORFEIT!`
+}
+
+// ---------------------------------------------------------------------------
+// Platform intent URLs
+// ---------------------------------------------------------------------------
+
 /** X (Twitter) intent URL. */
 export function getTwitterShareUrl(text: string, url: string): string {
   const encoded = encodeURIComponent(`${text} ${url}`.trim())
@@ -45,6 +98,22 @@ export function getTwitterShareUrl(text: string, url: string): string {
 export function getFacebookShareUrl(url: string): string {
   return `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`
 }
+
+/** WhatsApp share URL. */
+export function getWhatsAppShareUrl(text: string, url: string): string {
+  const encoded = encodeURIComponent(`${text} ${url}`.trim())
+  return `https://wa.me/?text=${encoded}`
+}
+
+/** SMS share URL. */
+export function getSMSShareUrl(text: string, url: string): string {
+  const encoded = encodeURIComponent(`${text} ${url}`.trim())
+  return `sms:?body=${encoded}`
+}
+
+// ---------------------------------------------------------------------------
+// Native share + clipboard
+// ---------------------------------------------------------------------------
 
 export interface SharePayload {
   title?: string

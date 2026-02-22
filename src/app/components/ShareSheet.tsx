@@ -7,8 +7,11 @@ import {
 import {
   getTwitterShareUrl,
   getFacebookShareUrl,
+  getWhatsAppShareUrl,
+  getSMSShareUrl,
   copyToClipboard,
 } from '@/lib/share'
+import { MessageSquare } from 'lucide-react'
 
 export interface ShareSheetProps {
   open: boolean
@@ -47,11 +50,24 @@ export function ShareSheet({
     closeAndNotify()
   }
 
+  const handleWhatsApp = () => {
+    window.open(getWhatsAppShareUrl(text, url), '_blank', 'noopener,noreferrer')
+    closeAndNotify()
+  }
+
+  const handleSMS = () => {
+    window.location.href = getSMSShareUrl(text, url)
+    closeAndNotify()
+  }
+
   const handleCopy = async () => {
     const ok = await copyToClipboard(fullText)
     if (ok) onCopied?.()
     closeAndNotify()
   }
+
+  const btnClass =
+    'flex items-center gap-3 w-full px-4 py-3 rounded-xl bg-bg-elevated hover:bg-bg-elevated/80 border border-border-subtle text-text-primary font-semibold text-left transition-colors'
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -60,27 +76,23 @@ export function ShareSheet({
           <DialogTitle className="text-text-primary">{title}</DialogTitle>
         </DialogHeader>
         <div className="grid gap-2 pt-2">
-          <button
-            type="button"
-            onClick={handleTwitter}
-            className="flex items-center gap-3 w-full px-4 py-3 rounded-xl bg-bg-elevated hover:bg-bg-elevated/80 border border-border-subtle text-text-primary font-semibold text-left transition-colors"
-          >
+          <button type="button" onClick={handleTwitter} className={btnClass}>
             <span className="text-xl" aria-hidden>𝕏</span>
             Post to X (Twitter)
           </button>
-          <button
-            type="button"
-            onClick={handleFacebook}
-            className="flex items-center gap-3 w-full px-4 py-3 rounded-xl bg-bg-elevated hover:bg-bg-elevated/80 border border-border-subtle text-text-primary font-semibold text-left transition-colors"
-          >
+          <button type="button" onClick={handleFacebook} className={btnClass}>
             <span className="text-xl" aria-hidden>f</span>
             Share on Facebook
           </button>
-          <button
-            type="button"
-            onClick={handleCopy}
-            className="flex items-center gap-3 w-full px-4 py-3 rounded-xl bg-bg-elevated hover:bg-bg-elevated/80 border border-border-subtle text-text-primary font-semibold text-left transition-colors"
-          >
+          <button type="button" onClick={handleWhatsApp} className={btnClass}>
+            <span className="text-xl" aria-hidden>💬</span>
+            Share on WhatsApp
+          </button>
+          <button type="button" onClick={handleSMS} className={btnClass}>
+            <MessageSquare className="w-5 h-5 text-text-primary" aria-hidden />
+            Send via SMS
+          </button>
+          <button type="button" onClick={handleCopy} className={btnClass}>
             <span className="text-xl" aria-hidden>🔗</span>
             Copy link
           </button>

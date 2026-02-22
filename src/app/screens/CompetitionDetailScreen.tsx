@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router'
-import { ChevronLeft, MessageCircle, Globe, Lock } from 'lucide-react'
+import { ChevronLeft, MessageCircle, Globe, Lock, Share2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useCompetitionStore, useChatStore } from '@/stores'
 import { submitScore, uploadCompetitionProof, toggleCompetitionVisibility } from '@/lib/api/competitions'
@@ -17,6 +17,9 @@ import { Input } from '@/app/components/ui/input'
 import type { Bet } from '@/lib/database.types'
 import { format } from 'date-fns'
 import { useAuthStore } from '@/stores'
+import { AddToCalendar } from '@/app/components/AddToCalendar'
+import { ShareSheet } from '@/app/components/ShareSheet'
+import { getCompetitionShareUrl, getCompetitionShareText, shareWithNative } from '@/lib/share'
 
 const RANK_STYLES: Record<number, { bg: string; border: string; crown?: string }> = {
   1: { bg: 'bg-gold/10', border: 'border-gold/50', crown: '👑' },
@@ -39,6 +42,7 @@ export function CompetitionDetailScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [scoreError, setScoreError] = useState<string | null>(null)
   const [openingChat, setOpeningChat] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -79,6 +83,15 @@ export function CompetitionDetailScreen() {
   const progressPct = total > 0 ? Math.min(100, Math.max(0, (elapsed / total) * 100)) : 0
 
   const isParticipant = leaderboard.some((e) => e.score.user_id === user?.id)
+  const myRank = leaderboard.findIndex((e) => e.score.user_id === user?.id) + 1 || undefined
+
+  const handleShare = async () => {
+    if (!id || !competition) return
+    const url = getCompetitionShareUrl(id)
+    const text = getCompetitionShareText({ title: competition.title, rank: myRank })
+    const usedNative = await shareWithNative({ title: 'Share competition', text, url })
+    if (!usedNative) setShareOpen(true)
+  }
 
   const handleSubmitScore = async () => {
     if (!id) return
@@ -126,13 +139,22 @@ export function CompetitionDetailScreen() {
   return (
     <div className="h-full bg-bg-primary grain-texture flex flex-col">
       <div className="flex-1 overflow-y-auto pb-6">
-        <button
-          onClick={handleBack}
-          className="absolute top-6 left-6 p-2 -m-2 text-text-muted hover:text-text-primary transition-colors z-10"
-          aria-label="Go back"
-        >
-          <ChevronLeft className="w-6 h-6" />
-        </button>
+        <div className="absolute top-6 left-6 right-6 flex items-center justify-between z-10">
+          <button
+            onClick={handleBack}
+            className="p-2 -m-2 text-text-muted hover:text-text-primary transition-colors"
+            aria-label="Go back"
+          >
+            <ChevronLeft className="w-6 h-6" />
+          </button>
+          <button
+            onClick={handleShare}
+            className="p-2 -m-2 text-text-muted hover:text-text-primary transition-colors"
+            aria-label="Share"
+          >
+            <Share2 className="w-5 h-5" />
+          </button>
+        </div>
 
         <div className="px-6 pt-12 pb-6">
           <div className="flex items-center justify-between mb-2">
@@ -168,6 +190,20 @@ export function CompetitionDetailScreen() {
               />
             </div>
           </div>
+
+          {/* Add to Calendar */}
+          {competition && !isEnded && (
+            <div className="mb-4">
+              <AddToCalendar
+                event={{
+                  title: `FORFEIT: ${competition.title}`,
+                  description: `Competition "${competition.title}" — ${competition.comp_metric ?? 'Score'}.\n\n${getCompetitionShareUrl(id!)}`,
+                  startDate: new Date(competition.created_at),
+                  endDate: new Date(competition.deadline),
+                }}
+              />
+            </div>
+          )}
 
           {/* Competition Chat */}
           <button
@@ -301,6 +337,15 @@ export function CompetitionDetailScreen() {
           </PrimaryButton>
         </div>
       )}
+
+      {/* Share sheet */}
+      <ShareSheet
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        title="Share competition"
+        text={getCompetitionShareText({ title: competition?.title ?? 'Competition', rank: myRank })}
+        url={id ? getCompetitionShareUrl(id) : ''}
+      />
 
       {/* Score submission sheet */}
       <Sheet open={scoreSheetOpen} onOpenChange={setScoreSheetOpen}>

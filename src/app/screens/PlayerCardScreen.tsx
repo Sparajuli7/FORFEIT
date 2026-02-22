@@ -1,6 +1,7 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router'
 import { ArrowLeft, Share2, Download } from 'lucide-react'
+import { captureElementAsImage, shareImage, downloadImage } from '@/lib/utils/imageExport'
 import { useAuthStore } from '@/stores'
 import { getBetStatsForUser } from '@/lib/api/stats'
 import { formatMoney } from '@/lib/utils/formatters'
@@ -476,6 +477,8 @@ export function PlayerCardScreen() {
   const [stats, setStats] = useState<BetStatsForUser | null>(null)
   const [loading, setLoading] = useState(true)
   const [shared, setShared] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const cardRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!user?.id) { setLoading(false); return }
@@ -498,6 +501,21 @@ export function PlayerCardScreen() {
     } catch { /* dismissed */ }
     setShared(true)
     setTimeout(() => setShared(false), 2000)
+  }
+
+  const handleSaveCard = async () => {
+    if (!cardRef.current || saving) return
+    setSaving(true)
+    try {
+      const blob = await captureElementAsImage(cardRef.current, { scale: 2 })
+      const text = `My FORFEIT player card — ${profile?.wins}W · ${profile?.losses}L · rep ${profile?.rep_score}/100. Can you beat my record? 🎯`
+      await shareImage(blob, 'forfeit-player-card.png', text)
+    } catch {
+      // If capture fails, fall back to text share
+      handleShare()
+    } finally {
+      setSaving(false)
+    }
   }
 
   if (loading) {
@@ -549,27 +567,50 @@ export function PlayerCardScreen() {
 
       {/* Card centered */}
       <div className="flex-1 flex flex-col items-center justify-start px-4 pb-6 gap-5">
-        <TradingCard profile={profile} stats={stats} />
+        <div ref={cardRef}>
+          <TradingCard profile={profile} stats={stats} />
+        </div>
 
-        {/* Share CTA */}
-        <button
-          onClick={handleShare}
-          className="w-full max-w-[310px] py-3.5 rounded-2xl font-black text-sm tracking-wider uppercase flex items-center justify-center gap-2 transition-all active:scale-95"
-          style={{
-            background: cfg.badgeGradient,
-            color: cfg.badgeText,
-            boxShadow: `0 4px 24px ${cfg.glowColorFaint}`,
-          }}
-        >
-          {shared ? (
-            <>✓ Copied!</>
-          ) : (
-            <>
-              <Share2 className="w-4 h-4" />
-              Share my card
-            </>
-          )}
-        </button>
+        {/* Action buttons */}
+        <div className="w-full max-w-[310px] flex gap-3">
+          <button
+            onClick={handleShare}
+            className="flex-1 py-3.5 rounded-2xl font-black text-sm tracking-wider uppercase flex items-center justify-center gap-2 transition-all active:scale-95"
+            style={{
+              background: cfg.badgeGradient,
+              color: cfg.badgeText,
+              boxShadow: `0 4px 24px ${cfg.glowColorFaint}`,
+            }}
+          >
+            {shared ? (
+              <>✓ Copied!</>
+            ) : (
+              <>
+                <Share2 className="w-4 h-4" />
+                Share
+              </>
+            )}
+          </button>
+          <button
+            onClick={handleSaveCard}
+            disabled={saving}
+            className="py-3.5 px-5 rounded-2xl font-black text-sm tracking-wider uppercase flex items-center justify-center gap-2 transition-all active:scale-95 border-2"
+            style={{
+              borderColor: cfg.hpColor,
+              color: cfg.hpColor,
+              opacity: saving ? 0.6 : 1,
+            }}
+          >
+            {saving ? (
+              <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <>
+                <Download className="w-4 h-4" />
+                Save
+              </>
+            )}
+          </button>
+        </div>
 
         <p className="text-[10px] text-white/25 text-center tracking-wide">
           Post it. Let your group know who runs the board.

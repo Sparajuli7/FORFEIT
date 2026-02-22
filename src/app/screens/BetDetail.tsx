@@ -16,6 +16,8 @@ import { ShareSheet } from '../components/ShareSheet'
 import { MediaGallery } from '../components/MediaGallery'
 import type { MediaItem } from '../components/MediaGallery'
 import { getBetShareUrl, getBetShareText, shareWithNative } from '@/lib/share'
+import { AddToCalendar } from '../components/AddToCalendar'
+import type { CalendarEvent } from '@/lib/utils/calendar'
 
 const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop'
 
@@ -221,6 +223,17 @@ export function BetDetail({ onBack }: BetDetailProps) {
             <div
               className="h-full bg-accent-green transition-all"
               style={{ width: `${Math.max(0, countdown ? (countdown.totalMs / (countdown.totalMs + 1000)) * 100 : 0)}%` }}
+            />
+          </div>
+        )}
+        {!countdown?.isExpired && activeBet.deadline && (
+          <div className="flex justify-center mt-3">
+            <AddToCalendar
+              event={{
+                title: `FORFEIT: ${activeBet.title}`,
+                description: `Bet deadline for "${activeBet.title}"${claimant?.display_name ? ` by ${claimant.display_name}` : ''}. Stake: ${formatStake(activeBet)}.\n\n${getBetShareUrl(id!)}`,
+                startDate: new Date(activeBet.deadline),
+              } satisfies CalendarEvent}
             />
           </div>
         )}

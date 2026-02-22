@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
-import { Trophy, XCircle, MinusCircle, Flame } from 'lucide-react'
+import { Trophy, XCircle, MinusCircle, Flame, Share2 } from 'lucide-react'
 import { useAuthStore, useGroupStore, useShameStore } from '@/stores'
 import { getBetStatsForUser } from '@/lib/api/stats'
 import { getReactionCounts, hasUserReacted } from '@/stores/shameStore'
@@ -14,6 +14,8 @@ import type { MediaItem } from '@/app/components/MediaGallery'
 import type { BetStatsForUser as BetStatsType, UserBetResult } from '@/lib/api/stats'
 import type { ShamePostEnriched } from '@/stores/shameStore'
 import type { ProfileWithRep } from '@/lib/api/profiles'
+import { ShareSheet } from '@/app/components/ShareSheet'
+import { getRecordShareText, getBetShareUrl, shareWithNative } from '@/lib/share'
 
 function ResultBadge({ result }: { result: UserBetResult }) {
   if (result === 'won')
@@ -47,6 +49,7 @@ export function RecordScreen() {
 
   const [stats, setStats] = useState<BetStatsType | null>(null)
   const [statsLoading, setStatsLoading] = useState(true)
+  const [shareOpen, setShareOpen] = useState(false)
 
   const shamePosts = useShameStore((s) => s.shamePosts)
   const punishmentLeaderboard = useShameStore((s) => s.punishmentLeaderboard)
@@ -98,13 +101,39 @@ export function RecordScreen() {
   const showMyRecord = !statsLoading
   const showShame = effectiveGroup != null
 
+  const handleShareRecord = async () => {
+    const text = getRecordShareText({ wins: t.wins, losses: t.losses, winRate })
+    const url = typeof window !== 'undefined' ? window.location.origin : ''
+    const usedNative = await shareWithNative({ title: 'My FORFEIT Record', text, url })
+    if (!usedNative) setShareOpen(true)
+  }
+
   return (
     <div className="h-full bg-bg-primary overflow-y-auto pb-8">
       {/* Header */}
-      <div className="px-6 pt-6 pb-4 border-b border-border-subtle">
-        <h1 className="text-2xl font-black text-text-primary">Record</h1>
-        <p className="text-text-muted text-sm mt-0.5">Your stats and group punishments</p>
+      <div className="px-6 pt-6 pb-4 border-b border-border-subtle flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-black text-text-primary">Record</h1>
+          <p className="text-text-muted text-sm mt-0.5">Your stats and group punishments</p>
+        </div>
+        {showMyRecord && (
+          <button
+            onClick={handleShareRecord}
+            className="mt-1 w-9 h-9 flex items-center justify-center rounded-lg hover:bg-bg-elevated transition-colors"
+            aria-label="Share record"
+          >
+            <Share2 className="w-5 h-5 text-text-muted" />
+          </button>
+        )}
       </div>
+
+      <ShareSheet
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        title="Share your record"
+        text={getRecordShareText({ wins: t.wins, losses: t.losses, winRate })}
+        url={typeof window !== 'undefined' ? window.location.origin : ''}
+      />
 
       <div className="px-6 py-5 space-y-8">
         {/* ——— Player card CTA ——— */}

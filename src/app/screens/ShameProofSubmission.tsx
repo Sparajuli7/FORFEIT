@@ -1,10 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router'
-import { Camera, Image, Video, FileText, X, CheckCircle } from 'lucide-react'
+import { Camera, Image, Video, FileText, X, CheckCircle, Share2 } from 'lucide-react'
 import { getOutcome } from '@/lib/api/outcomes'
 import { submitShameProof } from '@/lib/api/shame'
 import { supabase } from '@/lib/supabase'
 import { PrimaryButton } from '../components/PrimaryButton'
+import { ShareSheet } from '../components/ShareSheet'
+import { getShameShareText, getBetShareUrl, shareWithNative } from '@/lib/share'
+import { useAuthStore } from '@/stores'
 
 interface UploadEntry {
   file: File
@@ -205,10 +208,38 @@ export function ShameProofSubmission() {
   }
 
   if (submitted) {
+    const profile = useAuthStore.getState().profile
+    const loserName = profile?.display_name ?? 'Someone'
+    const shareText = getShameShareText({ loserName, betTitle })
+    const shareUrl = id ? getBetShareUrl(id) : ''
+
+    const handleShareAfterSubmit = async () => {
+      const usedNative = await shareWithNative({ title: 'Punishment Complete', text: shareText, url: shareUrl })
+      if (!usedNative) {
+        // fallback: open share sheet inline
+        window.open(
+          `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText + ' ' + shareUrl)}`,
+          '_blank',
+          'noopener,noreferrer',
+        )
+      }
+      navigate('/shame')
+    }
+
     return (
-      <div className="h-full bg-bg-primary flex flex-col items-center justify-center">
+      <div className="h-full bg-bg-primary flex flex-col items-center justify-center px-6">
         <CheckCircle className="w-16 h-16 text-accent-green mb-4" />
-        <p className="text-accent-green font-bold text-xl">Punishment proof submitted!</p>
+        <p className="text-accent-green font-bold text-xl mb-6">Punishment proof submitted!</p>
+        <PrimaryButton onClick={handleShareAfterSubmit} className="w-full mb-3">
+          <Share2 className="w-4 h-4 mr-2" />
+          Share to Hall of Shame
+        </PrimaryButton>
+        <button
+          onClick={() => navigate('/shame')}
+          className="text-sm text-text-muted font-medium"
+        >
+          Skip
+        </button>
       </div>
     )
   }
