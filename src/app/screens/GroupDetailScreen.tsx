@@ -18,7 +18,6 @@ import {
 } from '@/app/components/ui/alert-dialog'
 import { useCountdown } from '@/lib/hooks/useCountdown'
 import { formatMoney, formatOdds } from '@/lib/utils/formatters'
-import { BET_CATEGORIES } from '@/lib/utils/constants'
 import type { BetWithSides } from '@/stores/betStore'
 import type { ProfileWithRep } from '@/lib/api/profiles'
 
@@ -59,7 +58,6 @@ function GroupBetCard({
   return (
     <BetCard
       groupName={`${group.name} ${group.avatar_emoji}`}
-      category={BET_CATEGORIES[bet.category]?.label ?? bet.category.toUpperCase()}
       countdown={showProofBadge ? '' : countdown.formatted}
       claimText={bet.title}
       claimantName={claimant?.display_name ?? 'Anonymous'}

@@ -9,7 +9,6 @@ import { useRealtime } from '@/lib/hooks/useRealtime'
 import { getProfilesByIds } from '@/lib/api/profiles'
 import { formatMoney } from '@/lib/utils/formatters'
 import { formatOdds } from '@/lib/utils/formatters'
-import { BET_CATEGORIES } from '@/lib/utils/constants'
 import { OddsBar } from '../components/OddsBar'
 import { PrimaryButton } from '../components/PrimaryButton'
 import { ShareSheet } from '../components/ShareSheet'
@@ -205,27 +204,30 @@ export function BetDetail({ onBack }: BetDetailProps) {
         <h2 className="text-[32px] font-extrabold text-white text-center leading-tight" style={{ letterSpacing: '-0.02em' }}>
           {activeBet.title}
         </h2>
-        <p className="text-center text-text-muted text-sm mt-2">
-          {BET_CATEGORIES[activeBet.category]?.emoji} {BET_CATEGORIES[activeBet.category]?.label}
-        </p>
       </div>
 
       {/* Countdown Timer */}
       <div className="px-6 mb-6">
-        <div className="flex justify-center gap-2 mb-3">
-          <div className="bg-bg-elevated rounded-xl px-4 py-3 min-w-[70px] text-center">
-            <div className="text-3xl font-black text-white tabular-nums">{countdown?.days ?? 0}</div>
-            <div className="text-xs text-text-muted uppercase tracking-wider">days</div>
+        {countdown && countdown.totalMs < 10 * 60 * 60 * 1000 ? (
+          <div className={`text-center text-2xl font-black tabular-nums mb-3 ${countdown.isExpired ? 'text-accent-coral' : 'text-white'}`}>
+            {countdown.formatted}
           </div>
-          <div className="bg-bg-elevated rounded-xl px-4 py-3 min-w-[70px] text-center">
-            <div className="text-3xl font-black text-white tabular-nums">{countdown?.hours ?? 0}</div>
-            <div className="text-xs text-text-muted uppercase tracking-wider">hrs</div>
+        ) : (
+          <div className="flex justify-center gap-2 mb-3">
+            <div className="bg-bg-elevated rounded-xl px-4 py-3 min-w-[70px] text-center">
+              <div className="text-3xl font-black text-white tabular-nums">{countdown?.days ?? 0}</div>
+              <div className="text-xs text-text-muted uppercase tracking-wider">days</div>
+            </div>
+            <div className="bg-bg-elevated rounded-xl px-4 py-3 min-w-[70px] text-center">
+              <div className="text-3xl font-black text-white tabular-nums">{countdown?.hours ?? 0}</div>
+              <div className="text-xs text-text-muted uppercase tracking-wider">hrs</div>
+            </div>
+            <div className="bg-bg-elevated rounded-xl px-4 py-3 min-w-[70px] text-center">
+              <div className="text-3xl font-black text-white tabular-nums">{countdown?.minutes ?? 0}</div>
+              <div className="text-xs text-text-muted uppercase tracking-wider">min</div>
+            </div>
           </div>
-          <div className="bg-bg-elevated rounded-xl px-4 py-3 min-w-[70px] text-center">
-            <div className="text-3xl font-black text-white tabular-nums">{countdown?.minutes ?? 0}</div>
-            <div className="text-xs text-text-muted uppercase tracking-wider">min</div>
-          </div>
-        </div>
+        )}
         {!countdown?.isExpired && (
           <div className="h-1 bg-border-subtle rounded-full overflow-hidden">
             <div
