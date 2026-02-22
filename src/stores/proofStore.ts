@@ -40,6 +40,7 @@ interface ProofActions {
     files: ProofFiles,
     proofType: ProofType,
     caption?: string,
+    endNow?: boolean,
   ) => Promise<Proof | null>
   fetchProofs: (betId: string) => Promise<void>
   voteOnProof: (proofId: string, vote: VoteChoice) => Promise<void>
@@ -176,7 +177,7 @@ const useProofStore = create<ProofStore>()((set, get) => ({
 
   // ---- actions ----
 
-  submitProof: async (betId, files, proofType, caption) => {
+  submitProof: async (betId, files, proofType, caption, endNow = true) => {
     const userId = await getCurrentUserId()
     if (!userId) return null
 
@@ -256,14 +257,16 @@ const useProofStore = create<ProofStore>()((set, get) => ({
       return null
     }
 
-    // Advance bet status to proof_submitted
-    const { error: statusError } = await supabase
-      .from('bets')
-      .update({ status: 'proof_submitted' })
-      .eq('id', betId)
+    // Advance bet status to proof_submitted only when the user wants to end the bet now
+    if (endNow) {
+      const { error: statusError } = await supabase
+        .from('bets')
+        .update({ status: 'proof_submitted' })
+        .eq('id', betId)
 
-    if (statusError) {
-      console.warn('[proofStore] Proof saved but failed to update bet status:', statusError.message)
+      if (statusError) {
+        console.warn('[proofStore] Proof saved but failed to update bet status:', statusError.message)
+      }
     }
 
     set((state) => ({
