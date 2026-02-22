@@ -8,6 +8,8 @@ import { formatMoney } from '@/lib/utils/formatters'
 import { BET_CATEGORIES } from '@/lib/utils/constants'
 import type { BetStatsForUser } from '@/lib/api/stats'
 import type { Profile } from '@/lib/database.types'
+import { ShareSheet } from '@/app/components/ShareSheet'
+import { shareWithNative } from '@/lib/share'
 
 // ---------------------------------------------------------------------------
 // Tier + title engine
@@ -478,6 +480,7 @@ export function PlayerCardScreen() {
   const [loading, setLoading] = useState(true)
   const [shared, setShared] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [shareSheetOpen, setShareSheetOpen] = useState(false)
   const cardRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -490,15 +493,14 @@ export function PlayerCardScreen() {
   const tier = profile ? getTier(profile.rep_score) : 'sketchy'
   const cfg = TIER[tier]
 
+  const playerShareText = `My FORFEIT player card — ${profile?.wins}W · ${profile?.losses}L · rep ${profile?.rep_score}/100. Can you beat my record? 🎯`
+  const playerShareUrl = typeof window !== 'undefined' ? `${window.location.origin}/profile/${profile?.username ?? ''}` : ''
+
   const handleShare = async () => {
-    const text = `My FORFEIT player card — ${profile?.wins}W · ${profile?.losses}L · rep ${profile?.rep_score}/100. Can you beat my record? 🎯`
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: 'My FORFEIT Card', text })
-      } else {
-        await navigator.clipboard.writeText(text)
-      }
-    } catch { /* dismissed */ }
+    const usedNative = await shareWithNative({ title: 'My FORFEIT Card', text: playerShareText, url: playerShareUrl })
+    if (!usedNative) {
+      setShareSheetOpen(true)
+    }
     setShared(true)
     setTimeout(() => setShared(false), 2000)
   }
@@ -616,6 +618,14 @@ export function PlayerCardScreen() {
           Post it. Let your group know who runs the board.
         </p>
       </div>
+
+      <ShareSheet
+        open={shareSheetOpen}
+        onOpenChange={setShareSheetOpen}
+        title="Share player card"
+        text={playerShareText}
+        url={playerShareUrl}
+      />
     </div>
   )
 }

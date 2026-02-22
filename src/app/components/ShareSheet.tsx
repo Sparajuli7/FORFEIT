@@ -10,8 +10,12 @@ import {
   getWhatsAppShareUrl,
   getSMSShareUrl,
   copyToClipboard,
+  shareToInstagramStories,
+  shareToTikTok,
+  fetchImageAsFile,
 } from '@/lib/share'
 import { MessageSquare } from 'lucide-react'
+import { useState } from 'react'
 
 export interface ShareSheetProps {
   open: boolean
@@ -40,6 +44,8 @@ export function ShareSheet({
   onShared,
 }: ShareSheetProps) {
   const fullText = `${text} ${url}`.trim()
+  const [igLoading, setIgLoading] = useState(false)
+  const [tiktokLoading, setTiktokLoading] = useState(false)
 
   const closeAndNotify = () => {
     onOpenChange(false)
@@ -64,6 +70,48 @@ export function ShareSheet({
   const handleSMS = () => {
     window.location.href = getSMSShareUrl(text, url)
     closeAndNotify()
+  }
+
+  const handleInstagram = async () => {
+    if (igLoading) return
+    setIgLoading(true)
+    try {
+      if (imageUrl) {
+        const file = await fetchImageAsFile(imageUrl, 'forfeit-story.png')
+        if (file) {
+          await shareToInstagramStories(file, fullText)
+          closeAndNotify()
+          return
+        }
+      }
+      // No image — copy text and open IG
+      await copyToClipboard(fullText)
+      window.open('https://www.instagram.com/', '_blank', 'noopener,noreferrer')
+      closeAndNotify()
+    } finally {
+      setIgLoading(false)
+    }
+  }
+
+  const handleTikTok = async () => {
+    if (tiktokLoading) return
+    setTiktokLoading(true)
+    try {
+      if (imageUrl) {
+        const file = await fetchImageAsFile(imageUrl, 'forfeit-tiktok.png')
+        if (file) {
+          await shareToTikTok(file, fullText)
+          closeAndNotify()
+          return
+        }
+      }
+      // No image — copy text and open TikTok
+      await copyToClipboard(fullText)
+      window.open('https://www.tiktok.com/upload', '_blank', 'noopener,noreferrer')
+      closeAndNotify()
+    } finally {
+      setTiktokLoading(false)
+    }
   }
 
   const handleCopy = async () => {
@@ -104,6 +152,14 @@ export function ShareSheet({
           <button type="button" onClick={handleFacebook} className={btnClass}>
             <span className="text-xl" aria-hidden>f</span>
             Share on Facebook
+          </button>
+          <button type="button" onClick={handleInstagram} disabled={igLoading} className={btnClass}>
+            <span className="text-xl" aria-hidden>📷</span>
+            {igLoading ? 'Preparing...' : imageUrl ? 'Share to Instagram' : 'Open Instagram'}
+          </button>
+          <button type="button" onClick={handleTikTok} disabled={tiktokLoading} className={btnClass}>
+            <span className="text-xl" aria-hidden>🎵</span>
+            {tiktokLoading ? 'Preparing...' : imageUrl ? 'Share to TikTok' : 'Open TikTok'}
           </button>
           <button type="button" onClick={handleWhatsApp} className={btnClass}>
             <span className="text-xl" aria-hidden>💬</span>

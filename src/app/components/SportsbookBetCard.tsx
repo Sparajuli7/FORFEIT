@@ -2,7 +2,6 @@ import { OddsDisplay } from "./OddsDisplay";
 
 interface SportsbookBetCardProps {
   groupName: string;
-  category: string;
   countdown: string;
   claimText: string;
   claimantName: string;
@@ -19,7 +18,6 @@ interface SportsbookBetCardProps {
 
 export function SportsbookBetCard({
   groupName,
-  category,
   countdown,
   claimText,
   claimantName,
@@ -61,11 +59,6 @@ export function SportsbookBetCard({
         <span className={`text-sm font-black tabular-nums ${urgent ? 'text-live-indicator' : 'text-text-primary'}`}>
           {countdown}
         </span>
-      </div>
-
-      {/* Category */}
-      <div className="text-[11px] font-bold uppercase tracking-wider text-text-muted mb-2">
-        {category}
       </div>
 
       {/* Claim */}

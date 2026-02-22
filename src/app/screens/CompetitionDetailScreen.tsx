@@ -44,6 +44,9 @@ export function CompetitionDetailScreen() {
   const [scoreError, setScoreError] = useState<string | null>(null)
   const [openingChat, setOpeningChat] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
+  const [scoreShareOpen, setScoreShareOpen] = useState(false)
+  const [lastProofUrl, setLastProofUrl] = useState<string | null>(null)
+  const [lastScore, setLastScore] = useState<number | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -120,6 +123,10 @@ export function CompetitionDetailScreen() {
       setScoreInput('')
       setProofFile(null)
       fetchLeaderboard(id)
+      // Show share prompt after successful submission
+      setLastProofUrl(proofUrl)
+      setLastScore(score)
+      setScoreShareOpen(true)
     } catch (e) {
       setScoreError(e instanceof Error ? e.message : 'Failed to submit')
     } finally {
@@ -230,8 +237,7 @@ export function CompetitionDetailScreen() {
                 <MessageCircle className="w-4 h-4 text-accent-green" />
               )}
             </div>
-            <p className="flex-1 text-sm font-bold text-text-primary text-left">Competition Chat</p>
-            <span className="text-xs text-text-muted">Talk trash &rarr;</span>
+            <p className="flex-1 text-sm font-bold text-text-primary text-left">Chat</p>
           </button>
 
           {/* Visibility toggle — creator only */}
@@ -346,6 +352,17 @@ export function CompetitionDetailScreen() {
         title="Share competition"
         text={getCompetitionShareText({ title: competition?.title ?? 'Competition', rank: myRank })}
         url={id ? getCompetitionShareUrl(id) : ''}
+      />
+
+      {/* Score proof share sheet — shown after submitting a score */}
+      <ShareSheet
+        open={scoreShareOpen}
+        onOpenChange={setScoreShareOpen}
+        title="Share your score"
+        text={`I just scored ${lastScore} in "${competition?.title ?? 'a competition'}" on FORFEIT! 🏆🎲`}
+        url={id ? getCompetitionShareUrl(id) : ''}
+        imageUrl={lastProofUrl}
+        caption={`Score: ${lastScore} — ${competition?.title ?? 'Competition'}`}
       />
 
       {/* Score submission sheet */}

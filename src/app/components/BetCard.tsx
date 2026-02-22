@@ -2,7 +2,6 @@ import { OddsBar } from "./OddsBar";
 
 interface BetCardProps {
   groupName: string;
-  category: string;
   countdown: string;
   claimText: string;
   claimantName: string;
@@ -20,7 +19,6 @@ interface BetCardProps {
 
 export function BetCard({
   groupName,
-  category,
   countdown,
   claimText,
   claimantName,
@@ -104,11 +102,6 @@ export function BetCard({
             {countdown}
           </span>
         )}
-      </div>
-
-      {/* Category */}
-      <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-text-muted mb-2">
-        {category}
       </div>
 
       {/* Claim */}

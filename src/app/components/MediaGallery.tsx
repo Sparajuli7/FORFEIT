@@ -1,5 +1,7 @@
 import { useState, useCallback, useEffect } from 'react'
-import { X, ChevronLeft, ChevronRight, FileText, Download } from 'lucide-react'
+import { X, ChevronLeft, ChevronRight, FileText, Download, Share2 } from 'lucide-react'
+import { shareWithNative, fetchImageAsFile, copyToClipboard } from '@/lib/share'
+import { ShareSheet } from './ShareSheet'
 
 export interface MediaItem {
   url: string
@@ -11,10 +13,14 @@ interface MediaGalleryProps {
   items: MediaItem[]
   /** Optional caption displayed below media */
   caption?: string | null
+  /** Optional share text used when sharing from the fullscreen lightbox. */
+  shareText?: string
+  /** Optional share URL used when sharing from the fullscreen lightbox. */
+  shareUrl?: string
 }
 
 /** Inline media grid with tap-to-fullscreen lightbox */
-export function MediaGallery({ items, caption }: MediaGalleryProps) {
+export function MediaGallery({ items, caption, shareText, shareUrl }: MediaGalleryProps) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
 
   if (items.length === 0 && !caption) return null
@@ -42,6 +48,8 @@ export function MediaGallery({ items, caption }: MediaGalleryProps) {
           index={lightboxIndex}
           onClose={() => setLightboxIndex(null)}
           onChange={setLightboxIndex}
+          shareText={shareText}
+          shareUrl={shareUrl}
         />
       )}
     </>
@@ -91,15 +99,20 @@ function Lightbox({
   index,
   onClose,
   onChange,
+  shareText,
+  shareUrl,
 }: {
   items: MediaItem[]
   index: number
   onClose: () => void
   onChange: (i: number) => void
+  shareText?: string
+  shareUrl?: string
 }) {
   const item = items[index]
   const hasPrev = index > 0
   const hasNext = index < items.length - 1
+  const [shareSheetOpen, setShareSheetOpen] = useState(false)
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -119,6 +132,17 @@ function Lightbox({
     }
   }, [handleKeyDown])
 
+  const handleShareImage = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (item.type !== 'image') return
+    const text = shareText ?? 'Check this out on FORFEIT 🎲'
+    const url = shareUrl ?? ''
+    const file = await fetchImageAsFile(item.url, 'forfeit-proof.jpg')
+    const files = file ? [file] : []
+    const usedNative = await shareWithNative({ title: 'FORFEIT', text, url, files })
+    if (!usedNative) setShareSheetOpen(true)
+  }
+
   return (
     <div className="fixed inset-0 z-50 bg-black/95 flex flex-col" onClick={onClose}>
       {/* Header */}
@@ -126,12 +150,22 @@ function Lightbox({
         <span className="text-white/60 text-sm font-bold">
           {index + 1} / {items.length}
         </span>
-        <button
-          onClick={onClose}
-          className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center"
-        >
-          <X className="w-5 h-5 text-white" />
-        </button>
+        <div className="flex items-center gap-2">
+          {item.type === 'image' && (
+            <button
+              onClick={handleShareImage}
+              className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center"
+            >
+              <Share2 className="w-5 h-5 text-white" />
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center"
+          >
+            <X className="w-5 h-5 text-white" />
+          </button>
+        </div>
       </div>
 
       {/* Content */}
@@ -193,6 +227,18 @@ function Lightbox({
       {/* Label */}
       {item.label && (
         <p className="text-center text-white/60 text-sm py-3 pb-safe">{item.label}</p>
+      )}
+
+      {/* ShareSheet for fullscreen image sharing */}
+      {item.type === 'image' && (
+        <ShareSheet
+          open={shareSheetOpen}
+          onOpenChange={setShareSheetOpen}
+          title="Share image"
+          text={shareText ?? 'Check this out on FORFEIT 🎲'}
+          url={shareUrl ?? ''}
+          imageUrl={item.url}
+        />
       )}
     </div>
   )

@@ -283,8 +283,7 @@ export function BetDetail({ onBack }: BetDetailProps) {
                 <MessageCircle className="w-4 h-4 text-accent-green" />
               )}
             </div>
-            <p className="flex-1 text-sm font-bold text-text-primary text-left">Bet Chat</p>
-            <span className="text-xs text-text-muted">Talk trash &rarr;</span>
+            <p className="flex-1 text-sm font-bold text-text-primary text-left">Chat</p>
           </button>
         </div>
       )}
@@ -406,7 +405,12 @@ export function BetDetail({ onBack }: BetDetailProps) {
             return (
               <div key={proof.id} className="bg-bg-card rounded-2xl border border-border-subtle p-4 mb-4">
                 {/* Proof media */}
-                <MediaGallery items={mediaItems} caption={editingProofId === proof.id ? undefined : proof.caption} />
+                <MediaGallery
+                  items={mediaItems}
+                  caption={editingProofId === proof.id ? undefined : proof.caption}
+                  shareText={getProofShareText({ betTitle: activeBet.title, personName: claimant?.display_name ?? 'Anonymous', result: activeBet.status === 'completed' ? 'won' : 'proof' })}
+                  shareUrl={getBetShareUrl(id)}
+                />
 
                 {/* Share proof as framed card */}
                 {firstImageUrl && (

@@ -423,7 +423,11 @@ function ShameCardCompact({
       </div>
       {items.length > 0 && (
         <div className="px-2 pb-2">
-          <MediaGallery items={items} />
+          <MediaGallery
+            items={items}
+            shareText={getProofShareText({ betTitle: post._betTitle ?? 'Bet', personName: profile?.display_name ?? 'Unknown', result: 'shame' })}
+            shareUrl={getBetShareUrl(post.bet_id)}
+          />
         </div>
       )}
       {post.caption && (

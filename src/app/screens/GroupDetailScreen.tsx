@@ -219,11 +219,7 @@ export function GroupDetailScreen() {
               <MessageCircle className="w-5 h-5 text-accent-green" />
             )}
           </div>
-          <div className="flex-1 text-left">
-            <p className="text-sm font-bold text-text-primary">Group Chat</p>
-            <p className="text-xs text-text-muted">Message your group</p>
-          </div>
-          <ChevronRight className="w-5 h-5 text-text-muted" />
+          <p className="flex-1 text-sm font-bold text-text-primary text-left">Chat</p>
         </button>
 
         {/* Invite link */}

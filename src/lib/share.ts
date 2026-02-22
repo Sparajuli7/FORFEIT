@@ -124,6 +124,87 @@ export function getSMSShareUrl(text: string, url: string): string {
   return `sms:?body=${encoded}`
 }
 
+/**
+ * Instagram Stories deep link.
+ * On iOS/Android, opens IG Stories with the image pre-loaded as a background.
+ * Requires the image as a Data URI (base64) for the sticker/background.
+ * Falls back to opening Instagram web profile.
+ */
+export async function shareToInstagramStories(
+  imageBlob: Blob,
+  caption: string,
+): Promise<boolean> {
+  // Copy caption so user can paste it
+  await copyToClipboard(caption).catch(() => {})
+
+  // Try the Facebook/Instagram Stories deep link (works on iOS & Android)
+  // This requires passing data through the pasteboard on native apps,
+  // which web can't do directly. Instead, we use the Web Share API targeting IG,
+  // or fall back to download + open IG.
+  const file = new File([imageBlob], 'forfeit-story.png', { type: 'image/png' })
+
+  // On mobile, try native share which shows IG Stories as an option
+  if (
+    typeof navigator !== 'undefined' &&
+    navigator.share &&
+    navigator.canShare?.({ files: [file] })
+  ) {
+    try {
+      await navigator.share({ files: [file], text: caption })
+      return true
+    } catch (e) {
+      if ((e as Error).name === 'AbortError') return true
+    }
+  }
+
+  // Fallback: download image so user can pick it in IG
+  downloadBlobAsFile(imageBlob, 'forfeit-story.png')
+  return false
+}
+
+/**
+ * TikTok share: saves the image and copies caption.
+ * TikTok has no web share API, so the flow is:
+ * 1. Save the image to device
+ * 2. Copy caption to clipboard
+ * 3. Open TikTok (deep link on mobile, web on desktop)
+ */
+export async function shareToTikTok(
+  imageBlob: Blob,
+  caption: string,
+): Promise<void> {
+  await copyToClipboard(caption).catch(() => {})
+  downloadBlobAsFile(imageBlob, 'forfeit-tiktok.png')
+
+  // Try TikTok deep link on mobile, fall back to web
+  const opened = tryOpenDeepLink('tiktok://') || tryOpenDeepLink('snssdk1233://')
+  if (!opened) {
+    window.open('https://www.tiktok.com/upload', '_blank', 'noopener,noreferrer')
+  }
+}
+
+/** Download a Blob as a file (used by IG/TikTok flows). */
+function downloadBlobAsFile(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+/** Try to open a deep link. Returns true if the browser didn't block it. */
+function tryOpenDeepLink(url: string): boolean {
+  try {
+    window.location.href = url
+    return true
+  } catch {
+    return false
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Native share + clipboard
 // ---------------------------------------------------------------------------

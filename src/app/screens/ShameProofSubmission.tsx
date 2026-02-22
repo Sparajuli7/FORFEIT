@@ -26,6 +26,7 @@ export function ShameProofSubmission() {
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [shareSheetOpen, setShareSheetOpen] = useState(false)
 
   const photoInputRef = useRef<HTMLInputElement>(null)
   const videoInputRef = useRef<HTMLInputElement>(null)
@@ -230,13 +231,8 @@ export function ShameProofSubmission() {
         files: proofImageFiles,
       })
       if (!usedNative) {
-        window.open(
-          `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText + ' ' + shareUrl)}`,
-          '_blank',
-          'noopener,noreferrer',
-        )
+        setShareSheetOpen(true)
       }
-      navigate('/shame')
     }
 
     return (
@@ -266,6 +262,17 @@ export function ShameProofSubmission() {
         >
           Skip
         </button>
+
+        <ShareSheet
+          open={shareSheetOpen}
+          onOpenChange={setShareSheetOpen}
+          title="Share punishment proof"
+          text={shareText}
+          url={shareUrl}
+          imageUrl={firstPreviewUrl}
+          caption={betTitle}
+          onShared={() => navigate('/shame')}
+        />
       </div>
     )
   }

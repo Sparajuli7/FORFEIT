@@ -1,7 +1,7 @@
 import { forwardRef, useState } from 'react'
-import { Share2, Download } from 'lucide-react'
+import { Share2, Download, Camera, Music } from 'lucide-react'
 import { ShareSheet } from './ShareSheet'
-import { getBetShareUrl, shareWithNative, fetchImageAsFile } from '@/lib/share'
+import { getBetShareUrl, shareWithNative, fetchImageAsFile, shareToInstagramStories, shareToTikTok } from '@/lib/share'
 import { captureElementAsImage, shareImage, downloadImage } from '@/lib/utils/imageExport'
 
 export type ProofCardFrame = 'default' | 'winner' | 'forfeit' | 'shame'
@@ -76,6 +76,8 @@ export const ProofCard = forwardRef<HTMLDivElement, ProofCardProps>(
   ) {
     const [shareOpen, setShareOpen] = useState(false)
     const [saving, setSaving] = useState(false)
+    const [igLoading, setIgLoading] = useState(false)
+    const [tiktokLoading, setTiktokLoading] = useState(false)
     const cardRef = (ref as React.RefObject<HTMLDivElement>) ?? { current: null }
 
     const config = FRAME_CONFIG[frame]
@@ -112,6 +114,40 @@ export const ProofCard = forwardRef<HTMLDivElement, ProofCardProps>(
         /* ignore capture errors */
       } finally {
         setSaving(false)
+      }
+    }
+
+    /** Capture the framed card and share to Instagram Stories. */
+    const handleInstagram = async (e: React.MouseEvent) => {
+      e.stopPropagation()
+      if (igLoading) return
+      setIgLoading(true)
+      try {
+        if (cardRef.current) {
+          const blob = await captureElementAsImage(cardRef.current, { scale: 2 })
+          await shareToInstagramStories(blob, shareText)
+        }
+      } catch {
+        /* ignore */
+      } finally {
+        setIgLoading(false)
+      }
+    }
+
+    /** Capture the framed card and share to TikTok. */
+    const handleTikTok = async (e: React.MouseEvent) => {
+      e.stopPropagation()
+      if (tiktokLoading) return
+      setTiktokLoading(true)
+      try {
+        if (cardRef.current) {
+          const blob = await captureElementAsImage(cardRef.current, { scale: 2 })
+          await shareToTikTok(blob, shareText)
+        }
+      } catch {
+        /* ignore */
+      } finally {
+        setTiktokLoading(false)
       }
     }
 
@@ -181,10 +217,10 @@ export const ProofCard = forwardRef<HTMLDivElement, ProofCardProps>(
         </div>
 
         {/* Action buttons — not part of captured image */}
-        <div className="flex items-center justify-center gap-3 mt-3">
+        <div className="grid grid-cols-2 gap-2 mt-3">
           <button
             onClick={handleShare}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-bg-elevated border border-border-subtle text-text-primary text-sm font-semibold hover:bg-bg-card transition-colors"
+            className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-bg-elevated border border-border-subtle text-text-primary text-sm font-semibold hover:bg-bg-card transition-colors"
           >
             <Share2 className="w-4 h-4" />
             Share
@@ -192,10 +228,26 @@ export const ProofCard = forwardRef<HTMLDivElement, ProofCardProps>(
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-bg-elevated border border-border-subtle text-text-primary text-sm font-semibold hover:bg-bg-card transition-colors disabled:opacity-50"
+            className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-bg-elevated border border-border-subtle text-text-primary text-sm font-semibold hover:bg-bg-card transition-colors disabled:opacity-50"
           >
             <Download className="w-4 h-4" />
             {saving ? 'Saving...' : 'Save'}
+          </button>
+          <button
+            onClick={handleInstagram}
+            disabled={igLoading}
+            className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-gradient-to-r from-purple-600/20 to-pink-500/20 border border-purple-500/30 text-text-primary text-sm font-semibold hover:from-purple-600/30 hover:to-pink-500/30 transition-colors disabled:opacity-50"
+          >
+            <Camera className="w-4 h-4" />
+            {igLoading ? 'Saving...' : 'Instagram'}
+          </button>
+          <button
+            onClick={handleTikTok}
+            disabled={tiktokLoading}
+            className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-bg-elevated border border-border-subtle text-text-primary text-sm font-semibold hover:bg-bg-card transition-colors disabled:opacity-50"
+          >
+            <Music className="w-4 h-4" />
+            {tiktokLoading ? 'Saving...' : 'TikTok'}
           </button>
         </div>
 
