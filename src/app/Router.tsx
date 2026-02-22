@@ -36,6 +36,7 @@ import { RematchScreen } from './screens/RematchScreen'
 import { ChatInboxScreen } from './screens/ChatInboxScreen'
 import { ChatConversationScreen } from './screens/ChatConversationScreen'
 import { JournalScreen } from './screens/JournalScreen'
+import { JournalDetailScreen } from './screens/JournalDetailScreen'
 import { ArchiveScreen } from './screens/ArchiveScreen'
 
 // ---------------------------------------------------------------------------
@@ -183,6 +184,7 @@ export function AppRouter() {
 
             {/* Journal (replaces Record in nav) */}
             <Route path="journal" element={<JournalScreen />} />
+            <Route path="journal/:id" element={<JournalDetailScreen />} />
 
             {/* Archive */}
             <Route path="archive" element={<ArchiveScreen />} />

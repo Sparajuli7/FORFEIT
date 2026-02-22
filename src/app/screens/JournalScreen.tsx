@@ -1,234 +1,220 @@
-import { useEffect, useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router'
-import { Plus, Archive, Trophy, XCircle, MinusCircle } from 'lucide-react'
-import { useAuthStore, useGroupStore } from '@/stores'
-import { getGroupBets } from '@/lib/api/bets'
-import { BET_CATEGORIES } from '@/lib/utils/constants'
-import { formatMoney } from '@/lib/utils/formatters'
-import type { BetWithSides } from '@/stores/betStore'
-import type { Group } from '@/lib/database.types'
+import { Plus, BookOpen, Trash2, ChevronRight } from 'lucide-react'
+import {
+  loadJournals,
+  createJournal,
+  deleteJournal,
+  type JournalCollection,
+} from '@/lib/utils/journalStorage'
 
-function StatusPill({ status }: { status: string }) {
-  if (status === 'completed') {
-    return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-accent-green/20 text-accent-green">
-        <Trophy className="w-3 h-3" /> Done
-      </span>
-    )
+// ---------------------------------------------------------------------------
+// Emoji options for new journals
+// ---------------------------------------------------------------------------
+
+const JOURNAL_EMOJIS = [
+  '📓', '📔', '📒', '📝', '🏆', '🎯', '🎲', '🃏',
+  '🏀', '⚽', '🏈', '🎰', '💰', '🔥', '⚡', '💯',
+  '👑', '🌟', '🎖️', '🏅', '🤝', '💪', '🎪', '🦁',
+]
+
+// ---------------------------------------------------------------------------
+// Create-journal modal (inline overlay)
+// ---------------------------------------------------------------------------
+
+function CreateModal({
+  onClose,
+  onCreate,
+}: {
+  onClose: () => void
+  onCreate: (col: JournalCollection) => void
+}) {
+  const [name, setName] = useState('')
+  const [emoji, setEmoji] = useState('📓')
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    setTimeout(() => inputRef.current?.focus(), 80)
+  }, [])
+
+  const handleCreate = () => {
+    if (!name.trim()) return
+    const col = createJournal(name, emoji)
+    onCreate(col)
   }
-  if (status === 'voided') {
-    return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-bg-elevated text-text-muted">
-        <MinusCircle className="w-3 h-3" /> Void
-      </span>
-    )
-  }
-  if (status === 'active') {
-    return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-accent-green/10 text-accent-green border border-accent-green/30">
-        Live
-      </span>
-    )
-  }
-  if (status === 'proof_submitted') {
-    return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-yellow-500/20 text-yellow-400">
-        Proof
-      </span>
-    )
-  }
+
   return (
-    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-bg-elevated text-text-muted">
-      {status}
-    </span>
+    <div
+      className="absolute inset-0 z-50 flex items-end bg-black/60"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="w-full bg-bg-primary rounded-t-3xl px-6 pt-5 pb-10 border-t border-border-subtle">
+        {/* Drag handle */}
+        <div className="w-10 h-1 rounded-full bg-border-subtle mx-auto mb-5" />
+
+        <h2 className="text-lg font-black text-text-primary mb-4">New Journal</h2>
+
+        {/* Name */}
+        <input
+          ref={inputRef}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
+          placeholder="Journal name…"
+          maxLength={40}
+          className="w-full h-11 rounded-xl bg-bg-elevated border border-border-subtle px-4 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-green/60 mb-4"
+        />
+
+        {/* Emoji picker */}
+        <p className="text-[11px] font-bold uppercase tracking-wider text-text-muted mb-2">
+          Pick an icon
+        </p>
+        <div className="flex flex-wrap gap-2 mb-5">
+          {JOURNAL_EMOJIS.map((e) => (
+            <button
+              key={e}
+              onClick={() => setEmoji(e)}
+              className={`w-10 h-10 rounded-xl text-xl flex items-center justify-center transition-all ${
+                emoji === e
+                  ? 'bg-accent-green/20 ring-2 ring-accent-green'
+                  : 'bg-bg-elevated hover:bg-bg-card'
+              }`}
+            >
+              {e}
+            </button>
+          ))}
+        </div>
+
+        <button
+          onClick={handleCreate}
+          disabled={!name.trim()}
+          className="w-full h-12 rounded-xl bg-accent-green text-white font-bold text-sm disabled:opacity-40 transition-opacity"
+        >
+          Create Journal
+        </button>
+      </div>
+    </div>
   )
 }
 
+// ---------------------------------------------------------------------------
+// Main screen
+// ---------------------------------------------------------------------------
+
 export function JournalScreen() {
   const navigate = useNavigate()
-  const user = useAuthStore((s) => s.user)
-  const groups = useGroupStore((s) => s.groups)
-  const fetchGroups = useGroupStore((s) => s.fetchGroups)
-  const groupsLoading = useGroupStore((s) => s.isLoading)
-
-  const [selectedGroup, setSelectedGroup] = useState<Group | null>(null)
-  const [groupBets, setGroupBets] = useState<BetWithSides[]>([])
-  const [betsLoading, setBetsLoading] = useState(false)
+  const [journals, setJournals] = useState<JournalCollection[]>([])
+  const [showCreate, setShowCreate] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
 
   useEffect(() => {
-    fetchGroups()
-  }, [fetchGroups])
+    setJournals(loadJournals())
+  }, [])
 
-  // Auto-select first group when groups load
-  useEffect(() => {
-    if (groups.length > 0 && !selectedGroup) {
-      setSelectedGroup(groups[0])
-    }
-  }, [groups, selectedGroup])
+  const handleCreated = (col: JournalCollection) => {
+    setJournals((prev) => [col, ...prev])
+    setShowCreate(false)
+    // Navigate straight into the new collection so user can add bets
+    navigate(`/journal/${col.id}`)
+  }
 
-  useEffect(() => {
-    if (!selectedGroup) {
-      setGroupBets([])
-      return
-    }
-    setBetsLoading(true)
-    getGroupBets(selectedGroup.id)
-      .then(setGroupBets)
-      .catch(() => setGroupBets([]))
-      .finally(() => setBetsLoading(false))
-  }, [selectedGroup?.id])
+  const handleDelete = (id: string) => {
+    deleteJournal(id)
+    setJournals((prev) => prev.filter((c) => c.id !== id))
+    setConfirmDelete(null)
+  }
 
   return (
-    <div className="h-full bg-bg-primary overflow-y-auto pb-6">
+    <div className="relative h-full bg-bg-primary flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="px-6 pt-6 pb-4 border-b border-border-subtle flex items-center justify-between">
+      <div className="px-6 pt-6 pb-4 border-b border-border-subtle shrink-0 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-black text-text-primary">Journal</h1>
-          <p className="text-text-muted text-sm mt-0.5">Your groups &amp; bet history</p>
+          <p className="text-text-muted text-sm mt-0.5">Your curated bet collections</p>
         </div>
         <button
-          onClick={() => navigate('/archive')}
-          className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-bg-elevated transition-colors"
-          aria-label="Archive"
+          onClick={() => setShowCreate(true)}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-accent-green/20 text-accent-green text-sm font-bold border border-accent-green/40 active:scale-95 transition-transform"
         >
-          <Archive className="w-5 h-5 text-text-muted" />
+          <Plus className="w-4 h-4" />
+          New
         </button>
       </div>
 
-      {/* Groups row */}
-      <div className="px-6 pt-4 pb-2">
-        <p className="text-[11px] font-bold uppercase tracking-wider text-text-muted mb-3">
-          My Groups
-        </p>
-        {groupsLoading && groups.length === 0 ? (
-          <div className="flex gap-3">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="w-24 h-20 rounded-xl bg-bg-card border border-border-subtle animate-pulse" />
-            ))}
-          </div>
-        ) : groups.length === 0 ? (
-          <div className="flex gap-3 items-center">
-            <p className="text-text-muted text-sm">No groups yet.</p>
+      {/* List */}
+      <div className="flex-1 overflow-y-auto px-6 py-4">
+        {journals.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full pb-16">
+            <BookOpen className="w-16 h-16 text-text-muted/30 mb-4" strokeWidth={1} />
+            <p className="text-text-primary font-bold text-lg mb-1">No journals yet</p>
+            <p className="text-text-muted text-sm text-center mb-6">
+              Create a journal and curate any bets<br />from your groups or personal challenges.
+            </p>
             <button
-              onClick={() => navigate('/group/create')}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-accent-green/20 text-accent-green text-xs font-bold border border-accent-green/40"
+              onClick={() => setShowCreate(true)}
+              className="flex items-center gap-2 px-5 py-3 rounded-xl bg-accent-green text-white font-bold text-sm"
             >
-              <Plus className="w-3 h-3" /> Create
+              <Plus className="w-4 h-4" />
+              Create your first journal
             </button>
           </div>
         ) : (
-          <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
-            {groups.map((g) => {
-              const isActive = selectedGroup?.id === g.id
-              return (
+          <div className="space-y-3">
+            {journals.map((col) => (
+              <div key={col.id} className="relative">
                 <button
-                  key={g.id}
-                  onClick={() => setSelectedGroup(g)}
-                  className={`shrink-0 w-24 rounded-xl border p-3 flex flex-col items-center gap-1 transition-all ${
-                    isActive
-                      ? 'bg-accent-green/10 border-accent-green/50'
-                      : 'bg-bg-card border-border-subtle hover:bg-bg-elevated'
-                  }`}
+                  onClick={() => navigate(`/journal/${col.id}`)}
+                  className="w-full bg-bg-card rounded-2xl border border-border-subtle p-4 text-left hover:bg-bg-elevated transition-colors active:scale-[0.99]"
                 >
-                  <span className="text-2xl">{g.avatar_emoji}</span>
-                  <p className={`text-[11px] font-bold truncate w-full text-center ${isActive ? 'text-accent-green' : 'text-text-primary'}`}>
-                    {g.name}
-                  </p>
+                  <div className="flex items-center gap-3">
+                    <span className="text-3xl">{col.emoji}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-text-primary truncate">{col.name}</p>
+                      <p className="text-[11px] text-text-muted mt-0.5">
+                        {col.bet_ids.length === 0
+                          ? 'No bets yet — tap to add'
+                          : `${col.bet_ids.length} bet${col.bet_ids.length !== 1 ? 's' : ''}`}
+                      </p>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-text-muted shrink-0" />
+                  </div>
                 </button>
-              )
-            })}
-            <button
-              onClick={() => navigate('/group/create')}
-              className="shrink-0 w-24 rounded-xl border border-dashed border-border-subtle p-3 flex flex-col items-center gap-1 hover:bg-bg-elevated transition-colors"
-            >
-              <div className="w-8 h-8 rounded-full bg-bg-elevated flex items-center justify-center">
-                <Plus className="w-4 h-4 text-text-muted" />
+
+                {/* Delete button */}
+                {confirmDelete === col.id ? (
+                  <div className="absolute right-0 top-0 h-full flex items-center gap-2 pr-3">
+                    <button
+                      onClick={() => setConfirmDelete(null)}
+                      className="text-xs text-text-muted font-bold px-2 py-1 rounded-lg bg-bg-elevated"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => handleDelete(col.id)}
+                      className="text-xs text-accent-coral font-bold px-2 py-1 rounded-lg bg-accent-coral/10"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setConfirmDelete(col.id)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center rounded-lg text-text-muted hover:text-accent-coral hover:bg-accent-coral/10 transition-colors"
+                    aria-label="Delete journal"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
-              <p className="text-[11px] text-text-muted font-bold">New</p>
-            </button>
+            ))}
           </div>
         )}
       </div>
 
-      {/* Bet History */}
-      <div className="px-6 pt-4">
-        {selectedGroup ? (
-          <>
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-text-muted">
-                {selectedGroup.avatar_emoji} {selectedGroup.name} — History
-              </p>
-              <button
-                onClick={() => navigate(`/group/${selectedGroup.id}`)}
-                className="text-[11px] text-accent-green font-bold"
-              >
-                View Group →
-              </button>
-            </div>
-            {betsLoading ? (
-              <div className="space-y-2">
-                {[...Array(4)].map((_, i) => (
-                  <div key={i} className="h-14 rounded-lg bg-bg-card border border-border-subtle animate-pulse" />
-                ))}
-              </div>
-            ) : groupBets.length === 0 ? (
-              <div className="py-10 text-center">
-                <p className="text-text-muted text-sm mb-3">No bets in this group yet.</p>
-                <button
-                  onClick={() => navigate('/bet/create')}
-                  className="px-4 py-2 rounded-xl bg-accent-green/20 text-accent-green text-sm font-bold border border-accent-green/40"
-                >
-                  Create a bet
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {groupBets.map((bet) => {
-                  const category = BET_CATEGORIES[bet.category]
-                  const participantCount = bet.bet_sides?.length ?? 0
-                  return (
-                    <button
-                      key={bet.id}
-                      onClick={() => navigate(`/bet/${bet.id}`)}
-                      className="w-full bg-bg-card rounded-xl border border-border-subtle px-3 py-3 flex items-center gap-3 text-left hover:bg-bg-elevated transition-colors"
-                    >
-                      <span className="text-xl shrink-0">{category?.emoji ?? '🎯'}</span>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-text-primary truncate">{bet.title}</p>
-                        <p className="text-[11px] text-text-muted mt-0.5">
-                          {new Date(bet.created_at).toLocaleDateString()} · {participantCount} player{participantCount !== 1 ? 's' : ''}
-                          {bet.stake_money ? ` · ${formatMoney(bet.stake_money)}` : ''}
-                        </p>
-                      </div>
-                      <StatusPill status={bet.status} />
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-          </>
-        ) : !groupsLoading && groups.length === 0 ? (
-          <div className="py-10 text-center">
-            <p className="text-4xl mb-3">📖</p>
-            <p className="text-text-primary font-bold mb-1">No journal yet</p>
-            <p className="text-text-muted text-sm mb-4">Create or join a group to start tracking bets.</p>
-            <div className="flex gap-3 justify-center">
-              <button
-                onClick={() => navigate('/group/create')}
-                className="px-4 py-2 rounded-xl bg-accent-green text-white text-sm font-bold"
-              >
-                Create Group
-              </button>
-              <button
-                onClick={() => navigate('/group/join')}
-                className="px-4 py-2 rounded-xl bg-bg-elevated text-text-primary text-sm font-bold border border-border-subtle"
-              >
-                Join Group
-              </button>
-            </div>
-          </div>
-        ) : null}
-      </div>
+      {/* Create modal */}
+      {showCreate && (
+        <CreateModal onClose={() => setShowCreate(false)} onCreate={handleCreated} />
+      )}
     </div>
   )
 }
