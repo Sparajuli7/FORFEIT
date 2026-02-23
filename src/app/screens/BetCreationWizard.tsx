@@ -154,6 +154,7 @@ export function BetCreationWizard() {
     if (currentStep === 1) {
       const { valid } = validateClaim(wizard.claim)
       if (!valid) return
+      if (!wizard.creatorSide) return
       updateWizardStep(1, { claim: wizard.claim.trim() })
     }
     if (currentStep === 2) {
@@ -243,6 +244,40 @@ export function BetCreationWizard() {
               >
                 ✨ Browse Templates
               </button>
+
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.1em] text-text-muted mb-3">Pick your side</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => updateWizardStep(1, { creatorSide: 'rider' })}
+                    className={`rounded-2xl p-4 flex flex-col items-center gap-2 border-2 transition-all btn-pressed ${
+                      wizard.creatorSide === 'rider'
+                        ? 'border-accent-green bg-accent-green/10'
+                        : 'border-border-subtle bg-bg-elevated'
+                    }`}
+                  >
+                    <span className="text-3xl">🤝</span>
+                    <span className={`font-extrabold text-sm ${wizard.creatorSide === 'rider' ? 'text-accent-green' : 'text-text-primary'}`}>
+                      Rider
+                    </span>
+                    <span className="text-[11px] text-text-muted text-center leading-tight">I believe this happens</span>
+                  </button>
+                  <button
+                    onClick={() => updateWizardStep(1, { creatorSide: 'doubter' })}
+                    className={`rounded-2xl p-4 flex flex-col items-center gap-2 border-2 transition-all btn-pressed ${
+                      wizard.creatorSide === 'doubter'
+                        ? 'border-accent-coral bg-accent-coral/10'
+                        : 'border-border-subtle bg-bg-elevated'
+                    }`}
+                  >
+                    <span className="text-3xl">💀</span>
+                    <span className={`font-extrabold text-sm ${wizard.creatorSide === 'doubter' ? 'text-accent-coral' : 'text-text-primary'}`}>
+                      Doubter
+                    </span>
+                    <span className="text-[11px] text-text-muted text-center leading-tight">I doubt this happens</span>
+                  </button>
+                </div>
+              </div>
             </motion.div>
           )}
 

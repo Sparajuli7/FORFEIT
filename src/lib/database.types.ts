@@ -26,6 +26,8 @@ export type ProofType = 'camera' | 'screenshot' | 'video' | 'document' | 'text'
 
 export type VoteChoice = 'confirm' | 'dispute'
 
+export type ProofRuling = 'riders_win' | 'doubters_win'
+
 export type OutcomeResult = 'claimant_succeeded' | 'claimant_failed' | 'voided'
 
 export type PunishmentCategory = 'physical' | 'social' | 'financial' | 'humiliating'
@@ -128,6 +130,10 @@ export interface ProofRow {
   proof_type: ProofType
   caption: string | null
   submitted_at: string
+  /** Claimant's verdict: riders_win (YES) or doubters_win (NO). NULL for evidence-only proofs. */
+  ruling: ProofRuling | null
+  /** 24-hour voting window deadline. Only set when ruling is not null. */
+  ruling_deadline: string | null
 }
 
 export interface ProofVoteRow {
@@ -240,7 +246,7 @@ export type BetInsert = Omit<BetRow, 'id' | 'created_at'> &
 export type BetSideInsert = Omit<BetSideRow, 'id' | 'joined_at'>
 
 export type ProofInsert = Omit<ProofRow, 'id' | 'submitted_at'> &
-  Partial<Pick<ProofRow, 'front_camera_url' | 'back_camera_url' | 'screenshot_urls' | 'video_url' | 'document_url' | 'caption'>>
+  Partial<Pick<ProofRow, 'front_camera_url' | 'back_camera_url' | 'screenshot_urls' | 'video_url' | 'document_url' | 'caption' | 'ruling' | 'ruling_deadline'>>
 
 export type ProofVoteInsert = Omit<ProofVoteRow, 'id' | 'voted_at'>
 
@@ -325,7 +331,7 @@ export interface Database {
       proofs: {
         Row: ProofRow
         Insert: ProofInsert
-        Update: Partial<Pick<ProofRow, 'caption'>>
+        Update: Partial<Pick<ProofRow, 'caption' | 'ruling' | 'ruling_deadline'>>
       }
       proof_votes: {
         Row: ProofVoteRow
@@ -388,6 +394,7 @@ export interface Database {
       bet_side: BetSide
       proof_type: ProofType
       vote_choice: VoteChoice
+      proof_ruling: ProofRuling
       outcome_result: OutcomeResult
       punishment_category: PunishmentCategory
       punishment_difficulty: PunishmentDifficulty

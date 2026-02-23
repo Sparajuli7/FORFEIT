@@ -28,6 +28,7 @@ export type BetWithSides = Bet & { bet_sides: BetSideEntry[] }
 
 export interface WizardFields {
   claim: string
+  creatorSide: BetSide | null
   category: BetCategory | null
   betType: BetType | null
   deadline: string | null          // ISO 8601 string
@@ -40,6 +41,7 @@ export interface WizardFields {
 
 const WIZARD_DEFAULTS: WizardFields = {
   claim: '',
+  creatorSide: null,
   category: null,
   betType: null,
   deadline: null,
@@ -304,11 +306,11 @@ const useBetStore = create<BetStore>()(
         return null
       }
 
-      // Creator auto-joins as a rider
+      // Creator auto-joins with their chosen side (defaults to rider if not selected)
       await supabase.from('bet_sides').insert({
         bet_id: data.id,
         user_id: userId,
-        side: 'rider',
+        side: wizard.creatorSide ?? 'rider',
       })
 
       set((draft) => {
@@ -411,6 +413,7 @@ const useBetStore = create<BetStore>()(
         draft.currentStep = 1
         draft.wizard = {
           claim: bet.title,
+          creatorSide: null,
           category: bet.category,
           betType: bet.bet_type,
           deadline: bet.deadline,
