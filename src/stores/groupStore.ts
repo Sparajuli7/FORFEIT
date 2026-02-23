@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { supabase } from '@/lib/supabase'
-import type { Group, GroupMember, GroupInsert } from '@/lib/database.types'
+import type { Group, GroupMember, GroupInsert, NotificationInsert } from '@/lib/database.types'
 import { createGroupConversation, addConversationParticipant, getGroupConversation, removeConversationParticipant } from '@/lib/api/chat'
 
 // ---------------------------------------------------------------------------
@@ -23,6 +23,8 @@ interface GroupActions {
   fetchMembers: (groupId: string) => Promise<void>
   setActiveGroup: (group: Group | null) => void
   leaveGroup: (groupId: string) => Promise<void>
+  /** Send a group_invite notification to a specific user */
+  sendGroupInvite: (groupId: string, targetUserId: string) => Promise<boolean>
   clearError: () => void
 }
 
@@ -256,6 +258,48 @@ const useGroupStore = create<GroupStore>()((set, get) => ({
       members: state.members.filter((m) => m.group_id !== groupId),
       isLoading: false,
     }))
+  },
+
+  sendGroupInvite: async (groupId, targetUserId) => {
+    const userId = await getCurrentUserId()
+    if (!userId) return false
+
+    // Find the group to get name and invite code
+    const group = get().groups.find((g) => g.id === groupId)
+    if (!group) {
+      set({ error: 'Group not found.' })
+      return false
+    }
+
+    // Check target isn't already a member
+    const { data: existing } = await supabase
+      .from('group_members')
+      .select('group_id')
+      .eq('group_id', groupId)
+      .eq('user_id', targetUserId)
+      .single()
+
+    if (existing) {
+      set({ error: 'This user is already in the group.' })
+      return false
+    }
+
+    // Insert notification for the target user
+    const notification: NotificationInsert = {
+      user_id: targetUserId,
+      type: 'group_invite',
+      title: 'Group Invite',
+      body: `You've been invited to join "${group.name}"`,
+      data: { group_id: groupId, invite_code: group.invite_code, group_name: group.name, group_emoji: group.avatar_emoji },
+    }
+
+    const { error } = await supabase.from('notifications').insert(notification)
+    if (error) {
+      set({ error: error.message })
+      return false
+    }
+
+    return true
   },
 
   clearError: () => set({ error: null }),

@@ -65,7 +65,7 @@ export function RematchScreen() {
   const handleRematch = async () => {
     if (!id || !selectedOption) return
     const newBet = await createRematchBet(id, selectedOption)
-    if (newBet) navigate(`/bet/${newBet.id}`)
+    if (newBet) navigate(`/compete/${newBet.id}`)
   }
 
   if (loading) {

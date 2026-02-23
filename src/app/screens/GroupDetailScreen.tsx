@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router'
-import { ChevronLeft, Copy, LogOut, MessageCircle, ChevronRight, Share2, MessageSquare } from 'lucide-react'
+import { ChevronLeft, Copy, LogOut, MessageCircle, ChevronRight, Share2, Search, UserPlus } from 'lucide-react'
 import { useGroupStore, useBetStore, useAuthStore, useChatStore } from '@/stores'
 import { getGroupBets } from '@/lib/api/bets'
 import { getProfilesWithRepByIds } from '@/lib/api/profiles'
@@ -18,11 +18,11 @@ import {
 } from '@/app/components/ui/alert-dialog'
 import { useCountdown } from '@/lib/hooks/useCountdown'
 import { formatMoney, formatOdds } from '@/lib/utils/formatters'
+import { ShareSheet } from '@/app/components/ShareSheet'
 import {
   getGroupInviteUrl,
   getGroupInviteShareText,
   shareWithNative,
-  getSMSShareUrl,
 } from '@/lib/share'
 import type { BetWithSides } from '@/stores/betStore'
 import type { ProfileWithRep } from '@/lib/api/profiles'
@@ -95,6 +95,7 @@ export function GroupDetailScreen() {
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
   const [leaving, setLeaving] = useState(false)
   const [openingChat, setOpeningChat] = useState(false)
+  const [shareSheetOpen, setShareSheetOpen] = useState(false)
 
   const group = groups.find((g) => g.id === id)
 
@@ -128,9 +129,7 @@ export function GroupDetailScreen() {
     const url = getGroupInviteUrl(group.invite_code)
     const text = getGroupInviteShareText(group.name)
     const used = await shareWithNative({ text, url, title: 'FORFEIT Invite' })
-    if (!used) {
-      window.open(getSMSShareUrl(text, url), '_self')
-    }
+    if (!used) setShareSheetOpen(true)
   }
 
   const handleLeave = async () => {
@@ -254,23 +253,22 @@ export function GroupDetailScreen() {
               <Copy className="w-4 h-4" />
             </button>
           </div>
-          <div className="flex gap-2">
-            <button
-              onClick={handleShareInvite}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-accent-green text-white font-bold text-sm hover:bg-accent-green/90 transition-colors"
-            >
-              <Share2 className="w-4 h-4" />
-              Share Invite
-            </button>
-            <a
-              href={getSMSShareUrl(getGroupInviteShareText(group.name), inviteLink)}
-              className="flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-border-subtle text-text-muted hover:text-text-primary hover:bg-bg-elevated transition-colors text-sm font-medium"
-            >
-              <MessageSquare className="w-4 h-4" />
-              SMS
-            </a>
-          </div>
+          <button
+            onClick={handleShareInvite}
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-accent-green text-white font-bold text-sm hover:bg-accent-green/90 transition-colors"
+          >
+            <Share2 className="w-4 h-4" />
+            Share Invite
+          </button>
         </div>
+
+        <ShareSheet
+          open={shareSheetOpen}
+          onOpenChange={setShareSheetOpen}
+          title="Share group invite"
+          text={getGroupInviteShareText(group.name)}
+          url={inviteLink}
+        />
 
         {/* Recent bets */}
         <div className="mb-6">

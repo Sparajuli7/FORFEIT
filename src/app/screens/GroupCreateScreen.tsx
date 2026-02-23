@@ -1,16 +1,15 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router'
-import { ChevronLeft, Share2, MessageSquare } from 'lucide-react'
+import { ChevronLeft, Share2 } from 'lucide-react'
 import { useGroupStore } from '@/stores'
 import { Input } from '@/app/components/ui/input'
 import { Button } from '@/app/components/ui/button'
 import { GROUP_EMOJIS } from '@/lib/utils/constants'
+import { ShareSheet } from '@/app/components/ShareSheet'
 import {
   getGroupInviteUrl,
   getGroupInviteShareText,
   shareWithNative,
-  canUseNativeShare,
-  getSMSShareUrl,
 } from '@/lib/share'
 
 export function GroupCreateScreen() {
@@ -28,6 +27,7 @@ export function GroupCreateScreen() {
   const [name, setName] = useState('')
   const [emoji, setEmoji] = useState('🔥')
   const [createdGroup, setCreatedGroup] = useState<{ id: string; name: string; invite_code: string } | null>(null)
+  const [shareSheetOpen, setShareSheetOpen] = useState(false)
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -55,12 +55,9 @@ export function GroupCreateScreen() {
   }
 
   const handleShare = async () => {
-    if (!inviteLink) return
-    const used = await shareWithNative({ text: shareText, url: inviteLink, title: 'FORFEIT Invite' })
-    if (!used) {
-      // Fallback: open SMS
-      window.open(getSMSShareUrl(shareText, inviteLink), '_self')
-    }
+    if (!inviteLink || !createdGroup) return
+    const usedNative = await shareWithNative({ title: `Join ${createdGroup.name}`, text: shareText, url: inviteLink })
+    if (!usedNative) setShareSheetOpen(true)
   }
 
   if (createdGroup) {
@@ -100,19 +97,12 @@ export function GroupCreateScreen() {
               </Button>
               <Button
                 onClick={handleShare}
-                className="flex-1 rounded-xl bg-accent-green text-white font-bold hover:bg-accent-green/90"
+                className="flex-1 rounded-xl bg-accent-green text-white hover:bg-accent-green/90 flex items-center justify-center gap-2"
               >
-                <Share2 className="w-4 h-4 mr-2" />
-                Share Invite
+                <Share2 className="w-4 h-4" />
+                Share
               </Button>
             </div>
-            <a
-              href={getSMSShareUrl(shareText, inviteLink)}
-              className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-border-subtle text-text-muted hover:text-text-primary hover:bg-bg-elevated transition-colors text-sm font-medium mt-2"
-            >
-              <MessageSquare className="w-4 h-4" />
-              Send via SMS
-            </a>
           </div>
 
           <Button
@@ -121,6 +111,14 @@ export function GroupCreateScreen() {
           >
             Go to Home
           </Button>
+
+          <ShareSheet
+            open={shareSheetOpen}
+            onOpenChange={setShareSheetOpen}
+            title="Share group invite"
+            text={shareText}
+            url={inviteLink}
+          />
         </div>
       </div>
     )

@@ -3,6 +3,7 @@ import { LayoutGrid, Trophy, BookOpen, User } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useNotifications } from '@/lib/hooks/useNotifications'
 import { useChat } from '@/lib/hooks/useChat'
+import { AdBanner } from '../components/AdBanner'
 
 interface NavItem {
   id: string
@@ -50,6 +51,8 @@ export function AppLayout() {
       <div className="flex-1 overflow-y-auto min-h-0">
         <Outlet />
       </div>
+      {/* Ad Banner */}
+      <AdBanner />
       {/* Bottom Navigation */}
       <nav className="shrink-0 h-16 bg-bg-primary border-t border-border-subtle flex items-center justify-around pb-safe">
         {NAV_ITEMS.map((item) => {

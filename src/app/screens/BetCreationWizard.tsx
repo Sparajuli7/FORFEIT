@@ -49,6 +49,7 @@ export function BetCreationWizard() {
   const profile = useAuthStore((s) => s.profile)
 
   const templateAppliedRef = useRef(false)
+  const [step1Error, setStep1Error] = useState<string | null>(null)
 
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(() => {
     const d = new Date()
@@ -82,6 +83,10 @@ export function BetCreationWizard() {
     emblaApi.on('select', onSelect)
     return () => emblaApi.off('select', onSelect)
   }, [emblaApi])
+
+  // Reset wizard every time this screen mounts so stale step/side state never leaks in
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { resetWizard() }, [])
 
   useEffect(() => {
     fetchGroups()
@@ -163,8 +168,15 @@ export function BetCreationWizard() {
   const handleNext = () => {
     if (currentStep === 1) {
       const { valid } = validateClaim(wizard.claim)
-      if (!valid) return
-      if (!wizard.creatorSide) return
+      if (!valid) {
+        setStep1Error('Enter a claim before continuing.')
+        return
+      }
+      if (!wizard.creatorSide) {
+        setStep1Error('Pick your side — Rider or Doubter.')
+        return
+      }
+      setStep1Error(null)
       updateWizardStep(1, { claim: wizard.claim.trim() })
     }
     if (currentStep === 2) {
@@ -259,7 +271,7 @@ export function BetCreationWizard() {
                 <p className="text-xs font-bold uppercase tracking-[0.1em] text-text-muted mb-3">Pick your side</p>
                 <div className="grid grid-cols-2 gap-3">
                   <button
-                    onClick={() => updateWizardStep(1, { creatorSide: 'rider' })}
+                    onClick={() => { updateWizardStep(1, { creatorSide: 'rider' }); setStep1Error(null) }}
                     className={`rounded-2xl p-4 flex flex-col items-center gap-2 border-2 transition-all btn-pressed ${
                       wizard.creatorSide === 'rider'
                         ? 'border-accent-green bg-accent-green/10'
@@ -273,7 +285,7 @@ export function BetCreationWizard() {
                     <span className="text-[11px] text-text-muted text-center leading-tight">I believe this happens</span>
                   </button>
                   <button
-                    onClick={() => updateWizardStep(1, { creatorSide: 'doubter' })}
+                    onClick={() => { updateWizardStep(1, { creatorSide: 'doubter' }); setStep1Error(null) }}
                     className={`rounded-2xl p-4 flex flex-col items-center gap-2 border-2 transition-all btn-pressed ${
                       wizard.creatorSide === 'doubter'
                         ? 'border-accent-coral bg-accent-coral/10'
@@ -493,6 +505,9 @@ export function BetCreationWizard() {
       {/* Bottom CTA for steps 1–2 */}
       {currentStep < 3 && (
         <div className="px-6 pb-8 pt-4 border-t border-border-subtle bg-bg-primary shrink-0">
+          {step1Error && currentStep === 1 && (
+            <p className="text-destructive text-sm font-semibold mb-3 text-center">{step1Error}</p>
+          )}
           <PrimaryButton onClick={handleNext}>Next</PrimaryButton>
         </div>
       )}
@@ -656,7 +671,7 @@ export function BetCreationWizard() {
               : []
           }
           groupName={wizard.selectedGroup?.name}
-          detailPath={`/bet/${createdBet.id}`}
+          detailPath={`/compete/${createdBet.id}`}
         />
       )}
     </div>

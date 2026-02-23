@@ -408,7 +408,7 @@ export function TheBoard() {
       </div>{/* end scrollable content */}
 
       {/* Quick Bet FAB — absolute inside phone frame, bottom-right */}
-      <div className="absolute bottom-5 right-4 z-20 flex flex-col items-end gap-2 pointer-events-none">
+      <div className="absolute bottom-[70px] right-4 z-20 flex flex-col items-end gap-2 pointer-events-none">
         <span className="pointer-events-auto text-[10px] font-bold text-text-muted uppercase tracking-wider bg-bg-card px-2.5 py-1 rounded-full border border-border-subtle shadow-sm">
           Quick Bet
         </span>

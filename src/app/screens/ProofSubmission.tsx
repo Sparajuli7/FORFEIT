@@ -30,7 +30,9 @@ export function ProofSubmission({ onSubmit, onBack }: ProofSubmissionProps) {
   const storeError = useProofStore((s) => s.error)
 
   // Is the current user the claimant (bet creator)?
-  const isClaimant = !!user && activeBet?.claimant_id === user.id
+  // Must also verify activeBet.id === id to guard against stale store state
+  // while the correct bet is still loading.
+  const isClaimant = !!user && !!activeBet && activeBet.id === id && activeBet.claimant_id === user.id
 
   // step: 'upload' → everyone uploads evidence
   //       'ruling' → claimant-only: declare YES or NO

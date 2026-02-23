@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
-import { Trophy, Lock } from 'lucide-react'
+import { Trophy, Lock, Swords } from 'lucide-react'
 import { getCompetitionsForUser, getLeaderboard } from '@/lib/api/competitions'
+import { getMyBets } from '@/lib/api/bets'
 import { formatMoney } from '@/lib/utils/formatters'
-import { BET_CATEGORIES } from '@/lib/utils/constants'
 import type { Bet } from '@/lib/database.types'
 import type { LeaderboardEntry } from '@/lib/api/competitions'
+import type { BetWithSides } from '@/lib/api/bets'
 import { useAuthStore } from '@/stores'
 import { SportsbookButton } from '../components/SportsbookButton'
-import { format } from 'date-fns'
+import { format, formatDistanceToNow } from 'date-fns'
 
 function getStatus(competition: Bet): 'OPEN' | 'LIVE' | 'ENDED' {
   const now = new Date()
@@ -43,19 +44,29 @@ export function Competitions() {
   const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
   const [competitions, setCompetitions] = useState<Bet[]>([])
+  const [challengeBets, setChallengeBets] = useState<BetWithSides[]>([])
   const [leaderboards, setLeaderboards] = useState<Record<string, LeaderboardEntry[]>>({})
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    getCompetitionsForUser()
-      .then((data) => {
-        setCompetitions(data)
-      })
-      .catch((err) => {
+    const fetchAll = async () => {
+      try {
+        const [comps, myBets] = await Promise.all([
+          getCompetitionsForUser(),
+          user ? getMyBets(user.id) : Promise.resolve([]),
+        ])
+        setCompetitions(comps)
+        // Show non-competition bets (quick, long, etc.) that the user is in
+        const compIds = new Set(comps.map((c) => c.id))
+        setChallengeBets(myBets.filter((b) => b.bet_type !== 'competition' && !compIds.has(b.id)))
+      } catch (err) {
         console.warn('[Competitions] Failed to fetch:', err)
-      })
-      .finally(() => setIsLoading(false))
-  }, [])
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchAll()
+  }, [user?.id])
 
   useEffect(() => {
     competitions.forEach((c) => {
@@ -75,133 +86,249 @@ export function Competitions() {
     )
   }
 
+  const totalItems = competitions.length + challengeBets.length
+
   return (
     <div className="h-full bg-bg-primary overflow-y-auto pb-6">
       <div className="px-6 pt-12 pb-6">
-        <h1 className="text-3xl font-black text-text-primary mb-2">🏆 COMPETITIONS</h1>
-        <p className="text-sm text-text-muted">Run a contest. Crown a winner.</p>
+        <h1 className="text-3xl font-black text-text-primary mb-2">⚔️ COMPETE</h1>
+        <p className="text-sm text-text-muted">Challenges, competitions, rematches.</p>
       </div>
 
       <div className="px-6 space-y-4">
-        {competitions.length === 0 ? (
+        {totalItems === 0 ? (
           <div className="bg-bg-card border border-border-subtle rounded-xl p-8 text-center">
-            <p className="text-text-muted mb-4">No competitions yet</p>
-            <SportsbookButton onClick={() => navigate('/compete/create')}>
-              CREATE COMPETITION
-            </SportsbookButton>
+            <p className="text-text-muted mb-4">No bets yet. Create a challenge or competition.</p>
+            <div className="flex flex-col gap-3">
+              <SportsbookButton onClick={() => navigate('/bet/create')}>
+                CREATE CHALLENGE
+              </SportsbookButton>
+              <button
+                onClick={() => navigate('/compete/create')}
+                className="w-full py-3 rounded-xl border border-border-subtle text-text-muted text-sm font-bold uppercase tracking-wide"
+              >
+                CREATE COMPETITION
+              </button>
+            </div>
           </div>
         ) : (
-          competitions.map((competition) => {
-            const status = getStatus(competition)
-            const lb = leaderboards[competition.id] ?? []
-            const top3 = lb.slice(0, 3)
-            const participantCount = lb.length
+          <>
+            {/* Challenge bets (quick / long / rematches) */}
+            {challengeBets.map((bet) => {
+              const status = getStatus(bet)
+              const riders = bet.bet_sides?.filter((s) => s.side === 'rider') ?? []
+              const doubters = bet.bet_sides?.filter((s) => s.side === 'doubter') ?? []
+              const statusLabel =
+                bet.status === 'proof_submitted'
+                  ? 'Vote Now'
+                  : bet.status === 'completed'
+                    ? 'Completed'
+                    : bet.status === 'voided'
+                      ? 'Voided'
+                      : 'Active'
+              const statusColor =
+                bet.status === 'proof_submitted'
+                  ? 'amber'
+                  : bet.status === 'completed'
+                    ? 'green'
+                    : bet.status === 'voided'
+                      ? 'coral'
+                      : 'green'
 
-            return (
-              <div
-                key={competition.id}
-                onClick={() => navigate(`/compete/${competition.id}`)}
-                className={`bg-bg-card border-l-4 rounded-xl p-5 cursor-pointer transition-opacity hover:opacity-95 ${
-                  status === 'ENDED' ? 'opacity-75 border-l-gold' : 'border-l-purple'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-text-muted">
-                      COMPETITION
-                    </span>
-                    <div
-                      className={`flex items-center gap-1 px-2 py-0.5 rounded-full ${
-                        status === 'LIVE'
-                          ? 'bg-accent-green/20'
-                          : status === 'OPEN'
-                            ? 'bg-gold/20'
-                            : 'bg-text-muted/20'
-                      }`}
-                    >
+              return (
+                <div
+                  key={bet.id}
+                  onClick={() => navigate(`/compete/${bet.id}`)}
+                  className={`bg-bg-card border-l-4 rounded-xl p-5 cursor-pointer transition-opacity hover:opacity-95 ${
+                    status === 'ENDED' ? 'opacity-75 border-l-accent-coral' : 'border-l-accent-green'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-text-muted">
+                        CHALLENGE
+                      </span>
                       <div
-                        className={`w-1.5 h-1.5 rounded-full ${
-                          status === 'LIVE' ? 'bg-accent-green pulse-live' : status === 'OPEN' ? 'bg-gold' : 'bg-text-muted'
-                        }`}
-                      />
-                      <span
-                        className={`text-[10px] font-bold uppercase ${
-                          status === 'LIVE' ? 'text-accent-green' : status === 'OPEN' ? 'text-gold' : 'text-text-muted'
+                        className={`flex items-center gap-1 px-2 py-0.5 rounded-full ${
+                          statusColor === 'amber'
+                            ? 'bg-amber-500/20'
+                            : statusColor === 'coral'
+                              ? 'bg-accent-coral/20'
+                              : 'bg-accent-green/20'
                         }`}
                       >
-                        {status}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {!competition.is_public && <Lock className="w-4 h-4 text-accent-coral" />}
-                    <Trophy className="w-5 h-5 text-gold" />
-                  </div>
-                </div>
-
-                <h3 className="text-xl font-black text-text-primary mb-4">{competition.title}</h3>
-
-                {top3.length > 0 && (
-                  <div className="bg-bg-elevated rounded-lg p-3 mb-4 space-y-2">
-                    {top3.map((entry, i) => {
-                      const isYou = entry.score.user_id === user?.id
-                      const rank = i + 1
-                      return (
                         <div
-                          key={entry.score.id}
-                          className={`flex items-center justify-between rounded-lg p-2 ${
-                            rank === 1 ? 'bg-gold/10' : isYou ? 'bg-purple/10 border border-purple/30' : ''
+                          className={`w-1.5 h-1.5 rounded-full ${
+                            statusColor === 'amber'
+                              ? 'bg-amber-400'
+                              : statusColor === 'coral'
+                                ? 'bg-accent-coral'
+                                : 'bg-accent-green'
+                          }`}
+                        />
+                        <span
+                          className={`text-[10px] font-bold uppercase ${
+                            statusColor === 'amber'
+                              ? 'text-amber-400'
+                              : statusColor === 'coral'
+                                ? 'text-accent-coral'
+                                : 'text-accent-green'
                           }`}
                         >
-                          <div className="flex items-center gap-3">
-                            <span
-                              className={`text-2xl font-black tabular-nums ${
-                                rank === 1 ? 'text-gold' : 'text-text-muted'
-                              }`}
-                            >
-                              {rank}
-                            </span>
-                            <span className="text-xl">{RANK_EMOJI[rank] ?? ''}</span>
-                            <span className="font-bold text-sm text-text-primary">
-                              {entry.profile?.display_name ?? 'Unknown'}
-                              {isYou ? ' (You)' : ''}
+                          {statusLabel}
+                        </span>
+                      </div>
+                    </div>
+                    <Swords className="w-4 h-4 text-text-muted" />
+                  </div>
+
+                  <h3 className="text-base font-black text-text-primary mb-3 leading-snug">{bet.title}</h3>
+
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm">🤝</span>
+                      <span className="text-xs font-bold text-accent-green">{riders.length} Rider{riders.length !== 1 ? 's' : ''}</span>
+                    </div>
+                    <span className="text-text-muted text-xs">vs</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm">💀</span>
+                      <span className="text-xs font-bold text-accent-coral">{doubters.length} Doubter{doubters.length !== 1 ? 's' : ''}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <span className="text-xs font-semibold px-3 py-1.5 bg-bg-elevated rounded-full">
+                      {formatStake(bet)}
+                    </span>
+                    <span className="text-xs font-semibold px-3 py-1.5 bg-bg-elevated rounded-full text-text-muted">
+                      {status === 'ENDED'
+                        ? `Ended ${formatDistanceToNow(new Date(bet.deadline), { addSuffix: true })}`
+                        : `Ends ${formatDistanceToNow(new Date(bet.deadline), { addSuffix: true })}`}
+                    </span>
+                  </div>
+                </div>
+              )
+            })}
+
+            {/* Score-based competitions */}
+            {competitions.map((competition) => {
+              const status = getStatus(competition)
+              const lb = leaderboards[competition.id] ?? []
+              const top3 = lb.slice(0, 3)
+              const participantCount = lb.length
+
+              return (
+                <div
+                  key={competition.id}
+                  onClick={() => navigate(`/compete/${competition.id}`)}
+                  className={`bg-bg-card border-l-4 rounded-xl p-5 cursor-pointer transition-opacity hover:opacity-95 ${
+                    status === 'ENDED' ? 'opacity-75 border-l-gold' : 'border-l-purple'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-text-muted">
+                        COMPETITION
+                      </span>
+                      <div
+                        className={`flex items-center gap-1 px-2 py-0.5 rounded-full ${
+                          status === 'LIVE'
+                            ? 'bg-accent-green/20'
+                            : status === 'OPEN'
+                              ? 'bg-gold/20'
+                              : 'bg-text-muted/20'
+                        }`}
+                      >
+                        <div
+                          className={`w-1.5 h-1.5 rounded-full ${
+                            status === 'LIVE' ? 'bg-accent-green pulse-live' : status === 'OPEN' ? 'bg-gold' : 'bg-text-muted'
+                          }`}
+                        />
+                        <span
+                          className={`text-[10px] font-bold uppercase ${
+                            status === 'LIVE' ? 'text-accent-green' : status === 'OPEN' ? 'text-gold' : 'text-text-muted'
+                          }`}
+                        >
+                          {status}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {!competition.is_public && <Lock className="w-4 h-4 text-accent-coral" />}
+                      <Trophy className="w-5 h-5 text-gold" />
+                    </div>
+                  </div>
+
+                  <h3 className="text-xl font-black text-text-primary mb-4">{competition.title}</h3>
+
+                  {top3.length > 0 && (
+                    <div className="bg-bg-elevated rounded-lg p-3 mb-4 space-y-2">
+                      {top3.map((entry, i) => {
+                        const isYou = entry.score.user_id === user?.id
+                        const rank = i + 1
+                        return (
+                          <div
+                            key={entry.score.id}
+                            className={`flex items-center justify-between rounded-lg p-2 ${
+                              rank === 1 ? 'bg-gold/10' : isYou ? 'bg-purple/10 border border-purple/30' : ''
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <span
+                                className={`text-2xl font-black tabular-nums ${
+                                  rank === 1 ? 'text-gold' : 'text-text-muted'
+                                }`}
+                              >
+                                {rank}
+                              </span>
+                              <span className="text-xl">{RANK_EMOJI[rank] ?? ''}</span>
+                              <span className="font-bold text-sm text-text-primary">
+                                {entry.profile?.display_name ?? 'Unknown'}
+                                {isYou ? ' (You)' : ''}
+                              </span>
+                            </div>
+                            <span className="text-xl font-black tabular-nums text-text-primary">
+                              {entry.score.score}
                             </span>
                           </div>
-                          <span className="text-xl font-black tabular-nums text-text-primary">
-                            {entry.score.score}
-                          </span>
-                        </div>
-                      )
-                    })}
+                        )
+                      })}
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    <span className="text-xs font-semibold px-3 py-1.5 bg-bg-elevated rounded-full">
+                      {participantCount} participant{participantCount !== 1 ? 's' : ''}
+                    </span>
+                    <span className="text-xs font-semibold px-3 py-1.5 bg-bg-elevated rounded-full">
+                      {formatTimeframe(competition)}
+                    </span>
+                    <span className="text-xs font-semibold px-3 py-1.5 bg-accent-coral/20 text-accent-coral rounded-full">
+                      {formatStake(competition)}
+                    </span>
                   </div>
-                )}
 
-                <div className="flex flex-wrap gap-2 mb-4">
-                  <span className="text-xs font-semibold px-3 py-1.5 bg-bg-elevated rounded-full">
-                    {participantCount} participant{participantCount !== 1 ? 's' : ''}
-                  </span>
-                  <span className="text-xs font-semibold px-3 py-1.5 bg-bg-elevated rounded-full">
-                    {formatTimeframe(competition)}
-                  </span>
-                  <span className="text-xs font-semibold px-3 py-1.5 bg-accent-coral/20 text-accent-coral rounded-full">
-                    {formatStake(competition)}
-                  </span>
+                  <button className="w-full text-center text-sm font-bold text-accent-green uppercase tracking-wide">
+                    VIEW LEADERBOARD →
+                  </button>
                 </div>
-
-                <button className="w-full text-center text-sm font-bold text-accent-green uppercase tracking-wide">
-                  VIEW LEADERBOARD →
-                </button>
-              </div>
-            )
-          })
+              )
+            })}
+          </>
         )}
       </div>
 
-      {competitions.length > 0 && (
-        <div className="px-6 mt-6">
-          <SportsbookButton onClick={() => navigate('/compete/create')}>
-            CREATE COMPETITION
+      {totalItems > 0 && (
+        <div className="px-6 mt-6 flex flex-col gap-3">
+          <SportsbookButton onClick={() => navigate('/bet/create')}>
+            CREATE CHALLENGE
           </SportsbookButton>
+          <button
+            onClick={() => navigate('/compete/create')}
+            className="w-full py-3 rounded-xl border border-border-subtle text-text-muted text-sm font-bold uppercase tracking-wide"
+          >
+            CREATE COMPETITION
+          </button>
         </div>
       )}
     </div>

@@ -92,6 +92,28 @@ export async function uploadAvatar(userId: string, file: File): Promise<string> 
   return publicUrl
 }
 
+/** Search profiles by username (case-insensitive partial match). Excludes the current user. */
+export async function searchProfiles(query: string): Promise<Profile[]> {
+  const trimmed = query.trim().toLowerCase()
+  if (!trimmed) return []
+
+  const { data: { user } } = await supabase.auth.getUser()
+
+  let q = supabase
+    .from('profiles')
+    .select('*')
+    .ilike('username', `%${trimmed}%`)
+    .limit(10)
+
+  if (user) {
+    q = q.neq('id', user.id)
+  }
+
+  const { data, error } = await q
+  if (error) throw error
+  return data ?? []
+}
+
 export async function checkUsernameAvailable(username: string): Promise<boolean> {
   const { data } = await supabase
     .from('profiles')

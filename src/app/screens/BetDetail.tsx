@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useMemo } from 'react'
-import { useParams, useNavigate } from 'react-router'
+import { useParams, useNavigate, useLocation } from 'react-router'
 import { ArrowLeft, Share2, Pencil, Check, X, MessageCircle, Repeat2 } from 'lucide-react'
 import { useBetStore, useChatStore } from '@/stores'
 import { useProofStore } from '@/stores'
@@ -42,6 +42,8 @@ interface BetDetailProps {
 export function BetDetail({ onBack }: BetDetailProps) {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
+  const basePath = location.pathname.startsWith('/compete/') ? '/compete' : '/bet'
   const user = useAuthStore((s) => s.user)
 
   const activeBet = useBetStore((s) => s.activeBet)
@@ -101,7 +103,7 @@ export function BetDetail({ onBack }: BetDetailProps) {
       id
     ) {
       // Small delay so user sees the resolution before navigating
-      const timer = setTimeout(() => navigate(`/bet/${id}/outcome`), 1500)
+      const timer = setTimeout(() => navigate(`${basePath}/${id}/outcome`), 1500)
       return () => clearTimeout(timer)
     }
     prevStatusRef.current = activeBet?.status
@@ -405,7 +407,7 @@ export function BetDetail({ onBack }: BetDetailProps) {
       {/* Submit Proof CTA */}
       {showSubmitProof && (
         <div className="px-6 mb-6">
-          <PrimaryButton onClick={() => navigate(`/bet/${id}/proof`)}>
+          <PrimaryButton onClick={() => navigate(`${basePath}/${id}/proof`)}>
             Submit Proof
           </PrimaryButton>
         </div>
@@ -678,7 +680,7 @@ export function BetDetail({ onBack }: BetDetailProps) {
             {/* Submit additional evidence (any participant) */}
             {mySide && activeBet.status === 'proof_submitted' && (
               <button
-                onClick={() => navigate(`/bet/${id}/proof`)}
+                onClick={() => navigate(`${basePath}/${id}/proof`)}
                 className="w-full text-center text-sm font-bold text-text-muted hover:text-accent-green transition-colors mt-3"
               >
                 + Submit additional evidence
@@ -691,11 +693,11 @@ export function BetDetail({ onBack }: BetDetailProps) {
       {/* Outcome link + Rematch (visible to everyone who can view the bet; only participants can complete rematch) */}
       {(activeBet.status === 'completed' || activeBet.status === 'voided') && (
         <div className="px-6 mb-6 space-y-3">
-          <PrimaryButton onClick={() => navigate(`/bet/${id}/outcome`)} className="w-full">
+          <PrimaryButton onClick={() => navigate(`${basePath}/${id}/outcome`)} className="w-full">
             View Outcome
           </PrimaryButton>
           <button
-            onClick={() => navigate(`/bet/${id}/rematch`)}
+            onClick={() => navigate(`${basePath}/${id}/rematch`)}
             className="w-full py-3 rounded-xl border border-accent-green text-accent-green font-bold text-sm"
           >
             Rematch — same people, higher stakes
@@ -750,7 +752,7 @@ export function BetDetail({ onBack }: BetDetailProps) {
               {/* Submit stake proof CTA for losers */}
               {canSubmitStakeProof && (
                 <button
-                  onClick={() => navigate(`/bet/${id}/shame-proof`)}
+                  onClick={() => navigate(`${basePath}/${id}/shame-proof`)}
                   className="mt-3 w-full py-3 rounded-xl bg-accent-coral text-white font-bold text-sm btn-pressed"
                 >
                   Submit Stake Proof
