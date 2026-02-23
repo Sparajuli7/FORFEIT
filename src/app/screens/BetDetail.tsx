@@ -9,8 +9,9 @@ import { useRealtime } from '@/lib/hooks/useRealtime'
 import { getProfilesByIds } from '@/lib/api/profiles'
 import { formatMoney } from '@/lib/utils/formatters'
 import { getShamePostByBetId } from '@/lib/api/shame'
+import { getOutcome } from '@/lib/api/outcomes'
 import { getPunishmentText } from '@/lib/api/punishments'
-import type { HallOfShameEntry } from '@/lib/database.types'
+import type { HallOfShameEntry, Outcome } from '@/lib/database.types'
 import { PrimaryButton } from '../components/PrimaryButton'
 import { ShareSheet } from '../components/ShareSheet'
 import { MediaGallery } from '../components/MediaGallery'
@@ -61,6 +62,7 @@ export function BetDetail({ onBack }: BetDetailProps) {
   const [editingProofId, setEditingProofId] = useState<string | null>(null)
   const [editCaption, setEditCaption] = useState('')
   const [shamePost, setShamePost] = useState<HallOfShameEntry | null>(null)
+  const [outcome, setOutcome] = useState<Outcome | null>(null)
   const [punishmentCardText, setPunishmentCardText] = useState<string | null>(null)
 
   // Always call useCountdown (Rules of Hooks). Use current time as fallback when no bet so countdown is expired.
@@ -112,10 +114,11 @@ export function BetDetail({ onBack }: BetDetailProps) {
     }
   }, [id, fetchBetDetail, fetchProofs])
 
-  // Fetch punishment proof (hall_of_shame) for completed bets
+  // Fetch outcome + punishment proof (hall_of_shame) for completed bets
   useEffect(() => {
     if (id && (activeBet?.status === 'completed' || activeBet?.status === 'voided')) {
       getShamePostByBetId(id).then(setShamePost).catch(() => {})
+      getOutcome(id).then(setOutcome).catch(() => {})
     }
   }, [id, activeBet?.status])
 
@@ -652,38 +655,63 @@ export function BetDetail({ onBack }: BetDetailProps) {
         </div>
       )}
 
-      {/* Punishment proof (from hall_of_shame) */}
-      {shamePost && (activeBet.status === 'completed' || activeBet.status === 'voided') && (() => {
+      {/* Stake */}
+      {(() => {
+        // Determine if current user is on the losing side
+        const isCompleted = activeBet.status === 'completed' || activeBet.status === 'voided'
+        const isLoser = isCompleted && outcome && user ? (() => {
+          if (outcome.result === 'claimant_succeeded') return doubters.some((d) => d.user_id === user.id)
+          if (outcome.result === 'claimant_failed') return riders.some((r) => r.user_id === user.id)
+          return false
+        })() : false
+        const canSubmitStakeProof = isLoser && !shamePost
+
+        // Build shame proof media
         const shameMedia: MediaItem[] = []
-        if (shamePost.front_url) shameMedia.push({ url: shamePost.front_url, type: 'image', label: 'Front' })
-        if (shamePost.back_url) shameMedia.push({ url: shamePost.back_url, type: 'image', label: 'Back' })
-        if (shamePost.screenshot_urls?.length) {
-          shamePost.screenshot_urls.forEach((url, i) => shameMedia.push({ url, type: 'image', label: `Photo ${i + 1}` }))
+        if (shamePost) {
+          if (shamePost.front_url) shameMedia.push({ url: shamePost.front_url, type: 'image', label: 'Front' })
+          if (shamePost.back_url) shameMedia.push({ url: shamePost.back_url, type: 'image', label: 'Back' })
+          if (shamePost.screenshot_urls?.length) {
+            shamePost.screenshot_urls.forEach((url, i) => shameMedia.push({ url, type: 'image', label: `Photo ${i + 1}` }))
+          }
+          if (shamePost.video_url) shameMedia.push({ url: shamePost.video_url, type: 'video', label: 'Video' })
+          if (shamePost.document_url) shameMedia.push({ url: shamePost.document_url, type: 'document', label: 'Document' })
         }
-        if (shamePost.video_url) shameMedia.push({ url: shamePost.video_url, type: 'video', label: 'Video' })
-        if (shamePost.document_url) shameMedia.push({ url: shamePost.document_url, type: 'document', label: 'Document' })
-        return (shameMedia.length > 0 || shamePost.caption) ? (
+        const hasShameMedia = shameMedia.length > 0 || !!shamePost?.caption
+
+        return (
           <div className="px-6 mb-6">
-            <div className="flex items-center gap-2 mb-3">
-              <h3 className="text-sm font-bold text-white uppercase tracking-wider">Punishment Proof</h3>
-              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-accent-coral/20 text-accent-coral border border-accent-coral/30">
-                🔥 Completed
-              </span>
-            </div>
             <div className="bg-bg-card rounded-2xl border border-border-subtle p-4">
-              <MediaGallery items={shameMedia} caption={shamePost.caption} />
+              <div className="flex items-center justify-between mb-1.5">
+                <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-text-muted">Stake</p>
+                {hasShameMedia && (
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-accent-coral/20 text-accent-coral border border-accent-coral/30">
+                    🔥 Paid up
+                  </span>
+                )}
+              </div>
+              <p className="text-white font-bold text-base">{formatStake(activeBet, punishmentCardText)}</p>
+
+              {/* Stake proof media (from hall_of_shame) */}
+              {hasShameMedia && (
+                <div className="mt-3">
+                  <MediaGallery items={shameMedia} caption={shamePost?.caption} />
+                </div>
+              )}
+
+              {/* Submit stake proof CTA for losers */}
+              {canSubmitStakeProof && (
+                <button
+                  onClick={() => navigate(`/bet/${id}/shame-proof`)}
+                  className="mt-3 w-full py-3 rounded-xl bg-accent-coral text-white font-bold text-sm btn-pressed"
+                >
+                  Submit Stake Proof
+                </button>
+              )}
             </div>
           </div>
-        ) : null
+        )
       })()}
-
-      {/* Stake */}
-      <div className="px-6 mb-6">
-        <div className="bg-bg-card rounded-2xl border border-border-subtle p-4">
-          <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-text-muted mb-1.5">Stake</p>
-          <p className="text-white font-bold text-base">{formatStake(activeBet, punishmentCardText)}</p>
-        </div>
-      </div>
 
       {error && <p className="px-6 text-destructive text-sm">{error}</p>}
 
