@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router'
-import { ArrowLeft, Share2, Pencil, Check, X, MessageCircle } from 'lucide-react'
+import { ArrowLeft, Share2, Pencil, Check, X, MessageCircle, Repeat2 } from 'lucide-react'
 import { useBetStore, useChatStore } from '@/stores'
 import { useProofStore } from '@/stores'
 import { useAuthStore } from '@/stores'
@@ -218,6 +218,13 @@ export function BetDetail({ onBack }: BetDetailProps) {
               )}
             </button>
           )}
+          <button
+            onClick={() => navigate('/bet/create', { state: { templateBetId: id } })}
+            className="w-10 h-10 flex items-center justify-center btn-pressed rounded-lg hover:bg-bg-elevated transition-colors"
+            aria-label="Remix"
+          >
+            <Repeat2 className="w-5 h-5 text-white" />
+          </button>
           <button
             onClick={handleShare}
             className="w-10 h-10 flex items-center justify-center btn-pressed rounded-lg hover:bg-bg-elevated transition-colors"
@@ -669,16 +676,6 @@ export function BetDetail({ onBack }: BetDetailProps) {
           </div>
         ) : null
       })()}
-
-      {/* Remix — use this challenge as a template (for all bets the user can see) */}
-      <div className="px-6 mb-6">
-        <button
-          onClick={() => navigate('/bet/create', { state: { templateBetId: id } })}
-          className="w-full py-3 rounded-xl border border-border-subtle text-text-muted hover:text-text-primary hover:border-accent-green/50 font-bold text-sm transition-colors"
-        >
-          Remix — use as template & pick who to invite
-        </button>
-      </div>
 
       {/* Stake */}
       <div className="px-6 mb-6">
