@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router'
 import { ArrowLeft, Share2, Pencil, Check, X, MessageCircle } from 'lucide-react'
 import { useBetStore, useChatStore } from '@/stores'
@@ -9,6 +9,7 @@ import { useRealtime } from '@/lib/hooks/useRealtime'
 import { getProfilesByIds } from '@/lib/api/profiles'
 import { formatMoney } from '@/lib/utils/formatters'
 import { getShamePostByBetId } from '@/lib/api/shame'
+import { getPunishmentText } from '@/lib/api/punishments'
 import type { HallOfShameEntry } from '@/lib/database.types'
 import { PrimaryButton } from '../components/PrimaryButton'
 import { ShareSheet } from '../components/ShareSheet'
@@ -27,10 +28,10 @@ import {
 
 const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop'
 
-function formatStake(bet: { stake_money: number | null; stake_custom_punishment: string | null; stake_punishment_id: string | null }) {
+function formatStake(bet: { stake_money: number | null; stake_custom_punishment: string | null; stake_punishment_id: string | null }, punishmentCardText?: string | null) {
   if (bet.stake_money) return formatMoney(bet.stake_money)
   if (bet.stake_custom_punishment) return bet.stake_custom_punishment
-  if (bet.stake_punishment_id) return '🔥 Punishment'
+  if (bet.stake_punishment_id) return punishmentCardText ? `🔥 ${punishmentCardText}` : '🔥 Punishment'
   return '—'
 }
 
@@ -61,6 +62,7 @@ export function BetDetail({ onBack }: BetDetailProps) {
   const [editingProofId, setEditingProofId] = useState<string | null>(null)
   const [editCaption, setEditCaption] = useState('')
   const [shamePost, setShamePost] = useState<HallOfShameEntry | null>(null)
+  const [punishmentCardText, setPunishmentCardText] = useState<string | null>(null)
 
   // Always call useCountdown (Rules of Hooks). Use current time as fallback when no bet so countdown is expired.
   const countdown = useCountdown(activeBet?.deadline ?? new Date().toISOString())
@@ -78,6 +80,7 @@ export function BetDetail({ onBack }: BetDetailProps) {
   const [votingProofId, setVotingProofId] = useState<string | null>(null)
   const [openingChat, setOpeningChat] = useState(false)
   const [proofShareUrl, setProofShareUrl] = useState<string | null>(null)
+  const [activeProofSlide, setActiveProofSlide] = useState(0)
   const prevStatusRef = useRef(activeBet?.status)
 
   // Auto-navigate to outcome when bet resolves (e.g. after a majority vote)
@@ -116,6 +119,13 @@ export function BetDetail({ onBack }: BetDetailProps) {
       getShamePostByBetId(id).then(setShamePost).catch(() => {})
     }
   }, [id, activeBet?.status])
+
+  // Resolve punishment card text when bet has a stake_punishment_id
+  useEffect(() => {
+    if (activeBet?.stake_punishment_id) {
+      getPunishmentText(activeBet.stake_punishment_id).then(setPunishmentCardText).catch(() => {})
+    }
+  }, [activeBet?.stake_punishment_id])
 
   useEffect(() => {
     const ids = new Set<string>()
@@ -281,7 +291,7 @@ export function BetDetail({ onBack }: BetDetailProps) {
             <AddToCalendar
               event={{
                 title: `FORFEIT: ${activeBet.title}`,
-                description: `DEADLINE: ${formatDeadline(new Date(activeBet.deadline))}\n\nBet: "${activeBet.title}"${claimant?.display_name ? `\nBy: ${claimant.display_name}` : ''}\nStake: ${formatStake(activeBet)}\n\n${getBetShareUrl(id!)}`,
+                description: `DEADLINE: ${formatDeadline(new Date(activeBet.deadline))}\n\nBet: "${activeBet.title}"${claimant?.display_name ? `\nBy: ${claimant.display_name}` : ''}\nStake: ${formatStake(activeBet, punishmentCardText)}\n\n${getBetShareUrl(id!)}`,
                 startDate: new Date(activeBet.deadline),
               } satisfies CalendarEvent}
             />
@@ -640,7 +650,7 @@ export function BetDetail({ onBack }: BetDetailProps) {
       <div className="px-6 mb-6">
         <div className="bg-bg-card rounded-2xl border border-border-subtle p-4 text-center">
           <span className="text-text-muted text-sm">Stake: </span>
-          <span className="text-white font-bold">{formatStake(activeBet)}</span>
+          <span className="text-white font-bold">{formatStake(activeBet, punishmentCardText)}</span>
         </div>
       </div>
 
@@ -662,7 +672,7 @@ export function BetDetail({ onBack }: BetDetailProps) {
                 personName: claimant?.display_name ?? 'Anonymous',
                 result: activeBet.status === 'completed' ? 'won' : 'proof',
               })}
-              subtitle={`Stake: ${formatStake(activeBet)}`}
+              subtitle={`Stake: ${formatStake(activeBet, punishmentCardText)}`}
             />
           )}
         </DialogContent>

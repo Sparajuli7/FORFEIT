@@ -51,6 +51,15 @@ export async function createPunishment(
   return card
 }
 
+export async function getPunishmentText(punishmentId: string): Promise<string | null> {
+  const { data } = await supabase
+    .from('punishment_cards')
+    .select('text')
+    .eq('id', punishmentId)
+    .single()
+  return data?.text ?? null
+}
+
 export interface PunishmentStats {
   timesAssigned: number
   timesCompleted: number

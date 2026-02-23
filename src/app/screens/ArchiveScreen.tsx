@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router'
 import { ChevronLeft, Star, Trophy, XCircle, MinusCircle } from 'lucide-react'
 import { useAuthStore, useGroupStore } from '@/stores'
 import { getMyBets } from '@/lib/api/bets'
+import { supabase } from '@/lib/supabase'
 import { BET_CATEGORIES } from '@/lib/utils/constants'
 import { formatMoney } from '@/lib/utils/formatters'
 import type { BetWithSides } from '@/stores/betStore'
@@ -78,6 +79,7 @@ export function ArchiveScreen() {
 
   const [favBets, setFavBets] = useState<Set<string>>(() => loadFavs(FAV_BETS_KEY))
   const [favGroups, setFavGroups] = useState<Set<string>>(() => loadFavs(FAV_GROUPS_KEY))
+  const [punishmentTexts, setPunishmentTexts] = useState<Map<string, string>>(new Map())
 
   useEffect(() => {
     if (!user?.id) {
@@ -90,6 +92,22 @@ export function ArchiveScreen() {
       .catch(() => setBets([]))
       .finally(() => setBetsLoading(false))
   }, [user?.id])
+
+  // Batch-fetch punishment card texts for bets that reference one
+  useEffect(() => {
+    const ids = [...new Set(bets.map((b) => b.stake_punishment_id).filter((id): id is string => !!id))]
+    if (ids.length === 0) return
+    supabase
+      .from('punishment_cards')
+      .select('id, text')
+      .in('id', ids)
+      .then(({ data }) => {
+        if (!data) return
+        const map = new Map<string, string>()
+        data.forEach((c: { id: string; text: string }) => map.set(c.id, c.text))
+        setPunishmentTexts(map)
+      })
+  }, [bets])
 
   useEffect(() => {
     setGroupsLoading(true)
@@ -218,7 +236,7 @@ export function ArchiveScreen() {
                             </p>
                             {bet.status === 'completed' && (bet.stake_custom_punishment || bet.stake_punishment_id) && (
                               <p className="text-[11px] text-accent-coral mt-0.5 truncate">
-                                🔥 {bet.stake_custom_punishment || 'Punishment'}
+                                🔥 {bet.stake_custom_punishment || (bet.stake_punishment_id && punishmentTexts.get(bet.stake_punishment_id)) || 'Punishment'}
                               </p>
                             )}
                           </div>
