@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useMemo } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router'
 import { ArrowLeft, Share2, Pencil, Check, X, MessageCircle } from 'lucide-react'
 import { useBetStore, useChatStore } from '@/stores'
@@ -20,7 +20,6 @@ import { AddToCalendar } from '../components/AddToCalendar'
 import type { CalendarEvent } from '@/lib/utils/calendar'
 import { formatDeadline } from '@/lib/utils/calendar'
 import { ProofCard } from '../components/ProofCard'
-import type { ProofCardFrame } from '../components/ProofCard'
 import {
   Dialog,
   DialogContent,
@@ -31,7 +30,7 @@ const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1535713875002-d1d0cf37
 function formatStake(bet: { stake_money: number | null; stake_custom_punishment: string | null; stake_punishment_id: string | null }, punishmentCardText?: string | null) {
   if (bet.stake_money) return formatMoney(bet.stake_money)
   if (bet.stake_custom_punishment) return bet.stake_custom_punishment
-  if (bet.stake_punishment_id) return punishmentCardText ? `🔥 ${punishmentCardText}` : '🔥 Punishment'
+  if (bet.stake_punishment_id) return punishmentCardText ?? 'Punishment'
   return '—'
 }
 
@@ -387,214 +386,249 @@ export function BetDetail({ onBack }: BetDetailProps) {
       )}
 
       {/* Proof with voting */}
-      {(activeBet.status === 'proof_submitted' || activeBet.status === 'completed' || activeBet.status === 'voided') && proofs.length > 0 && (
-        <div className="px-6 mb-6">
-          <div className="flex items-center gap-2 mb-4">
-            <h3 className="text-sm font-bold text-white uppercase tracking-wider">Proof Submitted</h3>
-            {activeBet.status === 'proof_submitted' && (
-              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                Awaiting Votes
-              </span>
-            )}
-            {activeBet.status === 'completed' && (
-              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-accent-green/20 text-accent-green border border-accent-green/30">
-                Resolved
-              </span>
-            )}
-          </div>
+      {(activeBet.status === 'proof_submitted' || activeBet.status === 'completed' || activeBet.status === 'voided') && proofs.length > 0 && (() => {
+        // Flatten all proof media into one slideable array
+        const allSlides: { item: MediaItem; proofId: string; caption?: string | null; proofOwnerId: string }[] = []
+        proofs.forEach((proof) => {
+          const items: MediaItem[] = []
+          if (proof.front_camera_url) items.push({ url: proof.front_camera_url, type: 'image', label: 'Front' })
+          if (proof.back_camera_url) items.push({ url: proof.back_camera_url, type: 'image', label: 'Back' })
+          if (proof.screenshot_urls?.length) {
+            proof.screenshot_urls.forEach((url, i) => items.push({ url, type: 'image', label: `Screenshot ${i + 1}` }))
+          }
+          if (proof.video_url) items.push({ url: proof.video_url, type: 'video', label: 'Video' })
+          if (proof.document_url) items.push({ url: proof.document_url, type: 'document', label: 'Document' })
+          items.forEach((item) => allSlides.push({ item, proofId: proof.id, caption: proof.caption, proofOwnerId: proof.submitted_by }))
+          // Text-only proof (no media) — add a placeholder slide
+          if (items.length === 0 && proof.caption) {
+            allSlides.push({ item: { url: '', type: 'document', label: 'Text' }, proofId: proof.id, caption: proof.caption, proofOwnerId: proof.submitted_by })
+          }
+        })
 
-          {proofs.map((proof) => {
-            const counts = getVoteCounts(proof.id)
-            const myVote = votes.find((v) => v.proof_id === proof.id && v.user_id === user?.id)
-            const isProofOwner = user?.id === proof.submitted_by
-            const canVote = !myVote && !isProofOwner && activeBet.status === 'proof_submitted'
-            const totalParticipants = activeBetSides.length
-            const majority = Math.floor(totalParticipants / 2) + 1
+        const clampedSlide = Math.min(activeProofSlide, allSlides.length - 1)
+        const currentSlide = allSlides[clampedSlide]
+        const currentProof = currentSlide ? proofs.find((p) => p.id === currentSlide.proofId) : null
+        const currentCounts = currentProof ? getVoteCounts(currentProof.id) : null
+        const currentMyVote = currentProof ? votes.find((v) => v.proof_id === currentProof.id && v.user_id === user?.id) : null
+        const currentIsOwner = currentProof ? user?.id === currentProof.submitted_by : false
+        const currentCanVote = currentProof && !currentMyVote && !currentIsOwner && activeBet.status === 'proof_submitted'
+        const totalParticipants = activeBetSides.length
+        const majority = Math.floor(totalParticipants / 2) + 1
+        const activeImageUrl = currentSlide?.item.type === 'image' ? currentSlide.item.url : null
 
-            // Build media items for the gallery
-            const mediaItems: MediaItem[] = []
-            if (proof.front_camera_url) mediaItems.push({ url: proof.front_camera_url, type: 'image', label: 'Front' })
-            if (proof.back_camera_url) mediaItems.push({ url: proof.back_camera_url, type: 'image', label: 'Back' })
-            if (proof.screenshot_urls?.length) {
-              proof.screenshot_urls.forEach((url, i) => mediaItems.push({ url, type: 'image', label: `Screenshot ${i + 1}` }))
-            }
-            if (proof.video_url) mediaItems.push({ url: proof.video_url, type: 'video', label: 'Video' })
-            if (proof.document_url) mediaItems.push({ url: proof.document_url, type: 'document', label: 'Document' })
+        return (
+          <div className="px-6 mb-6">
+            <div className="flex items-center gap-2 mb-4">
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider">Proof Submitted</h3>
+              {activeBet.status === 'proof_submitted' && (
+                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                  Awaiting Votes
+                </span>
+              )}
+              {activeBet.status === 'completed' && (
+                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-accent-green/20 text-accent-green border border-accent-green/30">
+                  Resolved
+                </span>
+              )}
+            </div>
 
-            const firstImageUrl = mediaItems.find((m) => m.type === 'image')?.url ?? null
-            const proofFrame: ProofCardFrame =
-              activeBet.status === 'completed' ? 'winner' : 'default'
+            <div className="bg-bg-card rounded-2xl border border-border-subtle p-4">
+              {/* Swipeable carousel */}
+              {allSlides.length > 0 && (
+                <div
+                  className="flex gap-3 overflow-x-auto no-scrollbar snap-x snap-mandatory -mx-1 px-1"
+                  onScroll={(e) => {
+                    const el = e.currentTarget
+                    const slideWidth = el.firstElementChild?.clientWidth ?? 1
+                    const idx = Math.round(el.scrollLeft / (slideWidth + 12))
+                    if (idx !== activeProofSlide) setActiveProofSlide(idx)
+                  }}
+                >
+                  {allSlides.map((slide, i) => (
+                    <div key={i} className="snap-center shrink-0 w-full">
+                      {slide.item.type === 'image' ? (
+                        <div className="aspect-[3/4] rounded-xl overflow-hidden bg-bg-elevated">
+                          <img src={slide.item.url} alt={slide.item.label ?? 'Proof'} className="w-full h-full object-cover" />
+                        </div>
+                      ) : slide.item.type === 'video' ? (
+                        <div className="rounded-xl overflow-hidden bg-bg-elevated">
+                          <video src={slide.item.url} controls playsInline preload="metadata" className="w-full aspect-video object-cover" />
+                        </div>
+                      ) : slide.item.url ? (
+                        <a href={slide.item.url} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-xl bg-bg-elevated border border-border-subtle p-6 aspect-[3/4] justify-center">
+                          <span className="text-accent-green font-bold text-sm">{slide.item.label ?? 'View document'}</span>
+                        </a>
+                      ) : (
+                        <div className="bg-bg-elevated rounded-xl p-6 aspect-[3/4] flex items-center justify-center">
+                          <p className="text-sm text-text-primary text-center">{slide.caption}</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
 
-            return (
-              <div key={proof.id} className="bg-bg-card rounded-2xl border border-border-subtle p-4 mb-4">
-                {/* Proof media */}
-                <MediaGallery
-                  items={mediaItems}
-                  caption={editingProofId === proof.id ? undefined : proof.caption}
-                  shareText={getProofShareText({ betTitle: activeBet.title, personName: claimant?.display_name ?? 'Anonymous', result: activeBet.status === 'completed' ? 'won' : 'proof' })}
-                  shareUrl={getBetShareUrl(id)}
-                />
-
-                {/* Share proof as framed card */}
-                {firstImageUrl && (
-                  <button
-                    onClick={() => setProofShareUrl(firstImageUrl)}
-                    className="flex items-center gap-1.5 mt-2 text-xs font-semibold text-accent-green hover:text-accent-green/80 transition-colors"
-                  >
-                    <Share2 className="w-3 h-3" />
-                    Share proof
-                  </button>
-                )}
-
-                {/* Text-only proof (no media) */}
-                {mediaItems.length === 0 && proof.caption && editingProofId !== proof.id && (
-                  <div className="bg-bg-elevated rounded-xl p-4 border border-border-subtle">
-                    <p className="text-sm text-text-primary">{proof.caption}</p>
-                  </div>
-                )}
-
-                {/* Inline caption edit */}
-                {editingProofId === proof.id ? (
-                  <div className="flex items-center gap-2 mt-2">
-                    <input
-                      type="text"
-                      value={editCaption}
-                      onChange={(e) => setEditCaption(e.target.value)}
-                      className="flex-1 h-9 rounded-lg bg-bg-elevated border border-border-subtle px-3 text-sm text-text-primary"
-                      autoFocus
+              {/* Dot indicators */}
+              {allSlides.length > 1 && (
+                <div className="flex justify-center gap-1.5 mt-3">
+                  {allSlides.map((_, i) => (
+                    <div
+                      key={i}
+                      className={`w-1.5 h-1.5 rounded-full transition-colors ${i === clampedSlide ? 'bg-white' : 'bg-white/30'}`}
                     />
-                    <button
-                      onClick={async () => {
-                        await updateCaption(proof.id, editCaption)
-                        setEditingProofId(null)
-                      }}
-                      className="w-8 h-8 rounded-lg bg-accent-green flex items-center justify-center"
-                    >
-                      <Check className="w-4 h-4 text-white" />
-                    </button>
-                    <button
-                      onClick={() => setEditingProofId(null)}
-                      className="w-8 h-8 rounded-lg bg-bg-elevated flex items-center justify-center"
-                    >
-                      <X className="w-4 h-4 text-text-muted" />
-                    </button>
-                  </div>
-                ) : isProofOwner && activeBet.status === 'proof_submitted' ? (
-                  <button
-                    onClick={() => { setEditingProofId(proof.id); setEditCaption(proof.caption ?? '') }}
-                    className="flex items-center gap-1 mt-2 text-xs text-text-muted hover:text-accent-green transition-colors"
-                  >
-                    <Pencil className="w-3 h-3" />
-                    {proof.caption ? 'Edit caption' : 'Add caption'}
-                  </button>
-                ) : null}
+                  ))}
+                </div>
+              )}
 
-                {/* Vote progress bar */}
+              {/* Caption for current slide */}
+              {currentSlide?.caption && currentSlide.item.url && (
+                <p className="text-sm text-text-muted mt-2">{currentSlide.caption}</p>
+              )}
+
+              {/* Share proof button — uses current visible slide */}
+              {activeImageUrl && (
+                <button
+                  onClick={() => setProofShareUrl(activeImageUrl)}
+                  className="flex items-center gap-1.5 mt-2 text-xs font-semibold text-accent-green hover:text-accent-green/80 transition-colors"
+                >
+                  <Share2 className="w-3 h-3" />
+                  Share proof
+                </button>
+              )}
+
+              {/* Caption edit for proof owner */}
+              {currentProof && (editingProofId === currentProof.id ? (
+                <div className="flex items-center gap-2 mt-2">
+                  <input
+                    type="text"
+                    value={editCaption}
+                    onChange={(e) => setEditCaption(e.target.value)}
+                    className="flex-1 h-9 rounded-lg bg-bg-elevated border border-border-subtle px-3 text-sm text-text-primary"
+                    autoFocus
+                  />
+                  <button
+                    onClick={async () => {
+                      await updateCaption(currentProof.id, editCaption)
+                      setEditingProofId(null)
+                    }}
+                    className="w-8 h-8 rounded-lg bg-accent-green flex items-center justify-center"
+                  >
+                    <Check className="w-4 h-4 text-white" />
+                  </button>
+                  <button
+                    onClick={() => setEditingProofId(null)}
+                    className="w-8 h-8 rounded-lg bg-bg-elevated flex items-center justify-center"
+                  >
+                    <X className="w-4 h-4 text-text-muted" />
+                  </button>
+                </div>
+              ) : currentIsOwner && activeBet.status === 'proof_submitted' ? (
+                <button
+                  onClick={() => { setEditingProofId(currentProof.id); setEditCaption(currentProof.caption ?? '') }}
+                  className="flex items-center gap-1 mt-2 text-xs text-text-muted hover:text-accent-green transition-colors"
+                >
+                  <Pencil className="w-3 h-3" />
+                  {currentProof.caption ? 'Edit caption' : 'Add caption'}
+                </button>
+              ) : null)}
+
+              {/* Vote progress bar */}
+              {currentCounts && (
                 <div className="mt-4">
                   <div className="flex items-center justify-between text-xs mb-2">
                     <span className="text-accent-green font-bold">
-                      {counts.confirm} Confirm{counts.confirm !== 1 ? 's' : ''}
+                      {currentCounts.confirm} Confirm{currentCounts.confirm !== 1 ? 's' : ''}
                     </span>
                     <span className="text-text-muted">
-                      {counts.total} / {totalParticipants} voted
+                      {currentCounts.total} / {totalParticipants} voted
                       {totalParticipants >= 2 && <> &middot; {majority} needed</>}
                     </span>
                     <span className="text-accent-coral font-bold">
-                      {counts.dispute} Dispute{counts.dispute !== 1 ? 's' : ''}
+                      {currentCounts.dispute} Dispute{currentCounts.dispute !== 1 ? 's' : ''}
                     </span>
                   </div>
                   <div className="h-2 bg-bg-elevated rounded-full overflow-hidden flex">
-                    {counts.total > 0 ? (
+                    {currentCounts.total > 0 ? (
                       <>
-                        <div
-                          className="h-full bg-accent-green transition-all duration-300"
-                          style={{ width: `${counts.confirmPct}%` }}
-                        />
-                        <div
-                          className="h-full bg-accent-coral transition-all duration-300"
-                          style={{ width: `${100 - counts.confirmPct}%` }}
-                        />
+                        <div className="h-full bg-accent-green transition-all duration-300" style={{ width: `${currentCounts.confirmPct}%` }} />
+                        <div className="h-full bg-accent-coral transition-all duration-300" style={{ width: `${100 - currentCounts.confirmPct}%` }} />
                       </>
                     ) : (
                       <div className="h-full w-full bg-bg-elevated" />
                     )}
                   </div>
                 </div>
+              )}
 
-                {/* Vote buttons */}
-                {canVote && (
-                  <div className="mt-4">
-                    <p className="text-xs text-text-muted text-center mb-3">Did they do it? Cast your vote.</p>
-                    <div className="grid grid-cols-2 gap-3">
-                      <button
-                        disabled={votingProofId === proof.id}
-                        onClick={async () => {
-                          setVotingProofId(proof.id)
-                          await voteOnProof(proof.id, 'confirm')
-                          if (id) {
-                            await Promise.all([fetchBetDetail(id), fetchProofs(id)])
-                          }
-                          setVotingProofId(null)
-                        }}
-                        className="py-3 rounded-2xl bg-accent-green text-bg-primary font-extrabold text-sm flex items-center justify-center gap-2 btn-pressed disabled:opacity-50"
-                      >
-                        {votingProofId === proof.id ? (
-                          <div className="w-4 h-4 border-2 border-bg-primary border-t-transparent rounded-full animate-spin" />
-                        ) : (
-                          <>🤝 Confirm</>
-                        )}
-                      </button>
-                      <button
-                        disabled={votingProofId === proof.id}
-                        onClick={async () => {
-                          setVotingProofId(proof.id)
-                          await voteOnProof(proof.id, 'dispute')
-                          if (id) {
-                            await Promise.all([fetchBetDetail(id), fetchProofs(id)])
-                          }
-                          setVotingProofId(null)
-                        }}
-                        className="py-3 rounded-2xl bg-accent-coral text-white font-extrabold text-sm flex items-center justify-center gap-2 btn-pressed disabled:opacity-50"
-                      >
-                        {votingProofId === proof.id ? (
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        ) : (
-                          <>💀 Dispute</>
-                        )}
-                      </button>
-                    </div>
+              {/* Vote buttons */}
+              {currentCanVote && currentProof && (
+                <div className="mt-4">
+                  <p className="text-xs text-text-muted text-center mb-3">Did they do it? Cast your vote.</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      disabled={votingProofId === currentProof.id}
+                      onClick={async () => {
+                        setVotingProofId(currentProof.id)
+                        await voteOnProof(currentProof.id, 'confirm')
+                        if (id) await Promise.all([fetchBetDetail(id), fetchProofs(id)])
+                        setVotingProofId(null)
+                      }}
+                      className="py-3 rounded-2xl bg-accent-green text-bg-primary font-extrabold text-sm flex items-center justify-center gap-2 btn-pressed disabled:opacity-50"
+                    >
+                      {votingProofId === currentProof.id ? (
+                        <div className="w-4 h-4 border-2 border-bg-primary border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <>🤝 Confirm</>
+                      )}
+                    </button>
+                    <button
+                      disabled={votingProofId === currentProof.id}
+                      onClick={async () => {
+                        setVotingProofId(currentProof.id)
+                        await voteOnProof(currentProof.id, 'dispute')
+                        if (id) await Promise.all([fetchBetDetail(id), fetchProofs(id)])
+                        setVotingProofId(null)
+                      }}
+                      className="py-3 rounded-2xl bg-accent-coral text-white font-extrabold text-sm flex items-center justify-center gap-2 btn-pressed disabled:opacity-50"
+                    >
+                      {votingProofId === currentProof.id ? (
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <>💀 Dispute</>
+                      )}
+                    </button>
                   </div>
-                )}
+                </div>
+              )}
 
-                {/* Already voted indicator */}
-                {myVote && (
-                  <div className="mt-3 flex items-center justify-center gap-2 py-2 rounded-xl bg-bg-elevated">
-                    <span className="text-sm">{myVote.vote === 'confirm' ? '🤝' : '💀'}</span>
-                    <span className="text-xs font-bold text-text-muted">
-                      You voted {myVote.vote === 'confirm' ? 'Confirm' : 'Dispute'}
-                    </span>
-                  </div>
-                )}
+              {/* Already voted indicator */}
+              {currentMyVote && (
+                <div className="mt-3 flex items-center justify-center gap-2 py-2 rounded-xl bg-bg-elevated">
+                  <span className="text-sm">{currentMyVote.vote === 'confirm' ? '🤝' : '💀'}</span>
+                  <span className="text-xs font-bold text-text-muted">
+                    You voted {currentMyVote.vote === 'confirm' ? 'Confirm' : 'Dispute'}
+                  </span>
+                </div>
+              )}
 
-                {/* Proof owner can't vote message */}
-                {isProofOwner && activeBet.status === 'proof_submitted' && (
-                  <p className="mt-3 text-xs text-text-muted text-center">Waiting for others to vote on your proof</p>
-                )}
-              </div>
-            )
-          })}
+              {/* Proof owner waiting message */}
+              {currentIsOwner && activeBet.status === 'proof_submitted' && (
+                <p className="mt-3 text-xs text-text-muted text-center">Waiting for others to vote on your proof</p>
+              )}
+            </div>
 
-          {/* Resubmit proof — claimant only, while still in proof_submitted */}
-          {isClaimant && activeBet.status === 'proof_submitted' && (
-            <button
-              onClick={() => navigate(`/bet/${id}/proof`)}
-              className="w-full text-center text-sm font-bold text-text-muted hover:text-accent-green transition-colors mt-2"
-            >
-              + Submit additional proof
-            </button>
-          )}
-        </div>
-      )}
+            {/* Resubmit proof */}
+            {isClaimant && activeBet.status === 'proof_submitted' && (
+              <button
+                onClick={() => navigate(`/bet/${id}/proof`)}
+                className="w-full text-center text-sm font-bold text-text-muted hover:text-accent-green transition-colors mt-3"
+              >
+                + Submit additional proof
+              </button>
+            )}
+          </div>
+        )
+      })()}
 
       {/* Outcome link + Rematch (visible to everyone who can view the bet; only participants can complete rematch) */}
       {(activeBet.status === 'completed' || activeBet.status === 'voided') && (
@@ -648,9 +682,9 @@ export function BetDetail({ onBack }: BetDetailProps) {
 
       {/* Stake */}
       <div className="px-6 mb-6">
-        <div className="bg-bg-card rounded-2xl border border-border-subtle p-4 text-center">
-          <span className="text-text-muted text-sm">Stake: </span>
-          <span className="text-white font-bold">{formatStake(activeBet, punishmentCardText)}</span>
+        <div className="bg-bg-card rounded-2xl border border-border-subtle p-4">
+          <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-text-muted mb-1.5">Stake</p>
+          <p className="text-white font-bold text-base">{formatStake(activeBet, punishmentCardText)}</p>
         </div>
       </div>
 
