@@ -168,43 +168,25 @@ export function JournalScreen() {
           </button>
         </div>
 
-        {/* Horizontal scroll of custom journal cards */}
-        <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
-          {journals.length === 0 ? (
-            /* placeholder card nudging user to create */
-            <button
-              onClick={() => setShowCreate(true)}
-              className="shrink-0 w-28 h-24 rounded-2xl border-2 border-dashed border-border-subtle flex flex-col items-center justify-center gap-1.5 text-text-muted hover:bg-bg-elevated transition-colors"
-            >
-              <Plus className="w-5 h-5" />
-              <span className="text-xs font-bold">New journal</span>
-            </button>
-          ) : (
-            <>
-              {journals.map((col) => (
-                <button
-                  key={col.id}
-                  onClick={() => navigate(`/journal/${col.id}`)}
-                  className="shrink-0 w-28 h-24 rounded-2xl bg-bg-card border border-border-subtle flex flex-col items-start justify-between p-3 hover:bg-bg-elevated transition-colors active:scale-95"
-                >
-                  <span className="text-2xl">{col.emoji}</span>
-                  <div className="w-full">
-                    <p className="text-xs font-bold text-text-primary truncate">{col.name}</p>
-                    <p className="text-[10px] text-text-muted">{col.bet_ids.length} bet{col.bet_ids.length !== 1 ? 's' : ''}</p>
-                  </div>
-                </button>
-              ))}
-              {/* Add-more card */}
-              <button
-                onClick={() => setShowCreate(true)}
-                className="shrink-0 w-24 h-24 rounded-2xl border-2 border-dashed border-border-subtle flex flex-col items-center justify-center gap-1 text-text-muted hover:bg-bg-elevated transition-colors"
-              >
-                <Plus className="w-5 h-5" />
-                <span className="text-[10px] font-bold">New</span>
-              </button>
-            </>
-          )}
-        </div>
+        {journals.length === 0 ? (
+          <button
+            onClick={() => setShowCreate(true)}
+            className="w-full py-6 rounded-2xl border-2 border-dashed border-border-subtle flex flex-col items-center justify-center gap-1.5 text-text-muted hover:bg-bg-elevated transition-colors"
+          >
+            <Plus className="w-5 h-5" />
+            <span className="text-xs font-bold">Create your first journal</span>
+          </button>
+        ) : (
+          <CircleGrid
+            items={journals.map((col) => ({
+              id: col.id,
+              icon: col.emoji,
+              label: col.name,
+              sublabel: `${col.bet_ids.length} bet${col.bet_ids.length !== 1 ? 's' : ''}`,
+            }))}
+            onItemClick={(id) => navigate(`/journal/${id}`)}
+          />
+        )}
       </div>
 
       {/* ══════════════════════════════════════
@@ -224,9 +206,12 @@ export function JournalScreen() {
         </div>
 
         {groupsLoading && groups.length === 0 ? (
-          <div className="space-y-2">
-            {[...Array(2)].map((_, i) => (
-              <div key={i} className="h-14 rounded-xl bg-bg-card border border-border-subtle animate-pulse" />
+          <div className="grid grid-cols-3 gap-y-5 gap-x-3">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="flex flex-col items-center gap-1.5">
+                <div className="w-[72px] h-[72px] rounded-full bg-bg-card border border-border-subtle animate-pulse" />
+                <div className="w-12 h-3 rounded bg-bg-card animate-pulse" />
+              </div>
             ))}
           </div>
         ) : groups.length === 0 ? (
@@ -244,28 +229,14 @@ export function JournalScreen() {
             </button>
           </div>
         ) : (
-          <div className="space-y-2">
-            {groups.map((g) => (
-              <button
-                key={g.id}
-                onClick={() => navigate(`/journal/group/${g.id}`)}
-                className="w-full bg-bg-card rounded-xl border border-border-subtle px-4 py-3 flex items-center gap-3 text-left hover:bg-bg-elevated transition-colors active:scale-[0.99]"
-              >
-                <span className="text-2xl">{g.avatar_emoji}</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-text-primary truncate">{g.name}</p>
-                  <p className="text-[11px] text-text-muted">Group journal — all bets</p>
-                </div>
-                <ChevronRight className="w-4 h-4 text-text-muted shrink-0" />
-              </button>
-            ))}
-            <button
-              onClick={() => navigate('/group/create')}
-              className="w-full py-2.5 rounded-xl border border-dashed border-border-subtle text-text-muted text-xs font-bold hover:bg-bg-elevated transition-colors"
-            >
-              + Create a new group
-            </button>
-          </div>
+          <CircleGrid
+            items={groups.map((g) => ({
+              id: g.id,
+              icon: g.avatar_emoji,
+              label: g.name,
+            }))}
+            onItemClick={(id) => navigate(`/journal/group/${id}`)}
+          />
         )}
       </div>
 
