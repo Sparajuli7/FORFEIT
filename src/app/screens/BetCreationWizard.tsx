@@ -107,16 +107,26 @@ export function BetCreationWizard() {
 
   // Load from template bet (Remix feature)
   const templateBetId = (location.state as { templateBetId?: string } | null)?.templateBetId
+  const [templateBet, setTemplateBet] = useState<Bet | null>(null)
+  // Fetch template bet once
   useEffect(() => {
-    if (!templateBetId || templateAppliedRef.current) return
+    if (!templateBetId || templateBet) return
+    getBetDetail(templateBetId).then(setTemplateBet).catch(() => {})
+  }, [templateBetId, templateBet])
+  // Apply template once bet is fetched and groups have loaded
+  useEffect(() => {
+    if (!templateBet || templateAppliedRef.current || groups.length === 0) return
     templateAppliedRef.current = true
-    getBetDetail(templateBetId)
-      .then((bet) => {
-        const group = groups.find((g) => g.id === bet.group_id) ?? null
-        loadWizardFromTemplate(bet, group)
-      })
-      .catch(() => {})
-  }, [templateBetId, groups, loadWizardFromTemplate])
+    const group = groups.find((g) => g.id === templateBet.group_id) ?? null
+    // Compute a fresh deadline: same duration as original, starting from now
+    const created = new Date(templateBet.created_at).getTime()
+    const deadlineMs = new Date(templateBet.deadline).getTime()
+    const durationMs = Math.max(deadlineMs - created, 24 * 60 * 60 * 1000) // at least 24h
+    const newDeadline = new Date(Date.now() + durationMs)
+    setSelectedDate(newDeadline)
+    setSelectedTime(`${String(newDeadline.getHours()).padStart(2, '0')}:${String(newDeadline.getMinutes()).padStart(2, '0')}`)
+    loadWizardFromTemplate({ ...templateBet, deadline: newDeadline.toISOString() }, group)
+  }, [templateBet, groups, loadWizardFromTemplate])
 
   useEffect(() => {
     getApprovedPunishments().then(setPunishments)

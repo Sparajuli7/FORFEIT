@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router'
-import { Plus, ChevronRight, BookOpen, Users } from 'lucide-react'
+import { Plus, BookOpen, Users } from 'lucide-react'
 import { useAuthStore, useGroupStore } from '@/stores'
 import { getMyBets } from '@/lib/api/bets'
 import { BET_CATEGORIES } from '@/lib/utils/constants'
@@ -10,6 +10,7 @@ import {
   createJournal,
   type JournalCollection,
 } from '@/lib/utils/journalStorage'
+import { CircleGrid } from '../components/CircleGrid'
 import type { BetWithSides } from '@/stores/betStore'
 
 // ---------------------------------------------------------------------------
