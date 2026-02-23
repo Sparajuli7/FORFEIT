@@ -22,6 +22,8 @@ interface CircleGridProps {
   columns?: 3 | 4
   /** Size of each circle: 'md' = 72px, 'lg' = 80px (default 'md') */
   size?: 'md' | 'lg'
+  /** Max lines for the label (default 1). Use 2 for longer text like bet titles. */
+  labelLines?: 1 | 2
 }
 
 export function CircleGrid({
@@ -29,10 +31,12 @@ export function CircleGrid({
   onItemClick,
   columns = 3,
   size = 'md',
+  labelLines = 1,
 }: CircleGridProps) {
   const gridCols = columns === 4 ? 'grid-cols-4' : 'grid-cols-3'
   const circleSize = size === 'lg' ? 'w-20 h-20' : 'w-[72px] h-[72px]'
   const iconSize = size === 'lg' ? 'text-3xl' : 'text-2xl'
+  const clampClass = labelLines === 2 ? 'line-clamp-2' : 'line-clamp-1'
 
   return (
     <div className={`grid ${gridCols} gap-y-5 gap-x-3`}>
@@ -47,7 +51,7 @@ export function CircleGrid({
           >
             <span className={iconSize}>{item.icon}</span>
           </div>
-          <span className="text-xs font-semibold text-text-primary text-center leading-tight line-clamp-1 max-w-full px-1">
+          <span className={`text-[11px] font-semibold text-text-primary text-center leading-tight ${clampClass} max-w-full px-0.5`}>
             {item.label}
           </span>
           {item.sublabel && (

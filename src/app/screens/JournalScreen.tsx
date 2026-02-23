@@ -4,7 +4,6 @@ import { Plus, BookOpen, Users } from 'lucide-react'
 import { useAuthStore, useGroupStore } from '@/stores'
 import { getMyBets } from '@/lib/api/bets'
 import { BET_CATEGORIES } from '@/lib/utils/constants'
-import { formatMoney } from '@/lib/utils/formatters'
 import {
   loadJournals,
   createJournal,
@@ -90,22 +89,6 @@ function CreateModal({
       </div>
     </div>
   )
-}
-
-// ---------------------------------------------------------------------------
-// Shared status pill
-// ---------------------------------------------------------------------------
-
-function StatusPill({ status }: { status: string }) {
-  if (status === 'completed')
-    return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-accent-green/20 text-accent-green whitespace-nowrap">Done</span>
-  if (status === 'voided')
-    return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-bg-elevated text-text-muted whitespace-nowrap">Void</span>
-  if (status === 'active')
-    return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-accent-green/10 text-accent-green border border-accent-green/30 whitespace-nowrap">Live</span>
-  if (status === 'proof_submitted')
-    return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-yellow-500/20 text-yellow-400 whitespace-nowrap">Proof</span>
-  return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-bg-elevated text-text-muted whitespace-nowrap capitalize">{status.replace(/_/g, ' ')}</span>
 }
 
 // ---------------------------------------------------------------------------
@@ -252,9 +235,12 @@ export function JournalScreen() {
         </div>
 
         {betsLoading ? (
-          <div className="space-y-2">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-14 rounded-xl bg-bg-card border border-border-subtle animate-pulse" />
+          <div className="grid grid-cols-3 gap-y-5 gap-x-3">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="flex flex-col items-center gap-1.5">
+                <div className="w-[72px] h-[72px] rounded-full bg-bg-card border border-border-subtle animate-pulse" />
+                <div className="w-14 h-3 rounded bg-bg-card animate-pulse" />
+              </div>
             ))}
           </div>
         ) : personalBets.length === 0 ? (
@@ -262,28 +248,19 @@ export function JournalScreen() {
             <p className="text-text-muted text-sm">No bets yet — start one from Home.</p>
           </div>
         ) : (
-          <div className="space-y-2">
-            {personalBets.map((bet) => {
+          <CircleGrid
+            items={personalBets.map((bet) => {
               const category = BET_CATEGORIES[bet.category]
-              return (
-                <button
-                  key={bet.id}
-                  onClick={() => navigate(`/bet/${bet.id}`)}
-                  className="w-full bg-bg-card rounded-xl border border-border-subtle px-3 py-3 flex items-center gap-3 text-left hover:bg-bg-elevated transition-colors"
-                >
-                  <span className="text-xl shrink-0">{category?.emoji ?? '🎯'}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-text-primary truncate">{bet.title}</p>
-                    <p className="text-[11px] text-text-muted mt-0.5">
-                      {new Date(bet.created_at).toLocaleDateString()}
-                      {bet.stake_money ? ` · ${formatMoney(bet.stake_money)}` : ''}
-                    </p>
-                  </div>
-                  <StatusPill status={bet.status} />
-                </button>
-              )
+              return {
+                id: bet.id,
+                icon: category?.emoji ?? '🎯',
+                label: bet.title,
+                sublabel: bet.status === 'active' ? '🟢 Live' : bet.status === 'completed' ? '✅ Done' : bet.status.replace(/_/g, ' '),
+              }
             })}
-          </div>
+            onItemClick={(id) => navigate(`/bet/${id}`)}
+            labelLines={2}
+          />
         )}
       </div>
 
