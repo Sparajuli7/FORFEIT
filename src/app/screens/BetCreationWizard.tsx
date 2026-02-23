@@ -671,7 +671,7 @@ export function BetCreationWizard() {
               : []
           }
           groupName={wizard.selectedGroup?.name}
-          detailPath={`/bet/${createdBet.id}`}
+          detailPath={`/compete/${createdBet.id}`}
         />
       )}
     </div>

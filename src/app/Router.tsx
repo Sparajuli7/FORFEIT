@@ -112,6 +112,27 @@ function ProofSubmissionRoute() {
   )
 }
 
+function CompeteProofSubmissionRoute() {
+  const navigate = useNavigate()
+  const { id } = useParams<{ id: string }>()
+  return (
+    <ProofSubmission
+      onSubmit={() => id && navigate(`/compete/${id}`)}
+      onBack={() => navigate(-1)}
+    />
+  )
+}
+
+function CompeteOutcomeRevealRoute() {
+  const navigate = useNavigate()
+  return (
+    <OutcomeReveal
+      onShare={() => navigate('/shame')}
+      onBack={() => navigate('/compete')}
+    />
+  )
+}
+
 function OutcomeRevealRoute() {
   const navigate = useNavigate()
   return (
@@ -180,8 +201,12 @@ export function AppRouter() {
 
             {/* Competition (merged with former H2H) */}
             <Route path="compete" element={<Competitions />} />
-            <Route path="compete/:id" element={<CompetitionDetailScreen />} />
             <Route path="compete/create" element={<CompetitionCreateScreen />} />
+            <Route path="compete/:id" element={<BetDetailRoute />} />
+            <Route path="compete/:id/proof" element={<CompeteProofSubmissionRoute />} />
+            <Route path="compete/:id/shame-proof" element={<ShameProofSubmission />} />
+            <Route path="compete/:id/outcome" element={<CompeteOutcomeRevealRoute />} />
+            <Route path="compete/:id/rematch" element={<RematchScreen />} />
 
             {/* Journal (replaces Record in nav) */}
             <Route path="journal" element={<JournalScreen />} />

@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router'
-import { ChevronLeft } from 'lucide-react'
+import { ChevronLeft, Share2 } from 'lucide-react'
 import { useGroupStore } from '@/stores'
 import { Input } from '@/app/components/ui/input'
 import { Button } from '@/app/components/ui/button'
 import { GROUP_EMOJIS } from '@/lib/utils/constants'
+import { ShareSheet } from '@/app/components/ShareSheet'
+import { shareWithNative } from '@/lib/share'
 
 const APP_URL = typeof window !== 'undefined' ? window.location.origin : ''
 
@@ -23,6 +25,7 @@ export function GroupCreateScreen() {
   const [name, setName] = useState('')
   const [emoji, setEmoji] = useState('🔥')
   const [createdGroup, setCreatedGroup] = useState<{ id: string; name: string; invite_code: string } | null>(null)
+  const [shareSheetOpen, setShareSheetOpen] = useState(false)
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -45,6 +48,12 @@ export function GroupCreateScreen() {
     if (inviteLink) {
       navigator.clipboard.writeText(inviteLink)
     }
+  }
+  const handleShare = async () => {
+    if (!inviteLink || !createdGroup) return
+    const text = `Join my group "${createdGroup.name}" on FORFEIT 🎲`
+    const usedNative = await shareWithNative({ title: `Join ${createdGroup.name}`, text, url: inviteLink })
+    if (!usedNative) setShareSheetOpen(true)
   }
 
   if (createdGroup) {
@@ -74,13 +83,22 @@ export function GroupCreateScreen() {
             <p className="text-sm text-text-primary font-mono break-all mb-3">
               {inviteLink}
             </p>
-            <Button
-              onClick={handleCopyLink}
-              variant="outline"
-              className="w-full rounded-xl border-accent-green text-accent-green hover:bg-accent-green/10"
-            >
-              Copy Link
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                onClick={handleCopyLink}
+                variant="outline"
+                className="flex-1 rounded-xl border-accent-green text-accent-green hover:bg-accent-green/10"
+              >
+                Copy Link
+              </Button>
+              <Button
+                onClick={handleShare}
+                className="flex-1 rounded-xl bg-accent-green text-white hover:bg-accent-green/90 flex items-center justify-center gap-2"
+              >
+                <Share2 className="w-4 h-4" />
+                Share
+              </Button>
+            </div>
           </div>
 
           <Button
@@ -89,6 +107,14 @@ export function GroupCreateScreen() {
           >
             Go to Home
           </Button>
+
+          <ShareSheet
+            open={shareSheetOpen}
+            onOpenChange={setShareSheetOpen}
+            title="Share group invite"
+            text={`Join my group "${createdGroup.name}" on FORFEIT 🎲`}
+            url={inviteLink}
+          />
         </div>
       </div>
     )
