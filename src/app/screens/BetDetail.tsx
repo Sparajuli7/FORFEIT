@@ -8,6 +8,8 @@ import { useCountdown } from '@/lib/hooks/useCountdown'
 import { useRealtime } from '@/lib/hooks/useRealtime'
 import { getProfilesByIds } from '@/lib/api/profiles'
 import { formatMoney } from '@/lib/utils/formatters'
+import { getShamePostByBetId } from '@/lib/api/shame'
+import type { HallOfShameEntry } from '@/lib/database.types'
 import { PrimaryButton } from '../components/PrimaryButton'
 import { ShareSheet } from '../components/ShareSheet'
 import { MediaGallery } from '../components/MediaGallery'
@@ -58,6 +60,7 @@ export function BetDetail({ onBack }: BetDetailProps) {
   const [profileMap, setProfileMap] = useState<Map<string, { display_name: string; avatar_url: string | null }>>(new Map())
   const [editingProofId, setEditingProofId] = useState<string | null>(null)
   const [editCaption, setEditCaption] = useState('')
+  const [shamePost, setShamePost] = useState<HallOfShameEntry | null>(null)
 
   // Always call useCountdown (Rules of Hooks). Use current time as fallback when no bet so countdown is expired.
   const countdown = useCountdown(activeBet?.deadline ?? new Date().toISOString())
@@ -106,6 +109,13 @@ export function BetDetail({ onBack }: BetDetailProps) {
       fetchProofs(id)
     }
   }, [id, fetchBetDetail, fetchProofs])
+
+  // Fetch punishment proof (hall_of_shame) for completed bets
+  useEffect(() => {
+    if (id && (activeBet?.status === 'completed' || activeBet?.status === 'voided')) {
+      getShamePostByBetId(id).then(setShamePost).catch(() => {})
+    }
+  }, [id, activeBet?.status])
 
   useEffect(() => {
     const ids = new Set<string>()
@@ -590,6 +600,31 @@ export function BetDetail({ onBack }: BetDetailProps) {
           </button>
         </div>
       )}
+
+      {/* Punishment proof (from hall_of_shame) */}
+      {shamePost && (activeBet.status === 'completed' || activeBet.status === 'voided') && (() => {
+        const shameMedia: MediaItem[] = []
+        if (shamePost.front_url) shameMedia.push({ url: shamePost.front_url, type: 'image', label: 'Front' })
+        if (shamePost.back_url) shameMedia.push({ url: shamePost.back_url, type: 'image', label: 'Back' })
+        if (shamePost.screenshot_urls?.length) {
+          shamePost.screenshot_urls.forEach((url, i) => shameMedia.push({ url, type: 'image', label: `Photo ${i + 1}` }))
+        }
+        if (shamePost.video_url) shameMedia.push({ url: shamePost.video_url, type: 'video', label: 'Video' })
+        if (shamePost.document_url) shameMedia.push({ url: shamePost.document_url, type: 'document', label: 'Document' })
+        return (shameMedia.length > 0 || shamePost.caption) ? (
+          <div className="px-6 mb-6">
+            <div className="flex items-center gap-2 mb-3">
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider">Punishment Proof</h3>
+              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-accent-coral/20 text-accent-coral border border-accent-coral/30">
+                🔥 Completed
+              </span>
+            </div>
+            <div className="bg-bg-card rounded-2xl border border-border-subtle p-4">
+              <MediaGallery items={shameMedia} caption={shamePost.caption} />
+            </div>
+          </div>
+        ) : null
+      })()}
 
       {/* Remix — use this challenge as a template (for all bets the user can see) */}
       <div className="px-6 mb-6">

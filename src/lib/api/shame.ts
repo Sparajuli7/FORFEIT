@@ -36,6 +36,20 @@ function parseReactions(raw: Json): Reactions {
   return {}
 }
 
+/** Get the punishment proof (hall_of_shame entry) for a specific bet */
+export async function getShamePostByBetId(betId: string): Promise<HallOfShameEntry | null> {
+  const { data, error } = await supabase
+    .from('hall_of_shame')
+    .select('*')
+    .eq('bet_id', betId)
+    .order('submitted_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error) throw error
+  return data
+}
+
 export async function getShameFeed(
   groupId: string,
   limit = 20,

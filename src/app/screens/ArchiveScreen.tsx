@@ -216,6 +216,11 @@ export function ArchiveScreen() {
                               {new Date(bet.created_at).toLocaleDateString()}
                               {bet.stake_money ? ` · ${formatMoney(bet.stake_money)}` : ''}
                             </p>
+                            {bet.status === 'completed' && (bet.stake_custom_punishment || bet.stake_punishment_id) && (
+                              <p className="text-[11px] text-accent-coral mt-0.5 truncate">
+                                🔥 {bet.stake_custom_punishment || 'Punishment'}
+                              </p>
+                            )}
                           </div>
                           <BetStatusBadge status={bet.status} />
                         </button>
