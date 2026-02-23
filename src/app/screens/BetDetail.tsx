@@ -11,6 +11,7 @@ import { formatMoney } from '@/lib/utils/formatters'
 import { getShamePostByBetId } from '@/lib/api/shame'
 import { getOutcome } from '@/lib/api/outcomes'
 import { getPunishmentText } from '@/lib/api/punishments'
+import { computeBetPayouts } from '@/lib/api/betPayouts'
 import type { HallOfShameEntry, Outcome } from '@/lib/database.types'
 import { PrimaryButton } from '../components/PrimaryButton'
 import { ShareSheet } from '../components/ShareSheet'
@@ -707,14 +708,31 @@ export function BetDetail({ onBack }: BetDetailProps) {
 
       {/* Stake */}
       {(() => {
-        // Determine if current user is on the losing side
         const isCompleted = activeBet.status === 'completed' || activeBet.status === 'voided'
-        const isLoser = isCompleted && outcome && user ? (() => {
-          if (outcome.result === 'claimant_succeeded') return doubters.some((d) => d.user_id === user.id)
-          if (outcome.result === 'claimant_failed') return riders.some((r) => r.user_id === user.id)
-          return false
-        })() : false
+
+        // Compute payouts and punishment assignments for resolved bets
+        const payouts = isCompleted && outcome
+          ? computeBetPayouts(
+              outcome.result as 'claimant_succeeded' | 'claimant_failed' | 'voided',
+              activeBet.claimant_id,
+              activeBetSides,
+              activeBet.stake_money,
+              activeBet.stake_type,
+              activeBet.stake_custom_punishment,
+              activeBet.stake_punishment_id,
+            )
+          : null
+
+        const isLoser = isCompleted && !!payouts && !!user && payouts.loserIds.includes(user.id)
+        const isWinner = isCompleted && !!payouts && !!user && payouts.winnerIds.includes(user.id)
+        const userWinPayout = payouts?.winnerPayouts.find((p) => p.userId === user?.id)
+        const userLossPayout = payouts?.loserPayouts.find((p) => p.userId === user?.id)
         const canSubmitStakeProof = isLoser && !shamePost
+
+        const punishmentOwerNames = (payouts?.punishmentOwers ?? []).map(
+          (uid) => profileMap.get(uid)?.display_name ?? 'Unknown'
+        )
+        const hasPunishment = (payouts?.punishmentOwers.length ?? 0) > 0
 
         // Build shame proof media
         const shameMedia: MediaItem[] = []
@@ -730,7 +748,7 @@ export function BetDetail({ onBack }: BetDetailProps) {
         const hasShameMedia = shameMedia.length > 0 || !!shamePost?.caption
 
         return (
-          <div className="px-6 mb-6">
+          <div className="px-6 mb-6 space-y-3">
             <div className="bg-bg-card rounded-2xl border border-border-subtle p-4">
               <div className="flex items-center justify-between mb-1.5">
                 <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-text-muted">Stake</p>
@@ -742,6 +760,30 @@ export function BetDetail({ onBack }: BetDetailProps) {
               </div>
               <p className="text-white font-bold text-base">{formatStake(activeBet, punishmentCardText)}</p>
 
+              {/* Per-user money result for resolved bets */}
+              {isCompleted && user && payouts && (
+                <div className="mt-3 rounded-xl border p-3"
+                  style={{
+                    background: isWinner ? 'rgba(0,230,118,0.08)' : isLoser ? 'rgba(255,107,53,0.08)' : 'transparent',
+                    borderColor: isWinner ? 'rgba(0,230,118,0.3)' : isLoser ? 'rgba(255,107,53,0.3)' : 'transparent',
+                  }}
+                >
+                  {isWinner && userWinPayout && userWinPayout.amount > 0 ? (
+                    <p className="text-sm font-bold text-accent-green">
+                      You won {formatMoney(userWinPayout.amount)} 🏆
+                    </p>
+                  ) : isLoser && userLossPayout && userLossPayout.amount > 0 ? (
+                    <p className="text-sm font-bold text-accent-coral">
+                      You owe {formatMoney(userLossPayout.amount)}
+                    </p>
+                  ) : isWinner ? (
+                    <p className="text-sm font-bold text-accent-green">You're in the clear ✅</p>
+                  ) : isLoser ? (
+                    <p className="text-sm font-bold text-accent-coral">You owe the punishment 💀</p>
+                  ) : null}
+                </div>
+              )}
+
               {/* Stake proof media (from hall_of_shame) */}
               {hasShameMedia && (
                 <div className="mt-3">
@@ -749,16 +791,41 @@ export function BetDetail({ onBack }: BetDetailProps) {
                 </div>
               )}
 
-              {/* Submit stake proof CTA for losers */}
+              {/* Submit stake proof CTA — only for losers who haven't submitted yet */}
               {canSubmitStakeProof && (
                 <button
                   onClick={() => navigate(`${basePath}/${id}/shame-proof`)}
                   className="mt-3 w-full py-3 rounded-xl bg-accent-coral text-white font-bold text-sm btn-pressed"
                 >
-                  Submit Stake Proof
+                  I did the punishment — Submit Proof
                 </button>
               )}
             </div>
+
+            {/* Punishment section — visible to all group members */}
+            {isCompleted && hasPunishment && (
+              <div className="bg-bg-card rounded-2xl border border-accent-coral/30 p-4">
+                <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-accent-coral mb-1.5">
+                  Punishment Due
+                </p>
+                <p className="text-sm font-bold text-white mb-1">
+                  {punishmentCardText ?? activeBet.stake_custom_punishment ?? 'Punishment'}
+                </p>
+                <p className="text-xs text-text-muted">
+                  Owed by: {punishmentOwerNames.join(', ')}
+                </p>
+                {shamePost && (
+                  <div className="mt-2 flex items-center gap-1.5">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-accent-green">✓ Proof submitted</span>
+                  </div>
+                )}
+                {!shamePost && payouts && payouts.punishmentOwers.length > 0 && (
+                  <div className="mt-2 flex items-center gap-1.5">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400">⏳ Awaiting proof</span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )
       })()}

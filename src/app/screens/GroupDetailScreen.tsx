@@ -1,11 +1,15 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
-import { ChevronLeft, Copy, LogOut, MessageCircle, ChevronRight } from 'lucide-react'
+import { ChevronLeft, Copy, LogOut, MessageCircle } from 'lucide-react'
 import { useGroupStore, useBetStore, useAuthStore, useChatStore } from '@/stores'
 import { getGroupBets } from '@/lib/api/bets'
 import { getProfilesWithRepByIds } from '@/lib/api/profiles'
+import { getOutcome } from '@/lib/api/outcomes'
+import { getShamePostByBetId } from '@/lib/api/shame'
+import { computeBetPayouts } from '@/lib/api/betPayouts'
 import { AvatarWithRepBadge } from '@/app/components/RepBadge'
 import { BetCard } from '@/app/components/BetCard'
+import type { Outcome } from '@/lib/database.types'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,11 +39,17 @@ function GroupBetCard({
   bet,
   group,
   claimant,
+  outcome,
+  shameDone,
+  profileMap,
   onNavigate,
 }: {
   bet: BetWithSides
   group: { name: string; avatar_emoji: string }
   claimant: ProfileWithRep | undefined
+  outcome: Outcome | null
+  shameDone: boolean
+  profileMap: Map<string, ProfileWithRep>
   onNavigate: (betId: string) => void
 }) {
   const countdown = useCountdown(bet.deadline)
@@ -55,22 +65,64 @@ function GroupBetCard({
         : 'completed'
   const showProofBadge = bet.status === 'proof_submitted'
 
+  // Compute punishment info for resolved bets
+  const isResolved = bet.status === 'completed' || bet.status === 'voided'
+  const payouts = isResolved && outcome
+    ? computeBetPayouts(
+        outcome.result as 'claimant_succeeded' | 'claimant_failed' | 'voided',
+        bet.claimant_id,
+        sides,
+        bet.stake_money,
+        bet.stake_type,
+        bet.stake_custom_punishment,
+        bet.stake_punishment_id,
+      )
+    : null
+  const hasPunishment = (payouts?.punishmentOwers.length ?? 0) > 0
+  const punishmentOwerNames = (payouts?.punishmentOwers ?? []).map(
+    (uid) => profileMap.get(uid)?.display_name ?? 'Unknown'
+  )
+  const punishmentLabel = bet.stake_custom_punishment ?? (hasPunishment ? 'Punishment' : null)
+
   return (
-    <BetCard
-      groupName={`${group.name} ${group.avatar_emoji}`}
-      countdown={showProofBadge ? '' : countdown.formatted}
-      claimText={bet.title}
-      claimantName={claimant?.display_name ?? 'Anonymous'}
-      claimantAvatar={claimant?.avatar_url ?? DEFAULT_AVATAR}
-      ridersPercent={riderPct}
-      doubtersPercent={doubterPct}
-      ridersCount={riderCount}
-      doubtersCount={doubterCount}
-      stake={formatStake(bet)}
-      status={status}
-      urgent={countdown.isUrgent && !countdown.isExpired}
-      onClick={() => onNavigate(bet.id)}
-    />
+    <div>
+      <BetCard
+        groupName={`${group.name} ${group.avatar_emoji}`}
+        countdown={showProofBadge ? '' : countdown.formatted}
+        claimText={bet.title}
+        claimantName={claimant?.display_name ?? 'Anonymous'}
+        claimantAvatar={claimant?.avatar_url ?? DEFAULT_AVATAR}
+        ridersPercent={riderPct}
+        doubtersPercent={doubterPct}
+        ridersCount={riderCount}
+        doubtersCount={doubterCount}
+        stake={formatStake(bet)}
+        status={status}
+        urgent={countdown.isUrgent && !countdown.isExpired}
+        onClick={() => onNavigate(bet.id)}
+      />
+      {/* Punishment info strip for resolved bets */}
+      {isResolved && hasPunishment && punishmentLabel && (
+        <div
+          className="mx-1 px-3 py-2 rounded-b-xl border-x border-b flex items-center justify-between"
+          style={{ borderColor: 'rgba(255,107,53,0.3)', background: 'rgba(255,107,53,0.08)' }}
+        >
+          <div className="flex-1 min-w-0">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-accent-coral mr-1.5">
+              Punishment:
+            </span>
+            <span className="text-xs text-text-muted truncate">
+              {punishmentOwerNames.join(', ')} owe &ldquo;{punishmentLabel}&rdquo;
+            </span>
+          </div>
+          {shameDone ? (
+            <span className="text-[10px] font-bold text-accent-green ml-2 shrink-0">✓ Done</span>
+          ) : (
+            <span className="text-[10px] font-bold text-amber-400 ml-2 shrink-0">⏳ Pending</span>
+          )}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -87,6 +139,8 @@ export function GroupDetailScreen() {
 
   const [bets, setBets] = useState<BetWithSides[]>([])
   const [profileMap, setProfileMap] = useState<Map<string, ProfileWithRep>>(new Map())
+  const [outcomeMap, setOutcomeMap] = useState<Map<string, Outcome>>(new Map())
+  const [shameDoneSet, setShameDoneSet] = useState<Set<string>>(new Set())
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
   const [leaving, setLeaving] = useState(false)
   const [openingChat, setOpeningChat] = useState(false)
@@ -103,7 +157,32 @@ export function GroupDetailScreen() {
 
   useEffect(() => {
     if (!id) return
-    getGroupBets(id).then(setBets)
+    getGroupBets(id).then((fetched) => {
+      setBets(fetched)
+      // For resolved bets, fetch outcomes and shame proof status
+      const resolved = fetched.filter(
+        (b) => b.status === 'completed' || b.status === 'voided',
+      )
+      if (resolved.length === 0) return
+      Promise.all(
+        resolved.map(async (b) => {
+          const [outcome, shamePost] = await Promise.all([
+            getOutcome(b.id).catch(() => null),
+            getShamePostByBetId(b.id).catch(() => null),
+          ])
+          return { betId: b.id, outcome, shameDone: !!shamePost }
+        }),
+      ).then((results) => {
+        const newOutcomeMap = new Map<string, Outcome>()
+        const newShameDoneSet = new Set<string>()
+        for (const r of results) {
+          if (r.outcome) newOutcomeMap.set(r.betId, r.outcome)
+          if (r.shameDone) newShameDoneSet.add(r.betId)
+        }
+        setOutcomeMap(newOutcomeMap)
+        setShameDoneSet(newShameDoneSet)
+      })
+    })
   }, [id])
 
   useEffect(() => {
@@ -256,6 +335,9 @@ export function GroupDetailScreen() {
                   bet={bet}
                   group={group}
                   claimant={profileMap.get(bet.claimant_id)}
+                  outcome={outcomeMap.get(bet.id) ?? null}
+                  shameDone={shameDoneSet.has(bet.id)}
+                  profileMap={profileMap}
                   onNavigate={(betId) => navigate(`/bet/${betId}`)}
                 />
               ))}
