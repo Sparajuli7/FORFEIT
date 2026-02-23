@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router'
-import { Camera, Image, Video, FileText, X, CheckCircle } from 'lucide-react'
+import { Camera, Image, Video, FileText, X, CheckCircle, ChevronRight } from 'lucide-react'
 import { useBetStore } from '@/stores'
 import { useProofStore } from '@/stores'
 import type { ProofType } from '@/lib/database.types'
@@ -28,6 +28,7 @@ export function ProofSubmission({ onSubmit, onBack }: ProofSubmissionProps) {
   const isSubmitting = useProofStore((s) => s.isSubmitting)
   const storeError = useProofStore((s) => s.error)
 
+  const [step, setStep] = useState<'upload' | 'choose'>('upload')
   const [uploadFiles, setUploadFiles] = useState<UploadEntry[]>([])
   const [caption, setCaption] = useState('')
   const [submitted, setSubmitted] = useState(false)
@@ -135,7 +136,6 @@ export function ProofSubmission({ onSubmit, onBack }: ProofSubmissionProps) {
   const flipCamera = useCallback(() => {
     const next = facingMode === 'environment' ? 'user' : 'environment'
     setFacingMode(next)
-    // Restart stream with new facing mode
     streamRef.current?.getTracks().forEach((t) => t.stop())
     navigator.mediaDevices.getUserMedia({ video: { facingMode: next } }).then((stream) => {
       streamRef.current = stream
@@ -153,7 +153,7 @@ export function ProofSubmission({ onSubmit, onBack }: ProofSubmissionProps) {
     }
   }, [])
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (endNow: boolean) => {
     if (!id) return
 
     const hasFiles = uploadFiles.length > 0
@@ -161,6 +161,7 @@ export function ProofSubmission({ onSubmit, onBack }: ProofSubmissionProps) {
 
     if (!hasFiles && !hasCaption) {
       setLocalError('Add proof media or a text description.')
+      setStep('upload')
       return
     }
 
@@ -181,13 +182,12 @@ export function ProofSubmission({ onSubmit, onBack }: ProofSubmissionProps) {
     if (video) files.videoFile = video
     if (doc) files.documentFile = doc
 
-    // Determine proof type based on what was uploaded
     let proofType: ProofType = 'text'
     if (video) proofType = 'video'
     else if (doc) proofType = 'document'
     else if (screenshots.length) proofType = 'screenshot'
 
-    const proof = await submitProof(id, files, proofType, caption.trim() || undefined)
+    const proof = await submitProof(id, files, proofType, caption.trim() || undefined, endNow)
     if (proof) {
       setSubmitted(true)
       if (onSubmit) {
@@ -202,11 +202,11 @@ export function ProofSubmission({ onSubmit, onBack }: ProofSubmissionProps) {
   const hasProof = uploadFiles.length > 0 || caption.trim().length > 0
   const error = localError || storeError
 
-  // Counts per type for badges
   const photoCount = uploadFiles.filter((u) => u.type === 'screenshot').length
   const videoCount = uploadFiles.filter((u) => u.type === 'video').length
   const docCount = uploadFiles.filter((u) => u.type === 'document').length
 
+  // ── Submitted confirmation ──────────────────────────────────────────────────
   if (submitted) {
     return (
       <div className="h-full bg-bg-primary flex flex-col items-center justify-center">
@@ -216,6 +216,80 @@ export function ProofSubmission({ onSubmit, onBack }: ProofSubmissionProps) {
     )
   }
 
+  // ── Step 2: Choose what happens next ───────────────────────────────────────
+  if (step === 'choose') {
+    return (
+      <div className="h-full bg-bg-primary flex flex-col overflow-hidden">
+        {/* Header */}
+        <div className="px-6 pt-12 pb-6 border-b border-border-subtle shrink-0">
+          <button onClick={() => setStep('upload')} className="text-text-primary font-bold mb-4">
+            &larr; Back
+          </button>
+          <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-text-muted mb-1">
+            PROOF READY
+          </p>
+          <h2 className="text-2xl font-black text-text-primary leading-tight">
+            What happens next?
+          </h2>
+          <p className="text-sm text-text-muted mt-1">
+            {uploadFiles.length > 0
+              ? `${uploadFiles.length} file${uploadFiles.length !== 1 ? 's' : ''} attached`
+              : 'Text proof ready'}
+            {caption.trim() ? ' · with description' : ''}
+          </p>
+        </div>
+
+        {/* Options */}
+        <div className="flex-1 px-6 py-6 space-y-4 overflow-y-auto">
+          {/* Option A: Let it ride */}
+          <button
+            onClick={() => handleSubmit(false)}
+            disabled={isSubmitting}
+            className="w-full bg-bg-card border border-border-subtle rounded-2xl p-5 text-left flex items-start gap-4 hover:border-accent-green/40 active:scale-[0.99] transition-all disabled:opacity-60"
+          >
+            <span className="text-4xl shrink-0 mt-0.5">🔥</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-base font-black text-text-primary mb-1">Let it ride</p>
+              <p className="text-sm text-text-muted leading-snug">
+                Proof is recorded as evidence. The bet stays active — others can see what you submitted.
+              </p>
+            </div>
+            <ChevronRight className="w-5 h-5 text-text-muted shrink-0 mt-1" />
+          </button>
+
+          {/* Option B: End it now */}
+          <button
+            onClick={() => handleSubmit(true)}
+            disabled={isSubmitting}
+            className="w-full bg-accent-green/10 border-2 border-accent-green/50 rounded-2xl p-5 text-left flex items-start gap-4 hover:border-accent-green active:scale-[0.99] transition-all disabled:opacity-60"
+          >
+            <span className="text-4xl shrink-0 mt-0.5">🏁</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-base font-black text-text-primary mb-1">End the bet now</p>
+              <p className="text-sm text-text-muted leading-snug">
+                Demand a verdict. Players vote to confirm or dispute your proof. The outcome is revealed dramatically.
+              </p>
+              <p className="text-[11px] font-bold text-accent-green mt-2 uppercase tracking-wide">
+                Triggers voting · Dramatic reveal
+              </p>
+            </div>
+            <ChevronRight className="w-5 h-5 text-accent-green shrink-0 mt-1" />
+          </button>
+
+          {isSubmitting && (
+            <div className="flex items-center justify-center gap-2 py-4">
+              <div className="w-4 h-4 border-2 border-accent-green border-t-transparent rounded-full animate-spin" />
+              <p className="text-sm text-text-muted">Submitting proof…</p>
+            </div>
+          )}
+
+          {error && <p className="text-destructive text-sm px-1">{error}</p>}
+        </div>
+      </div>
+    )
+  }
+
+  // ── Step 1: Upload proof ────────────────────────────────────────────────────
   return (
     <div className="h-full bg-bg-primary overflow-y-auto pb-8">
       <div className="px-6 pt-12 pb-6 border-b border-border-subtle">
@@ -227,32 +301,28 @@ export function ProofSubmission({ onSubmit, onBack }: ProofSubmissionProps) {
       </div>
 
       <div className="px-6 py-6 space-y-4">
-        {/* Upload buttons — use programmatic clicks for reliable mobile behavior */}
+        {/* Upload buttons */}
         <div>
           <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-text-muted mb-3">UPLOAD EVIDENCE</p>
           <div className="grid grid-cols-2 gap-3">
-            {/* Photos from gallery */}
             <UploadCard
               icon={<Image className="w-8 h-8 text-accent-green" />}
               label="Photos"
               count={photoCount}
               onClick={() => photoInputRef.current?.click()}
             />
-            {/* Video */}
             <UploadCard
               icon={<Video className="w-8 h-8 text-accent-green" />}
               label="Video"
               count={videoCount}
               onClick={() => videoInputRef.current?.click()}
             />
-            {/* Document */}
             <UploadCard
               icon={<FileText className="w-8 h-8 text-accent-green" />}
               label="Document"
               count={docCount}
               onClick={() => docInputRef.current?.click()}
             />
-            {/* Take Photo — opens camera viewfinder */}
             <UploadCard
               icon={<Camera className="w-8 h-8 text-accent-green" />}
               label="Take Photo"
@@ -348,8 +418,12 @@ export function ProofSubmission({ onSubmit, onBack }: ProofSubmissionProps) {
       {error && <p className="px-6 text-destructive text-sm mb-2">{error}</p>}
 
       <div className="px-6 pt-4 pb-safe">
-        <PrimaryButton onClick={handleSubmit} disabled={!hasProof || isSubmitting} variant="danger">
-          {isSubmitting ? 'Submitting...' : 'SUBMIT PROOF'}
+        <PrimaryButton
+          onClick={() => setStep('choose')}
+          disabled={!hasProof}
+          variant="danger"
+        >
+          Choose What Happens →
         </PrimaryButton>
       </div>
 
