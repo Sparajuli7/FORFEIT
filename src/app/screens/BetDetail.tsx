@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router'
 import { ArrowLeft, Share2, Pencil, Check, X, MessageCircle, Repeat2 } from 'lucide-react'
 import { useBetStore, useChatStore } from '@/stores'
@@ -57,6 +57,7 @@ export function BetDetail({ onBack }: BetDetailProps) {
   const voteOnProof = useProofStore((s) => s.voteOnProof)
   const updateCaption = useProofStore((s) => s.updateCaption)
   const getVoteCounts = useProofStore((s) => s.getVoteCounts)
+  const checkDeadlineResolution = useProofStore((s) => s.checkDeadlineResolution)
 
   const [profileMap, setProfileMap] = useState<Map<string, { display_name: string; avatar_url: string | null }>>(new Map())
   const [editingProofId, setEditingProofId] = useState<string | null>(null)
@@ -67,15 +68,23 @@ export function BetDetail({ onBack }: BetDetailProps) {
 
   // Always call useCountdown (Rules of Hooks). Use current time as fallback when no bet so countdown is expired.
   const countdown = useCountdown(activeBet?.deadline ?? new Date().toISOString())
+
+  // Ruling proof: the single proof with a verdict declared (set by claimant)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const rulingProof = useMemo(() => proofs.find((p) => p.ruling != null) ?? null, [proofs])
+
+  // Separate countdown for the 24h vote window
+  const rulingCountdown = useCountdown(rulingProof?.ruling_deadline ?? new Date().toISOString())
+
   const riders = activeBetSides.filter((s) => s.side === 'rider')
   const doubters = activeBetSides.filter((s) => s.side === 'doubter')
   const totalSides = riders.length + doubters.length
   const riderPct = totalSides > 0 ? Math.round((riders.length / totalSides) * 100) : 50
   const doubterPct = 100 - riderPct
   const mySide = activeBetSides.find((s) => s.user_id === user?.id)?.side ?? null
-  const isClaimant = activeBet?.claimant_id === user?.id
   const canJoin = !mySide && (activeBet?.status === 'pending' || activeBet?.status === 'active')
-  const showSubmitProof = isClaimant && activeBet?.status === 'active'
+  // Any participant can submit evidence; claimant can also submit ruling (handled inside ProofSubmission)
+  const showSubmitProof = !!mySide && activeBet?.status === 'active'
 
   const [shareOpen, setShareOpen] = useState(false)
   const [votingProofId, setVotingProofId] = useState<string | null>(null)
@@ -113,6 +122,13 @@ export function BetDetail({ onBack }: BetDetailProps) {
       fetchProofs(id)
     }
   }, [id, fetchBetDetail, fetchProofs])
+
+  // Check if 24h ruling deadline has passed when viewing a proof_submitted bet
+  useEffect(() => {
+    if (id && activeBet?.status === 'proof_submitted') {
+      checkDeadlineResolution(id).catch(() => {})
+    }
+  }, [id, activeBet?.status, checkDeadlineResolution])
 
   // Fetch outcome + punishment proof (hall_of_shame) for completed bets
   useEffect(() => {
@@ -421,18 +437,20 @@ export function BetDetail({ onBack }: BetDetailProps) {
         const currentCounts = currentProof ? getVoteCounts(currentProof.id) : null
         const currentMyVote = currentProof ? votes.find((v) => v.proof_id === currentProof.id && v.user_id === user?.id) : null
         const currentIsOwner = currentProof ? user?.id === currentProof.submitted_by : false
-        const currentCanVote = currentProof && !currentMyVote && !currentIsOwner && activeBet.status === 'proof_submitted'
+        // Only allow voting on the ruling proof (not evidence-only proofs)
+        const currentIsRulingProof = currentProof?.ruling != null
+        const currentCanVote = currentIsRulingProof && !currentMyVote && !currentIsOwner && activeBet.status === 'proof_submitted'
         const totalParticipants = activeBetSides.length
         const majority = Math.floor(totalParticipants / 2) + 1
         const activeImageUrl = currentSlide?.item.type === 'image' ? currentSlide.item.url : null
 
         return (
           <div className="px-6 mb-6">
-            <div className="flex items-center gap-2 mb-4">
-              <h3 className="text-sm font-bold text-white uppercase tracking-wider">Proof Submitted</h3>
+            <div className="flex items-center gap-2 mb-4 flex-wrap">
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider">Proof</h3>
               {activeBet.status === 'proof_submitted' && (
                 <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                  Awaiting Votes
+                  Voting Open
                 </span>
               )}
               {activeBet.status === 'completed' && (
@@ -441,6 +459,34 @@ export function BetDetail({ onBack }: BetDetailProps) {
                 </span>
               )}
             </div>
+
+            {/* Ruling banner — shown when claimant has declared a verdict */}
+            {rulingProof && (
+              <div className={`mb-4 rounded-xl border p-3 flex items-center gap-3 ${
+                rulingProof.ruling === 'riders_win'
+                  ? 'bg-accent-green/10 border-accent-green/40'
+                  : 'bg-accent-coral/10 border-accent-coral/40'
+              }`}>
+                <span className="text-2xl shrink-0">
+                  {rulingProof.ruling === 'riders_win' ? '✅' : '❌'}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-xs font-extrabold uppercase tracking-wide ${
+                    rulingProof.ruling === 'riders_win' ? 'text-accent-green' : 'text-accent-coral'
+                  }`}>
+                    Verdict: {rulingProof.ruling === 'riders_win' ? 'YES — Riders Win' : 'NO — Doubters Win'}
+                  </p>
+                  {activeBet.status === 'proof_submitted' && rulingProof.ruling_deadline && !rulingCountdown.isExpired && (
+                    <p className="text-[11px] text-text-muted mt-0.5">
+                      Dispute window closes in {rulingCountdown.formatted}
+                    </p>
+                  )}
+                  {activeBet.status === 'proof_submitted' && rulingCountdown.isExpired && (
+                    <p className="text-[11px] text-text-muted mt-0.5">Dispute window closed</p>
+                  )}
+                </div>
+              </div>
+            )}
 
             <div className="bg-bg-card rounded-2xl border border-border-subtle p-4">
               {/* Swipeable carousel */}
@@ -542,12 +588,12 @@ export function BetDetail({ onBack }: BetDetailProps) {
                 </button>
               ) : null)}
 
-              {/* Vote progress bar */}
-              {currentCounts && (
+              {/* Vote progress bar — only on the ruling proof */}
+              {currentCounts && currentIsRulingProof && (
                 <div className="mt-4">
                   <div className="flex items-center justify-between text-xs mb-2">
                     <span className="text-accent-green font-bold">
-                      {currentCounts.confirm} Confirm{currentCounts.confirm !== 1 ? 's' : ''}
+                      {currentCounts.confirm} Validate{currentCounts.confirm !== 1 ? 's' : ''}
                     </span>
                     <span className="text-text-muted">
                       {currentCounts.total} / {totalParticipants} voted
@@ -570,10 +616,12 @@ export function BetDetail({ onBack }: BetDetailProps) {
                 </div>
               )}
 
-              {/* Vote buttons */}
+              {/* Vote buttons — only on the ruling proof */}
               {currentCanVote && currentProof && (
                 <div className="mt-4">
-                  <p className="text-xs text-text-muted text-center mb-3">Did they do it? Cast your vote.</p>
+                  <p className="text-xs text-text-muted text-center mb-3">
+                    Do you agree with the verdict? Cast your vote.
+                  </p>
                   <div className="grid grid-cols-2 gap-3">
                     <button
                       disabled={votingProofId === currentProof.id}
@@ -588,7 +636,7 @@ export function BetDetail({ onBack }: BetDetailProps) {
                       {votingProofId === currentProof.id ? (
                         <div className="w-4 h-4 border-2 border-bg-primary border-t-transparent rounded-full animate-spin" />
                       ) : (
-                        <>🤝 Confirm</>
+                        <>✅ Validate</>
                       )}
                     </button>
                     <button
@@ -612,28 +660,28 @@ export function BetDetail({ onBack }: BetDetailProps) {
               )}
 
               {/* Already voted indicator */}
-              {currentMyVote && (
+              {currentMyVote && currentIsRulingProof && (
                 <div className="mt-3 flex items-center justify-center gap-2 py-2 rounded-xl bg-bg-elevated">
-                  <span className="text-sm">{currentMyVote.vote === 'confirm' ? '🤝' : '💀'}</span>
+                  <span className="text-sm">{currentMyVote.vote === 'confirm' ? '✅' : '💀'}</span>
                   <span className="text-xs font-bold text-text-muted">
-                    You voted {currentMyVote.vote === 'confirm' ? 'Confirm' : 'Dispute'}
+                    You voted {currentMyVote.vote === 'confirm' ? 'Validate' : 'Dispute'}
                   </span>
                 </div>
               )}
 
-              {/* Proof owner waiting message */}
-              {currentIsOwner && activeBet.status === 'proof_submitted' && (
-                <p className="mt-3 text-xs text-text-muted text-center">Waiting for others to vote on your proof</p>
+              {/* Ruling proof owner waiting message */}
+              {currentIsOwner && currentIsRulingProof && activeBet.status === 'proof_submitted' && (
+                <p className="mt-3 text-xs text-text-muted text-center">Waiting for others to validate or dispute your verdict</p>
               )}
             </div>
 
-            {/* Resubmit proof */}
-            {isClaimant && activeBet.status === 'proof_submitted' && (
+            {/* Submit additional evidence (any participant) */}
+            {mySide && activeBet.status === 'proof_submitted' && (
               <button
                 onClick={() => navigate(`/bet/${id}/proof`)}
                 className="w-full text-center text-sm font-bold text-text-muted hover:text-accent-green transition-colors mt-3"
               >
-                + Submit additional proof
+                + Submit additional evidence
               </button>
             )}
           </div>

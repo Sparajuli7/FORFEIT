@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { supabase } from '@/lib/supabase'
-import type { Proof, ProofVote, ProofType, VoteChoice } from '@/lib/database.types'
+import type { Proof, ProofVote, ProofType, VoteChoice, ProofRuling } from '@/lib/database.types'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -15,7 +15,7 @@ export interface ProofFiles {
   documentFile?: File
 }
 
-/** Vote tallies for a proof — UI uses this to render confirm/dispute counts */
+/** Vote tallies for a proof — UI uses this to render validate/dispute counts */
 export interface VoteCounts {
   confirm: number
   dispute: number
@@ -35,12 +35,18 @@ interface ProofState {
 }
 
 interface ProofActions {
+  /**
+   * Submit proof for a bet.
+   * - Anyone can submit evidence (ruling omitted → no bet status change).
+   * - Only the claimant submits a ruling ('riders_win' | 'doubters_win').
+   *   Providing a ruling advances bet to proof_submitted and opens a 24h vote window.
+   */
   submitProof: (
     betId: string,
     files: ProofFiles,
     proofType: ProofType,
     caption?: string,
-    endNow?: boolean,
+    ruling?: ProofRuling,
   ) => Promise<Proof | null>
   fetchProofs: (betId: string) => Promise<void>
   voteOnProof: (proofId: string, vote: VoteChoice) => Promise<void>
@@ -48,6 +54,11 @@ interface ProofActions {
   updateCaption: (proofId: string, caption: string) => Promise<void>
   /** Derive vote counts from currently-loaded votes (no extra DB call) */
   getVoteCounts: (proofId: string) => VoteCounts
+  /**
+   * Check if the 24-hour ruling deadline has passed for a bet and resolve it
+   * if no outcome exists yet. Call this on BetDetail mount for proof_submitted bets.
+   */
+  checkDeadlineResolution: (betId: string) => Promise<void>
   clearError: () => void
 }
 
@@ -64,10 +75,6 @@ async function getCurrentUserId(): Promise<string | null> {
   return user?.id ?? null
 }
 
-/**
- * Upload a single file to Supabase Storage and return its public URL.
- * Bucket must exist and have appropriate RLS policies.
- */
 /** Get file extension from a File object (so storage URLs work) */
 function getExt(file: File): string {
   const fromName = file.name.split('.').pop()?.toLowerCase()
@@ -80,11 +87,7 @@ function getExt(file: File): string {
   return mimeMap[file.type] ?? (file.type.startsWith('image/') ? '.jpg' : file.type.startsWith('video/') ? '.mp4' : '.bin')
 }
 
-async function uploadFile(
-  bucket: string,
-  path: string,
-  file: File,
-): Promise<string | null> {
+async function uploadFile(bucket: string, path: string, file: File): Promise<string | null> {
   const fullPath = `${path}${getExt(file)}`
   const { error } = await supabase.storage.from(bucket).upload(fullPath, file, {
     upsert: true,
@@ -94,30 +97,55 @@ async function uploadFile(
     console.warn(`[proofStore] Upload failed for ${file.name}:`, error.message)
     return null
   }
-
-  const {
-    data: { publicUrl },
-  } = supabase.storage.from(bucket).getPublicUrl(fullPath)
+  const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(fullPath)
   return publicUrl
 }
 
+/** Flip a ruling to its opposite outcome result */
+function flipRuling(ruling: ProofRuling): 'claimant_succeeded' | 'claimant_failed' {
+  return ruling === 'riders_win' ? 'claimant_failed' : 'claimant_succeeded'
+}
+
+/** Convert a ruling to an outcome result (no flip) */
+function rulingToResult(ruling: ProofRuling): 'claimant_succeeded' | 'claimant_failed' {
+  return ruling === 'riders_win' ? 'claimant_succeeded' : 'claimant_failed'
+}
+
 /**
- * After a vote, check if a simple majority of bet participants has voted
- * the same way. If so, auto-resolve the outcome.
- * - confirm majority → claimant_succeeded
- * - dispute majority → claimant_failed
+ * Resolve a bet outcome given a final ruling.
+ * Creates the outcome row and marks the bet as completed.
+ */
+async function resolveOutcome(
+  betId: string,
+  result: 'claimant_succeeded' | 'claimant_failed',
+): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await supabase.from('outcomes').insert({ bet_id: betId, result } as any)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await supabase.from('bets').update({ status: 'completed' } as any).eq('id', betId)
+  console.info(`[proofStore] Resolved bet ${betId} → ${result}`)
+}
+
+/**
+ * After a vote, check if a simple majority of bet participants has voted.
+ * Resolution rules:
+ *   - >50% validate (confirm) → ruling stands, resolve immediately
+ *   - >50% dispute          → ruling flips, resolve immediately
+ *   - otherwise             → wait for more votes or deadline
  */
 async function autoResolveIfMajority(proofId: string): Promise<void> {
-  // Get the proof to find the bet
+  // Find the proof and confirm it has a ruling
   const { data: proofRow } = await supabase
     .from('proofs')
-    .select('bet_id')
+    .select('bet_id, ruling')
     .eq('id', proofId)
-    .single() as { data: { bet_id: string } | null }
-  if (!proofRow) return
-  const betId = proofRow.bet_id
+    .single() as { data: { bet_id: string; ruling: ProofRuling | null } | null }
 
-  // Check if outcome already exists
+  if (!proofRow?.ruling) return // evidence-only proof — not the ruling proof
+
+  const { bet_id: betId, ruling } = proofRow
+
+  // Skip if outcome already exists
   const { data: existing } = await supabase
     .from('outcomes')
     .select('id')
@@ -125,15 +153,15 @@ async function autoResolveIfMajority(proofId: string): Promise<void> {
     .maybeSingle() as { data: { id: string } | null }
   if (existing) return
 
-  // Count bet participants (riders + doubters)
+  // Count bet participants
   const { data: sides } = await supabase
     .from('bet_sides')
     .select('user_id')
     .eq('bet_id', betId) as { data: { user_id: string }[] | null }
   const participantCount = sides?.length ?? 0
-  if (participantCount < 2) return // Need at least 2 participants
+  if (participantCount < 2) return
 
-  // Get all votes for this proof
+  // Count votes on this ruling proof
   const { data: allVotes } = await supabase
     .from('proof_votes')
     .select('vote')
@@ -143,24 +171,14 @@ async function autoResolveIfMajority(proofId: string): Promise<void> {
   const disputes = (allVotes ?? []).filter((v) => v.vote === 'dispute').length
   const majority = Math.floor(participantCount / 2) + 1
 
-  let result: 'claimant_succeeded' | 'claimant_failed' | null = null
-  if (confirms >= majority) result = 'claimant_succeeded'
-  else if (disputes >= majority) result = 'claimant_failed'
-
-  if (!result) return
-
-  // Create outcome
-  await supabase
-    .from('outcomes')
-    .insert({ bet_id: betId, result } as never)
-
-  // Update bet status
-  await supabase
-    .from('bets')
-    .update({ status: 'completed' } as never)
-    .eq('id', betId)
-
-  console.info(`[proofStore] Auto-resolved bet ${betId} → ${result}`)
+  if (confirms >= majority) {
+    // Majority validates → ruling stands
+    await resolveOutcome(betId, rulingToResult(ruling))
+  } else if (disputes >= majority) {
+    // Majority disputes → ruling flips
+    await resolveOutcome(betId, flipRuling(ruling))
+  }
+  // else: not enough votes yet — wait
 }
 
 // ---------------------------------------------------------------------------
@@ -177,7 +195,7 @@ const useProofStore = create<ProofStore>()((set, get) => ({
 
   // ---- actions ----
 
-  submitProof: async (betId, files, proofType, caption, endNow = true) => {
+  submitProof: async (betId, files, proofType, caption, ruling) => {
     const userId = await getCurrentUserId()
     if (!userId) return null
 
@@ -186,30 +204,19 @@ const useProofStore = create<ProofStore>()((set, get) => ({
     const timestamp = Date.now()
     const basePath = `proofs/${betId}/${userId}/${timestamp}`
 
-    // Track which files were attempted vs succeeded
     const attempted: string[] = []
     const trackUpload = async (bucket: string, path: string, file: File): Promise<string | null> => {
       attempted.push(file.name)
       return uploadFile(bucket, path, file)
     }
 
-    // Upload all provided files in parallel
     const [frontUrl, backUrl, videoUrl, documentUrl] = await Promise.all([
-      files.frontCameraFile
-        ? trackUpload('proofs', `${basePath}/front`, files.frontCameraFile)
-        : null,
-      files.backCameraFile
-        ? trackUpload('proofs', `${basePath}/back`, files.backCameraFile)
-        : null,
-      files.videoFile
-        ? trackUpload('proofs', `${basePath}/video`, files.videoFile)
-        : null,
-      files.documentFile
-        ? trackUpload('proofs', `${basePath}/document`, files.documentFile)
-        : null,
+      files.frontCameraFile ? trackUpload('proofs', `${basePath}/front`, files.frontCameraFile) : null,
+      files.backCameraFile ? trackUpload('proofs', `${basePath}/back`, files.backCameraFile) : null,
+      files.videoFile ? trackUpload('proofs', `${basePath}/video`, files.videoFile) : null,
+      files.documentFile ? trackUpload('proofs', `${basePath}/document`, files.documentFile) : null,
     ])
 
-    // Screenshots are an array — upload each with an index suffix
     let screenshotUrls: string[] | null = null
     if (files.screenshotFiles?.length) {
       const results = await Promise.all(
@@ -220,12 +227,10 @@ const useProofStore = create<ProofStore>()((set, get) => ({
       screenshotUrls = results.filter((u): u is string => u !== null)
     }
 
-    // Check which uploads succeeded
     const succeeded = [frontUrl, backUrl, videoUrl, documentUrl, ...(screenshotUrls ?? [])].filter(Boolean)
     const hasAnyMedia = succeeded.length > 0
     const hasCaption = caption && caption.trim().length > 0
 
-    // Abort if no media uploaded AND no text caption (text-only proof is OK)
     if (!hasAnyMedia && !hasCaption) {
       set({
         error: attempted.length > 0
@@ -236,8 +241,14 @@ const useProofStore = create<ProofStore>()((set, get) => ({
       return null
     }
 
+    // Build proof insert — include ruling + ruling_deadline when provided
+    const rulingDeadline = ruling
+      ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+      : null
+
     const { data: proof, error } = await supabase
       .from('proofs')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .insert({
         bet_id: betId,
         submitted_by: userId,
@@ -248,7 +259,9 @@ const useProofStore = create<ProofStore>()((set, get) => ({
         document_url: documentUrl,
         screenshot_urls: screenshotUrls,
         caption: caption ?? null,
-      })
+        ruling: ruling ?? null,
+        ruling_deadline: rulingDeadline,
+      } as any)
       .select()
       .single()
 
@@ -257,11 +270,12 @@ const useProofStore = create<ProofStore>()((set, get) => ({
       return null
     }
 
-    // Advance bet status to proof_submitted only when the user wants to end the bet now
-    if (endNow) {
+    // When a ruling is submitted, advance the bet to proof_submitted
+    if (ruling) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error: statusError } = await supabase
         .from('bets')
-        .update({ status: 'proof_submitted' })
+        .update({ status: 'proof_submitted' } as any)
         .eq('id', betId)
 
       if (statusError) {
@@ -291,7 +305,6 @@ const useProofStore = create<ProofStore>()((set, get) => ({
       return
     }
 
-    // Also fetch all votes for these proofs in one query
     const proofIds = (data ?? []).map((p) => p.id)
     const { data: votes } = proofIds.length
       ? await supabase.from('proof_votes').select('*').in('proof_id', proofIds)
@@ -310,11 +323,11 @@ const useProofStore = create<ProofStore>()((set, get) => ({
 
     set({ error: null })
 
-    // Prevent double-voting (upsert on conflict)
     const { data: newVote, error } = await supabase
       .from('proof_votes')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .upsert(
-        { proof_id: proofId, user_id: userId, vote },
+        { proof_id: proofId, user_id: userId, vote } as any,
         { onConflict: 'proof_id,user_id' },
       )
       .select()
@@ -327,14 +340,12 @@ const useProofStore = create<ProofStore>()((set, get) => ({
 
     if (newVote) {
       set((state) => {
-        // Replace existing vote from this user on this proof, or append
         const others = state.votes.filter(
           (v) => !(v.proof_id === proofId && v.user_id === userId),
         )
         return { votes: [...others, newVote] }
       })
 
-      // Auto-resolve: check if majority reached among bet participants
       await autoResolveIfMajority(proofId)
     }
   },
@@ -351,6 +362,48 @@ const useProofStore = create<ProofStore>()((set, get) => ({
       total,
       confirmPct: total > 0 ? Math.round((confirm / total) * 100) : 0,
     }
+  },
+
+  checkDeadlineResolution: async (betId) => {
+    // Find the ruling proof for this bet
+    const { data: rulingProof } = await supabase
+      .from('proofs')
+      .select('id, ruling, ruling_deadline')
+      .eq('bet_id', betId)
+      .not('ruling', 'is', null)
+      .order('submitted_at', { ascending: false })
+      .limit(1)
+      .maybeSingle() as { data: { id: string; ruling: ProofRuling; ruling_deadline: string } | null }
+
+    if (!rulingProof) return
+    if (!rulingProof.ruling_deadline) return
+
+    const deadlinePassed = new Date(rulingProof.ruling_deadline) < new Date()
+    if (!deadlinePassed) return
+
+    // Skip if outcome already exists
+    const { data: existing } = await supabase
+      .from('outcomes')
+      .select('id')
+      .eq('bet_id', betId)
+      .maybeSingle() as { data: { id: string } | null }
+    if (existing) return
+
+    // Get all votes on the ruling proof
+    const { data: allVotes } = await supabase
+      .from('proof_votes')
+      .select('vote')
+      .eq('proof_id', rulingProof.id) as { data: { vote: string }[] | null }
+
+    const confirms = (allVotes ?? []).filter((v) => v.vote === 'confirm').length
+    const disputes = (allVotes ?? []).filter((v) => v.vote === 'dispute').length
+
+    // After deadline: disputes majority flips ruling; otherwise ruling stands
+    const result = disputes > confirms
+      ? flipRuling(rulingProof.ruling)
+      : rulingToResult(rulingProof.ruling)
+
+    await resolveOutcome(betId, result)
   },
 
   updateCaption: async (proofId, caption) => {
