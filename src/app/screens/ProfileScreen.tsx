@@ -36,6 +36,8 @@ function ProfileContent({
   const navigate = useNavigate()
   const [openingDM, setOpeningDM] = useState(false)
   const winRate = formatWinRate(profile.wins, profile.losses)
+  // pending = taken but proof not yet submitted; both fields are 0 until first outcome
+  const pendingPunishments = Math.max(0, profile.punishments_taken - profile.punishments_completed)
   const completionRate = formatCompletionRate(
     profile.punishments_completed,
     profile.punishments_taken,
@@ -118,12 +120,25 @@ function ProfileContent({
             </p>
           </div>
           <div className="glass-card rounded-2xl p-4 text-center">
-            <p className="text-text-muted text-xs uppercase tracking-wider mb-1">Punishments Taken</p>
+            <p className="text-text-muted text-xs uppercase tracking-wider mb-1">Punishments Owed</p>
             <p className="text-3xl font-black text-text-primary">{profile.punishments_taken} 💀</p>
+            {pendingPunishments > 0 && (
+              <p className="text-[11px] text-amber-400 mt-1 font-semibold">
+                {pendingPunishments} pending proof
+              </p>
+            )}
+            {pendingPunishments === 0 && profile.punishments_taken > 0 && (
+              <p className="text-[11px] text-accent-green mt-1 font-semibold">
+                all proved ✓
+              </p>
+            )}
           </div>
           <div className="glass-card rounded-2xl p-4 text-center">
-            <p className="text-text-muted text-xs uppercase tracking-wider mb-1">Completion Rate</p>
+            <p className="text-text-muted text-xs uppercase tracking-wider mb-1">Proof Rate</p>
             <p className="text-3xl font-black text-text-primary">{completionRate}</p>
+            <p className="text-[10px] text-text-muted mt-1">
+              {profile.punishments_completed}/{profile.punishments_taken} proved
+            </p>
           </div>
           <div className="glass-card rounded-2xl p-4 text-center col-span-2">
             <p className="text-text-muted text-xs uppercase tracking-wider mb-1">Biggest Win / Loss</p>
@@ -179,6 +194,29 @@ function ProfileContent({
           </div>
         )}
       </div>
+
+      {isOwnProfile && pendingPunishments > 0 && (
+        <div className="px-6 mb-2">
+          <div
+            className="rounded-2xl border p-4"
+            style={{ background: 'rgba(245,158,11,0.08)', borderColor: 'rgba(245,158,11,0.35)' }}
+          >
+            <p className="text-sm font-black text-amber-400 mb-0.5">
+              ⏳ {pendingPunishments} punishment{pendingPunishments > 1 ? 's' : ''} awaiting proof
+            </p>
+            <p className="text-xs text-text-muted mb-3">
+              Submit proof to officially close {pendingPunishments > 1 ? 'them' : 'it'} and earn +10 REP each.
+              Until then, {pendingPunishments > 1 ? 'they don\'t' : 'it doesn\'t'} count as complete on your card.
+            </p>
+            <button
+              onClick={() => navigate('/journal')}
+              className="text-xs font-bold text-amber-400 underline underline-offset-2"
+            >
+              Find the bet in Journal →
+            </button>
+          </div>
+        </div>
+      )}
 
       {isOwnProfile ? (
         <div className="px-6 mt-8 pb-8 space-y-3">

@@ -16,6 +16,8 @@ import { Download, Share2 } from 'lucide-react'
 import { captureElementAsImage, shareImage } from '@/lib/utils/imageExport'
 import { getPunishmentShareText } from '@/lib/share'
 import { computeBetPayouts } from '@/lib/api/betPayouts'
+import { getShamePostByBetId, recordPunishmentTaken } from '@/lib/api/shame'
+import type { HallOfShameEntry } from '@/lib/database.types'
 
 interface OutcomeRevealProps {
   onShare?: () => void
@@ -128,6 +130,8 @@ export function OutcomeReveal({ onShare, onBack }: OutcomeRevealProps) {
   const [phase, setPhase] = useState<'revealing' | 'result'>('revealing')
   const [shareSheetOpen, setShareSheetOpen] = useState(false)
   const [savingImage, setSavingImage] = useState(false)
+  // undefined = not yet loaded; null = no proof submitted; HallOfShameEntry = proof exists
+  const [shamePost, setShamePost] = useState<HallOfShameEntry | null | undefined>(undefined)
   const receiptRef = useRef<HTMLDivElement>(null)
   const winnerCardRef = useRef<HTMLDivElement>(null)
 
@@ -155,6 +159,32 @@ export function OutcomeReveal({ onShare, onBack }: OutcomeRevealProps) {
       })
     return () => { cancelled = true }
   }, [id])
+
+  // Load shame proof for this bet (to show "officially complete" vs "awaiting proof")
+  useEffect(() => {
+    if (!id || !data) return
+    getShamePostByBetId(id)
+      .then(setShamePost)
+      .catch(() => setShamePost(null))
+  }, [id, data])
+
+  // Record punishment taken once for losers on punishment bets (idempotent via localStorage)
+  useEffect(() => {
+    if (!data || !user || !id) return
+    const { outcome, bet, betSides } = data
+    const payouts = computeBetPayouts(
+      outcome.result as OutcomeResult,
+      bet.claimant_id,
+      betSides,
+      bet.stake_money,
+      bet.stake_type,
+      bet.stake_custom_punishment,
+      bet.stake_punishment_id,
+    )
+    if (payouts.punishmentOwers.includes(user.id)) {
+      recordPunishmentTaken(user.id, id)
+    }
+  }, [data, user, id])
 
   // Auto-advance reveal after 2.2s
   useEffect(() => {
@@ -532,6 +562,24 @@ export function OutcomeReveal({ onShare, onBack }: OutcomeRevealProps) {
 
           {/* Action buttons */}
           <div className="px-6 pb-8 pt-3 space-y-3 shrink-0 border-t border-white/5">
+            {/* Proof gate for losers viewing the WIN screen (doubters who lost) */}
+            {isUserLoser && punishmentOwers.includes(user?.id ?? '') && (
+              shamePost ? (
+                <div className="w-full py-3 px-4 rounded-xl border border-accent-green/40 bg-accent-green/10 text-center">
+                  <p className="text-sm font-black text-accent-green">✓ Officially Complete</p>
+                  <p className="text-xs text-text-muted mt-0.5">Punishment proof submitted — logged on your card</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <PrimaryButton onClick={handleSubmitPunishmentProof} variant="danger">
+                    SUBMIT PUNISHMENT PROOF 💀
+                  </PrimaryButton>
+                  <p className="text-center text-[11px] text-amber-400 font-semibold">
+                    ⏳ Required to officially close this bet on your card
+                  </p>
+                </div>
+              )
+            )}
             <PrimaryButton onClick={handleShare} variant="primary">
               Share Result 🏆
             </PrimaryButton>
@@ -718,11 +766,23 @@ export function OutcomeReveal({ onShare, onBack }: OutcomeRevealProps) {
 
           {/* Action buttons */}
           <div className="px-6 pb-8 pt-3 space-y-3 shrink-0 border-t border-white/5">
-            {/* Only losers submit punishment proof */}
-            {isUserLoser && (
-              <PrimaryButton onClick={handleSubmitPunishmentProof} variant="danger">
-                SUBMIT PUNISHMENT PROOF 💀
-              </PrimaryButton>
+            {/* Proof gate status — only for losers on punishment bets */}
+            {isUserLoser && punishmentOwers.includes(user?.id ?? '') && (
+              shamePost ? (
+                <div className="w-full py-3 px-4 rounded-xl border border-accent-green/40 bg-accent-green/10 text-center">
+                  <p className="text-sm font-black text-accent-green">✓ Officially Complete</p>
+                  <p className="text-xs text-text-muted mt-0.5">Proof submitted — punishment logged on your card</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <PrimaryButton onClick={handleSubmitPunishmentProof} variant="danger">
+                    SUBMIT PUNISHMENT PROOF 💀
+                  </PrimaryButton>
+                  <p className="text-center text-[11px] text-amber-400 font-semibold">
+                    ⏳ Required to officially close this bet on your card
+                  </p>
+                </div>
+              )
             )}
             {isUserWinner && (
               <div className="w-full py-3 rounded-xl border border-accent-green/40 bg-accent-green/10 text-accent-green text-sm font-bold text-center">
