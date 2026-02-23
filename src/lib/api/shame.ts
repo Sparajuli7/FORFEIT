@@ -138,7 +138,7 @@ export async function submitShameProof(
     ),
   ])
 
-  return postShameProof({
+  const post = await postShameProof({
     bet_id: betId,
     outcome_id: outcomeId,
     front_url: frontUrl ?? null,
@@ -152,6 +152,32 @@ export async function submitShameProof(
     caption: files.caption ?? null,
     is_public: true,
   })
+
+  // Update profile stats: increment punishments_completed and award rep points
+  await incrementPunishmentStats(user.id)
+
+  return post
+}
+
+/**
+ * Increment punishments_completed (+1) and rep_score (+10) for a user
+ * after they successfully submit punishment proof.
+ * Called in a single place so every proof submission updates stats consistently.
+ */
+async function incrementPunishmentStats(userId: string): Promise<void> {
+  const { data: prof } = await supabase
+    .from('profiles')
+    .select('punishments_completed, rep_score')
+    .eq('id', userId)
+    .single()
+
+  await supabase
+    .from('profiles')
+    .update({
+      punishments_completed: (prof?.punishments_completed ?? 0) + 1,
+      rep_score: (prof?.rep_score ?? 100) + 10,
+    })
+    .eq('id', userId)
 }
 
 /**

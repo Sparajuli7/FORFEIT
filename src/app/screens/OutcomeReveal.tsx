@@ -15,6 +15,7 @@ import { getBetShareUrl, getOutcomeShareText, shareWithNative, getProofShareFile
 import { Download, Share2 } from 'lucide-react'
 import { captureElementAsImage, shareImage } from '@/lib/utils/imageExport'
 import { getPunishmentShareText } from '@/lib/share'
+import { computeBetPayouts } from '@/lib/api/betPayouts'
 
 interface OutcomeRevealProps {
   onShare?: () => void
@@ -231,10 +232,29 @@ export function OutcomeReveal({ onShare, onBack }: OutcomeRevealProps) {
   const claimantAvatar = claimantProfile?.avatar_url
   const riders = betSides.filter((s) => s.side === 'rider')
   const doubters = betSides.filter((s) => s.side === 'doubter')
-  const winnerIds = result === 'claimant_succeeded' ? [bet.claimant_id, ...riders.map((r) => r.user_id)] : doubters.map((d) => d.user_id)
-  const loserIds = result === 'claimant_succeeded' ? doubters.map((d) => d.user_id) : [bet.claimant_id, ...riders.map((r) => r.user_id)]
+
+  // Compute payouts and punishment assignments
+  const payouts = computeBetPayouts(
+    result,
+    bet.claimant_id,
+    betSides,
+    bet.stake_money,
+    bet.stake_type,
+    bet.stake_custom_punishment,
+    bet.stake_punishment_id,
+  )
+  const { winnerIds, loserIds, winnerPayouts, loserPayouts, punishmentOwers } = payouts
+
   const winnerNames = winnerIds.map((uid) => profiles.get(uid)?.display_name ?? 'Unknown')
   const loserNames = loserIds.map((uid) => profiles.get(uid)?.display_name ?? 'Unknown')
+  const punishmentOwerNames = punishmentOwers.map((uid) => profiles.get(uid)?.display_name ?? 'Unknown')
+
+  // Current user's perspective
+  const isUserWinner = !!user && winnerIds.includes(user.id)
+  const isUserLoser = !!user && loserIds.includes(user.id)
+  const userWinPayout = winnerPayouts.find((p) => p.userId === user?.id)
+  const userLossPayout = loserPayouts.find((p) => p.userId === user?.id)
+
   const isParticipant = isParticipantInBet(bet, betSides, user?.id)
   const resolvedDate = new Date(outcome.resolved_at).toLocaleDateString('en-US', {
     month: 'short', day: 'numeric', year: 'numeric',
@@ -451,6 +471,62 @@ export function OutcomeReveal({ onShare, onBack }: OutcomeRevealProps) {
                   betId={id}
                 />
               </motion.div>
+
+              {/* Your result */}
+              {isParticipant && (
+                <motion.div
+                  className="w-full mb-3 mx-4"
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.55, duration: 0.35 }}
+                >
+                  <div
+                    className="rounded-2xl border p-4 text-center"
+                    style={{
+                      background: isUserWinner ? 'rgba(0,230,118,0.1)' : 'rgba(255,107,53,0.1)',
+                      borderColor: isUserWinner ? 'rgba(0,230,118,0.4)' : 'rgba(255,107,53,0.4)',
+                    }}
+                  >
+                    <p className="text-[11px] font-bold uppercase tracking-widest mb-1"
+                      style={{ color: isUserWinner ? '#00E676' : '#FF6B35' }}>
+                      YOUR RESULT
+                    </p>
+                    {isUserWinner && userWinPayout && userWinPayout.amount > 0 ? (
+                      <p className="text-xl font-black text-white">
+                        You won <span style={{ color: '#00E676' }}>{formatMoney(userWinPayout.amount)}</span> 🏆
+                      </p>
+                    ) : isUserLoser && userLossPayout && userLossPayout.amount > 0 ? (
+                      <p className="text-xl font-black text-white">
+                        You owe <span style={{ color: '#FF6B35' }}>{formatMoney(userLossPayout.amount)}</span>
+                      </p>
+                    ) : isUserWinner ? (
+                      <p className="text-lg font-black" style={{ color: '#00E676' }}>You're in the clear 👑</p>
+                    ) : (
+                      <p className="text-lg font-black" style={{ color: '#FF6B35' }}>You owe the punishment</p>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Who owes the punishment */}
+              {punishmentOwers.length > 0 && punishmentText && (
+                <motion.div
+                  className="w-full mx-4 mb-3"
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.65, duration: 0.35 }}
+                >
+                  <div className="rounded-2xl border border-accent-coral/40 bg-accent-coral/10 p-4">
+                    <p className="text-[11px] font-bold uppercase tracking-widest text-accent-coral mb-1">
+                      PUNISHMENT DUE
+                    </p>
+                    <p className="text-sm font-bold text-white mb-1">{punishmentText}</p>
+                    <p className="text-xs text-text-muted">
+                      Owed by: {punishmentOwerNames.join(', ')}
+                    </p>
+                  </div>
+                </motion.div>
+              )}
             </div>
           </div>
 
@@ -562,7 +638,7 @@ export function OutcomeReveal({ onShare, onBack }: OutcomeRevealProps) {
                 <PunishmentReceipt
                   ref={receiptRef}
                   betTitle={bet.title}
-                  loserName={claimantName}
+                  loserName={loserNames.length === 1 ? loserNames[0] : loserNames.join(' & ')}
                   punishment={punishmentText ?? 'Complete the stake'}
                   winnerNames={winnerNames}
                   issuedDate={resolvedDate}
@@ -570,13 +646,69 @@ export function OutcomeReveal({ onShare, onBack }: OutcomeRevealProps) {
                 />
               </motion.div>
 
+              {/* Your result */}
+              {isParticipant && (
+                <motion.div
+                  className="w-full mb-3"
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.45 }}
+                >
+                  <div
+                    className="rounded-2xl border p-4 text-center mx-0"
+                    style={{
+                      background: isUserWinner ? 'rgba(0,230,118,0.1)' : 'rgba(255,107,53,0.1)',
+                      borderColor: isUserWinner ? 'rgba(0,230,118,0.4)' : 'rgba(255,107,53,0.4)',
+                    }}
+                  >
+                    <p className="text-[11px] font-bold uppercase tracking-widest mb-1"
+                      style={{ color: isUserWinner ? '#00E676' : '#FF6B35' }}>
+                      YOUR RESULT
+                    </p>
+                    {isUserWinner && userWinPayout && userWinPayout.amount > 0 ? (
+                      <p className="text-xl font-black text-white">
+                        You won <span style={{ color: '#00E676' }}>{formatMoney(userWinPayout.amount)}</span> 🏆
+                      </p>
+                    ) : isUserLoser && userLossPayout && userLossPayout.amount > 0 ? (
+                      <p className="text-xl font-black text-white">
+                        You owe <span style={{ color: '#FF6B35' }}>{formatMoney(userLossPayout.amount)}</span>
+                      </p>
+                    ) : isUserWinner ? (
+                      <p className="text-lg font-black" style={{ color: '#00E676' }}>You're in the clear 🎉</p>
+                    ) : (
+                      <p className="text-lg font-black" style={{ color: '#FF6B35' }}>You owe the punishment 💀</p>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Who owes punishment (visible to everyone) */}
+              {punishmentOwers.length > 0 && punishmentText && (
+                <motion.div
+                  className="w-full mb-3"
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.55 }}
+                >
+                  <div className="rounded-2xl border border-accent-coral/40 bg-accent-coral/10 p-4">
+                    <p className="text-[11px] font-bold uppercase tracking-widest text-accent-coral mb-1">
+                      PUNISHMENT DUE
+                    </p>
+                    <p className="text-sm font-bold text-white mb-1">{punishmentText}</p>
+                    <p className="text-xs text-text-muted">
+                      Owed by: {punishmentOwerNames.join(', ')}
+                    </p>
+                  </div>
+                </motion.div>
+              )}
+
               {/* Who won */}
               {winnerNames.length > 0 && (
                 <motion.p
                   className="text-center text-xs text-text-muted"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  transition={{ delay: 0.5 }}
+                  transition={{ delay: 0.65 }}
                 >
                   {winnerNames.join(' & ')} {winnerNames.length === 1 ? 'wins' : 'win'} this one
                 </motion.p>
@@ -586,9 +718,17 @@ export function OutcomeReveal({ onShare, onBack }: OutcomeRevealProps) {
 
           {/* Action buttons */}
           <div className="px-6 pb-8 pt-3 space-y-3 shrink-0 border-t border-white/5">
-            <PrimaryButton onClick={handleSubmitPunishmentProof} variant="danger">
-              SUBMIT PUNISHMENT PROOF
-            </PrimaryButton>
+            {/* Only losers submit punishment proof */}
+            {isUserLoser && (
+              <PrimaryButton onClick={handleSubmitPunishmentProof} variant="danger">
+                SUBMIT PUNISHMENT PROOF 💀
+              </PrimaryButton>
+            )}
+            {isUserWinner && (
+              <div className="w-full py-3 rounded-xl border border-accent-green/40 bg-accent-green/10 text-accent-green text-sm font-bold text-center">
+                ✅ You won this one — no punishment for you!
+              </div>
+            )}
             <button
               onClick={handleSaveReceipt}
               disabled={savingImage}
@@ -613,12 +753,14 @@ export function OutcomeReveal({ onShare, onBack }: OutcomeRevealProps) {
                 Rematch — same people, higher stakes
               </PrimaryButton>
             )}
-            <button
-              onClick={handleDispute}
-              className="w-full text-xs text-text-muted font-medium btn-pressed py-2"
-            >
-              Dispute Outcome
-            </button>
+            {isUserLoser && (
+              <button
+                onClick={handleDispute}
+                className="w-full text-xs text-text-muted font-medium btn-pressed py-2"
+              >
+                Dispute Outcome
+              </button>
+            )}
           </div>
         </div>
       </>
