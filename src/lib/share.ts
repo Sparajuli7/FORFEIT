@@ -22,6 +22,20 @@ export function getCompetitionShareUrl(compId: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// Group invite helpers
+// ---------------------------------------------------------------------------
+
+/** Build full URL for a group invite link. */
+export function getGroupInviteUrl(inviteCode: string): string {
+  return `${APP_ORIGIN}/group/join/${inviteCode}`
+}
+
+/** Build share text for a group invite. */
+export function getGroupInviteShareText(groupName: string): string {
+  return `Join my group "${groupName}" on FORFEIT! 🎲`
+}
+
+// ---------------------------------------------------------------------------
 // Share text builders
 // ---------------------------------------------------------------------------
 

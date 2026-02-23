@@ -1,12 +1,17 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router'
-import { ChevronLeft } from 'lucide-react'
+import { ChevronLeft, Share2, MessageSquare } from 'lucide-react'
 import { useGroupStore } from '@/stores'
 import { Input } from '@/app/components/ui/input'
 import { Button } from '@/app/components/ui/button'
 import { GROUP_EMOJIS } from '@/lib/utils/constants'
-
-const APP_URL = typeof window !== 'undefined' ? window.location.origin : ''
+import {
+  getGroupInviteUrl,
+  getGroupInviteShareText,
+  shareWithNative,
+  canUseNativeShare,
+  getSMSShareUrl,
+} from '@/lib/share'
 
 export function GroupCreateScreen() {
   const navigate = useNavigate()
@@ -40,10 +45,21 @@ export function GroupCreateScreen() {
     }
   }
 
-  const inviteLink = createdGroup ? `${APP_URL}/group/join/${createdGroup.invite_code}` : ''
+  const inviteLink = createdGroup ? getGroupInviteUrl(createdGroup.invite_code) : ''
+  const shareText = createdGroup ? getGroupInviteShareText(createdGroup.name) : ''
+
   const handleCopyLink = () => {
     if (inviteLink) {
       navigator.clipboard.writeText(inviteLink)
+    }
+  }
+
+  const handleShare = async () => {
+    if (!inviteLink) return
+    const used = await shareWithNative({ text: shareText, url: inviteLink, title: 'FORFEIT Invite' })
+    if (!used) {
+      // Fallback: open SMS
+      window.open(getSMSShareUrl(shareText, inviteLink), '_self')
     }
   }
 
@@ -74,13 +90,29 @@ export function GroupCreateScreen() {
             <p className="text-sm text-text-primary font-mono break-all mb-3">
               {inviteLink}
             </p>
-            <Button
-              onClick={handleCopyLink}
-              variant="outline"
-              className="w-full rounded-xl border-accent-green text-accent-green hover:bg-accent-green/10"
+            <div className="flex gap-2">
+              <Button
+                onClick={handleCopyLink}
+                variant="outline"
+                className="flex-1 rounded-xl border-accent-green text-accent-green hover:bg-accent-green/10"
+              >
+                Copy Link
+              </Button>
+              <Button
+                onClick={handleShare}
+                className="flex-1 rounded-xl bg-accent-green text-white font-bold hover:bg-accent-green/90"
+              >
+                <Share2 className="w-4 h-4 mr-2" />
+                Share Invite
+              </Button>
+            </div>
+            <a
+              href={getSMSShareUrl(shareText, inviteLink)}
+              className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-border-subtle text-text-muted hover:text-text-primary hover:bg-bg-elevated transition-colors text-sm font-medium mt-2"
             >
-              Copy Link
-            </Button>
+              <MessageSquare className="w-4 h-4" />
+              Send via SMS
+            </a>
           </div>
 
           <Button

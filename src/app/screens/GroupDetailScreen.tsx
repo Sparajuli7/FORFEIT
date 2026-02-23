@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
-import { ChevronLeft, Copy, LogOut, MessageCircle, ChevronRight } from 'lucide-react'
+import { ChevronLeft, Copy, LogOut, MessageCircle, ChevronRight, Share2, MessageSquare } from 'lucide-react'
 import { useGroupStore, useBetStore, useAuthStore, useChatStore } from '@/stores'
 import { getGroupBets } from '@/lib/api/bets'
 import { getProfilesWithRepByIds } from '@/lib/api/profiles'
@@ -18,10 +18,15 @@ import {
 } from '@/app/components/ui/alert-dialog'
 import { useCountdown } from '@/lib/hooks/useCountdown'
 import { formatMoney, formatOdds } from '@/lib/utils/formatters'
+import {
+  getGroupInviteUrl,
+  getGroupInviteShareText,
+  shareWithNative,
+  getSMSShareUrl,
+} from '@/lib/share'
 import type { BetWithSides } from '@/stores/betStore'
 import type { ProfileWithRep } from '@/lib/api/profiles'
 
-const APP_URL = typeof window !== 'undefined' ? window.location.origin : ''
 const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop'
 
 function formatStake(bet: BetWithSides): string {
@@ -114,7 +119,17 @@ export function GroupDetailScreen() {
 
   const handleCopyInvite = () => {
     if (group?.invite_code) {
-      navigator.clipboard.writeText(`${APP_URL}/group/join/${group.invite_code}`)
+      navigator.clipboard.writeText(getGroupInviteUrl(group.invite_code))
+    }
+  }
+
+  const handleShareInvite = async () => {
+    if (!group?.invite_code) return
+    const url = getGroupInviteUrl(group.invite_code)
+    const text = getGroupInviteShareText(group.name)
+    const used = await shareWithNative({ text, url, title: 'FORFEIT Invite' })
+    if (!used) {
+      window.open(getSMSShareUrl(text, url), '_self')
     }
   }
 
@@ -138,7 +153,7 @@ export function GroupDetailScreen() {
     )
   }
 
-  const inviteLink = `${APP_URL}/group/join/${group.invite_code}`
+  const inviteLink = getGroupInviteUrl(group.invite_code)
 
   return (
     <div className="h-full bg-bg-primary grain-texture overflow-y-auto pb-6">
@@ -225,7 +240,7 @@ export function GroupDetailScreen() {
           <p className="text-xs font-bold uppercase tracking-wider text-text-muted mb-2">
             Invite link
           </p>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 mb-3">
             <input
               readOnly
               value={inviteLink}
@@ -238,6 +253,22 @@ export function GroupDetailScreen() {
             >
               <Copy className="w-4 h-4" />
             </button>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={handleShareInvite}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-accent-green text-white font-bold text-sm hover:bg-accent-green/90 transition-colors"
+            >
+              <Share2 className="w-4 h-4" />
+              Share Invite
+            </button>
+            <a
+              href={getSMSShareUrl(getGroupInviteShareText(group.name), inviteLink)}
+              className="flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-border-subtle text-text-muted hover:text-text-primary hover:bg-bg-elevated transition-colors text-sm font-medium"
+            >
+              <MessageSquare className="w-4 h-4" />
+              SMS
+            </a>
           </div>
         </div>
 
