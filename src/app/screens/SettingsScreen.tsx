@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router'
-import { ChevronLeft, Sun, Moon, LogOut, Eye, EyeOff, Lock } from 'lucide-react'
-import { useAuthStore, useUiStore } from '@/stores'
+import { ChevronLeft, Sun, Moon, LogOut, Eye, EyeOff, Lock, Bell, BellOff } from 'lucide-react'
+import { useAuthStore, useUiStore, usePushStore, useGroupStore, useCompetitionStore } from '@/stores'
+import { supabase } from '@/lib/supabase'
+import type { NotificationPreferenceRow } from '@/lib/database.types'
 import { Input } from '@/app/components/ui/input'
 import { Button } from '@/app/components/ui/button'
 import { validatePassword, validatePasswordMatch } from '@/lib/utils/validators'
@@ -22,6 +24,83 @@ export function SettingsScreen() {
   const setPassword = useAuthStore((s) => s.setPassword)
   const theme = useUiStore((s) => s.theme)
   const toggleTheme = useUiStore((s) => s.toggleTheme)
+  const userId = useAuthStore((s) => s.user?.id)
+
+  // Push notification state
+  const pushPermission = usePushStore((s) => s.permission)
+  const isSubscribed = usePushStore((s) => s.isSubscribed)
+  const pushSubscribe = usePushStore((s) => s.subscribe)
+  const pushUnsubscribe = usePushStore((s) => s.unsubscribe)
+  const pushInitialize = usePushStore((s) => s.initialize)
+  const pushLoading = usePushStore((s) => s.isLoading)
+
+  // Groups and competitions for per-entity toggles
+  const groups = useGroupStore((s) => s.groups)
+  const fetchGroups = useGroupStore((s) => s.fetchGroups)
+  const competitions = useCompetitionStore((s) => s.competitions)
+
+  // Notification preferences
+  const [preferences, setPreferences] = useState<NotificationPreferenceRow[]>([])
+  const [prefLoading, setPrefLoading] = useState<string | null>(null)
+
+  useEffect(() => {
+    pushInitialize()
+    fetchGroups()
+  }, [pushInitialize, fetchGroups])
+
+  // Fetch notification preferences
+  useEffect(() => {
+    if (!userId) return
+    supabase
+      .from('notification_preferences')
+      .select('*')
+      .eq('user_id', userId)
+      .then(({ data }) => {
+        if (data) setPreferences(data as NotificationPreferenceRow[])
+      })
+  }, [userId])
+
+  const isEntityMuted = useCallback((entityType: string, entityId: string) => {
+    const pref = preferences.find(
+      (p) => p.entity_type === entityType && p.entity_id === entityId,
+    )
+    return pref ? !pref.push_enabled : false
+  }, [preferences])
+
+  const toggleEntityPush = async (entityType: string, entityId: string) => {
+    if (!userId) return
+    const key = `${entityType}:${entityId}`
+    setPrefLoading(key)
+
+    const existing = preferences.find(
+      (p) => p.entity_type === entityType && p.entity_id === entityId,
+    )
+
+    if (existing) {
+      const newEnabled = !existing.push_enabled
+      await supabase
+        .from('notification_preferences')
+        .update({ push_enabled: newEnabled })
+        .eq('id', existing.id)
+      setPreferences((prev) =>
+        prev.map((p) => (p.id === existing.id ? { ...p, push_enabled: newEnabled } : p)),
+      )
+    } else {
+      // No row = default enabled, so inserting with push_enabled=false to mute
+      const { data } = await supabase
+        .from('notification_preferences')
+        .insert({
+          user_id: userId,
+          entity_type: entityType,
+          entity_id: entityId,
+          push_enabled: false,
+        })
+        .select()
+        .single()
+      if (data) setPreferences((prev) => [...prev, data as NotificationPreferenceRow])
+    }
+    setPrefLoading(null)
+  }
 
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
@@ -192,12 +271,108 @@ export function SettingsScreen() {
             </button>
           </div>
 
-          {/* Notification preferences - placeholder */}
-          <div className="bg-bg-card border border-border-subtle rounded-xl p-4 opacity-60">
-            <p className="text-xs font-bold uppercase tracking-wider text-text-muted mb-2">
-              Notification preferences
-            </p>
-            <p className="text-sm text-text-muted">Coming soon</p>
+          {/* Notification preferences */}
+          <div className="bg-bg-card border border-border-subtle rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Bell className="w-4 h-4 text-text-muted" />
+              <p className="text-xs font-bold uppercase tracking-wider text-text-muted">
+                Push Notifications
+              </p>
+            </div>
+
+            {/* Global push toggle */}
+            <div className="flex items-center justify-between py-2">
+              <div>
+                <p className="text-sm font-medium text-text-primary">Push notifications</p>
+                <p className="text-xs text-text-muted">
+                  {pushPermission === 'denied'
+                    ? 'Blocked by browser — enable in site settings'
+                    : isSubscribed
+                      ? 'Receiving push notifications'
+                      : 'Not enabled'}
+                </p>
+              </div>
+              <button
+                onClick={() => (isSubscribed ? pushUnsubscribe() : pushSubscribe())}
+                disabled={pushLoading || pushPermission === 'denied'}
+                className={`w-12 h-7 rounded-full transition-colors relative ${
+                  isSubscribed ? 'bg-accent-green' : 'bg-bg-elevated'
+                } ${pushLoading || pushPermission === 'denied' ? 'opacity-50' : ''}`}
+              >
+                <span
+                  className={`absolute top-0.5 w-6 h-6 rounded-full bg-white shadow transition-transform ${
+                    isSubscribed ? 'translate-x-5' : 'translate-x-0.5'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* Per-group toggles */}
+            {isSubscribed && groups.length > 0 && (
+              <div className="mt-3 pt-3 border-t border-border-subtle">
+                <p className="text-xs font-bold uppercase tracking-wider text-text-muted mb-2">
+                  Groups
+                </p>
+                <div className="space-y-1">
+                  {groups.map((g) => {
+                    const muted = isEntityMuted('group', g.id)
+                    const loading = prefLoading === `group:${g.id}`
+                    return (
+                      <div key={g.id} className="flex items-center justify-between py-1.5">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-base">{g.avatar_emoji}</span>
+                          <span className="text-sm text-text-primary truncate">{g.name}</span>
+                        </div>
+                        <button
+                          onClick={() => toggleEntityPush('group', g.id)}
+                          disabled={loading}
+                          className="flex-shrink-0 p-1.5 rounded-lg hover:bg-bg-elevated transition-colors"
+                          aria-label={muted ? 'Unmute group' : 'Mute group'}
+                        >
+                          {muted ? (
+                            <BellOff className="w-4 h-4 text-text-muted" />
+                          ) : (
+                            <Bell className="w-4 h-4 text-accent-green" />
+                          )}
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Per-competition toggles */}
+            {isSubscribed && competitions.length > 0 && (
+              <div className="mt-3 pt-3 border-t border-border-subtle">
+                <p className="text-xs font-bold uppercase tracking-wider text-text-muted mb-2">
+                  Competitions
+                </p>
+                <div className="space-y-1">
+                  {competitions.map((c) => {
+                    const muted = isEntityMuted('competition', c.id)
+                    const loading = prefLoading === `competition:${c.id}`
+                    return (
+                      <div key={c.id} className="flex items-center justify-between py-1.5">
+                        <span className="text-sm text-text-primary truncate">{c.title}</span>
+                        <button
+                          onClick={() => toggleEntityPush('competition', c.id)}
+                          disabled={loading}
+                          className="flex-shrink-0 p-1.5 rounded-lg hover:bg-bg-elevated transition-colors"
+                          aria-label={muted ? 'Unmute competition' : 'Mute competition'}
+                        >
+                          {muted ? (
+                            <BellOff className="w-4 h-4 text-text-muted" />
+                          ) : (
+                            <Bell className="w-4 h-4 text-accent-green" />
+                          )}
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Sign out */}

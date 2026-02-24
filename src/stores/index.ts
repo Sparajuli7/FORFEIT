@@ -12,6 +12,7 @@ export { default as useNotificationStore } from './notificationStore'
 export { default as useUiStore } from './uiStore'
 export { default as useCompetitionStore } from './competitionStore'
 export { default as useChatStore } from './chatStore'
+export { default as usePushStore } from './pushStore'
 
 // Re-export computed selectors so consumers can import everything from one place
 export { selectOdds, selectMySide } from './betStore'
@@ -34,3 +35,4 @@ export type {
   CompetitionData,
 } from './competitionStore'
 export type { ChatStore } from './chatStore'
+export type { PushStore } from './pushStore'

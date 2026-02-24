@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { useNavigate } from 'react-router'
 import { Bell, MessageCircle } from 'lucide-react'
 import { NotificationPanel } from '../components/NotificationPanel'
+import { PushPermissionBanner } from '../components/PushPermissionBanner'
 import { useGroupStore, useBetStore, useAuthStore, useNotificationStore, useChatStore } from '@/stores'
 import { useCountdown } from '@/lib/hooks/useCountdown'
 import { useRealtime } from '@/lib/hooks/useRealtime'
@@ -333,6 +334,9 @@ export function TheBoard() {
           )}
         </button>
       </div>
+
+      {/* Push notification prompt */}
+      <PushPermissionBanner />
 
       {/* ── My Bets strip ── */}
       <div className="px-4 pt-4 pb-2">

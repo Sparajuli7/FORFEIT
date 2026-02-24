@@ -229,6 +229,24 @@ export interface MessageRow {
   created_at: string
 }
 
+export interface PushSubscriptionRow {
+  id: string
+  user_id: string
+  endpoint: string
+  keys_p256dh: string
+  keys_auth: string
+  created_at: string
+}
+
+export interface NotificationPreferenceRow {
+  id: string
+  user_id: string
+  entity_type: 'group' | 'competition'
+  entity_id: string
+  push_enabled: boolean
+  created_at: string
+}
+
 // ---------------------------------------------------------------------------
 // Insert types — required fields only (omit server-generated fields)
 // ---------------------------------------------------------------------------
@@ -272,6 +290,11 @@ export type ConversationParticipantInsert = Omit<ConversationParticipantRow, 'id
 export type MessageInsert = Omit<MessageRow, 'id' | 'created_at'> &
   Partial<Pick<MessageRow, 'media_url'>>
 
+export type PushSubscriptionInsert = Omit<PushSubscriptionRow, 'id' | 'created_at'>
+
+export type NotificationPreferenceInsert = Omit<NotificationPreferenceRow, 'id' | 'created_at'> &
+  Partial<Pick<NotificationPreferenceRow, 'push_enabled'>>
+
 // ---------------------------------------------------------------------------
 // Update types — all fields optional except primary key
 // ---------------------------------------------------------------------------
@@ -295,6 +318,8 @@ export type ConversationUpdate = Partial<Pick<ConversationRow, 'last_message_at'
 export type ConversationParticipantUpdate = Partial<Pick<ConversationParticipantRow, 'last_read_at'>>
 
 export type MessageUpdate = never
+
+export type NotificationPreferenceUpdate = Partial<Pick<NotificationPreferenceRow, 'push_enabled'>>
 
 // ---------------------------------------------------------------------------
 // Supabase Database generic — passed to createClient<Database>()
@@ -378,6 +403,16 @@ export interface Database {
         Insert: MessageInsert
         Update: MessageUpdate
       }
+      push_subscriptions: {
+        Row: PushSubscriptionRow
+        Insert: PushSubscriptionInsert
+        Update: never
+      }
+      notification_preferences: {
+        Row: NotificationPreferenceRow
+        Insert: NotificationPreferenceInsert
+        Update: NotificationPreferenceUpdate
+      }
     }
     Views: {
       [_ in never]: never
@@ -424,3 +459,5 @@ export type Notification = Database['public']['Tables']['notifications']['Row']
 export type Conversation = Database['public']['Tables']['conversations']['Row']
 export type ConversationParticipant = Database['public']['Tables']['conversation_participants']['Row']
 export type Message = Database['public']['Tables']['messages']['Row']
+export type PushSubscription = Database['public']['Tables']['push_subscriptions']['Row']
+export type NotificationPreference = Database['public']['Tables']['notification_preferences']['Row']
