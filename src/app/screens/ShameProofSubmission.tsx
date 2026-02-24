@@ -176,7 +176,6 @@ export function ShameProofSubmission() {
         caption: caption.trim() || undefined,
       })
       setSubmitted(true)
-      setTimeout(() => navigate('/shame'), 1200)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed. Please try again.')
     } finally {
@@ -214,13 +213,11 @@ export function ShameProofSubmission() {
     const shareText = getShameShareText({ loserName, betTitle })
     const shareUrl = id ? getBetShareUrl(id) : ''
 
-    // Get proof image files that the user just uploaded for native sharing
     const proofImageFiles = uploadFiles
       .filter((u) => u.file.type.startsWith('image/'))
-      .slice(0, 1) // share the first image
+      .slice(0, 1)
       .map((u) => u.file)
 
-    // First image preview for fallback ShareSheet
     const firstPreviewUrl = uploadFiles.find((u) => u.previewUrl)?.previewUrl ?? null
 
     const handleShareAfterSubmit = async () => {
@@ -237,10 +234,27 @@ export function ShameProofSubmission() {
 
     return (
       <div className="h-full bg-bg-primary flex flex-col items-center justify-center px-6">
-        <CheckCircle className="w-16 h-16 text-accent-green mb-4" />
-        <p className="text-accent-green font-bold text-xl mb-2">Punishment proof submitted!</p>
+        {/* Official completion badge */}
+        <div
+          className="w-20 h-20 rounded-full flex items-center justify-center mb-4"
+          style={{ background: 'linear-gradient(135deg, #00E676, #00BCD4)', boxShadow: '0 0 30px rgba(0,230,118,0.4)' }}
+        >
+          <CheckCircle className="w-10 h-10 text-white" />
+        </div>
 
-        {/* Show the proof image they just uploaded */}
+        <p className="text-2xl font-black text-white mb-1 text-center">Officially Complete! 🏆</p>
+        <p className="text-accent-green font-bold text-sm mb-1">Punishment logged on your card</p>
+
+        {/* Rep bonus */}
+        <div
+          className="flex items-center gap-2 px-4 py-2 rounded-full mb-4"
+          style={{ background: 'rgba(0,230,118,0.12)', border: '1px solid rgba(0,230,118,0.3)' }}
+        >
+          <span className="text-lg">⚡</span>
+          <span className="text-sm font-black text-accent-green">+10 REP earned</span>
+        </div>
+
+        {/* Proof preview */}
         {firstPreviewUrl && (
           <div className="w-full max-w-xs rounded-xl overflow-hidden border border-border-subtle mb-4">
             <img src={firstPreviewUrl} alt="Your proof" className="w-full max-h-40 object-cover" />
@@ -250,18 +264,28 @@ export function ShameProofSubmission() {
           </div>
         )}
 
-        <p className="text-text-muted text-sm mb-6 text-center">Post it to social media and let everyone see.</p>
+        <p className="text-text-muted text-sm mb-6 text-center">
+          Your completion rate and rep score have been updated.
+        </p>
 
-        <PrimaryButton onClick={handleShareAfterSubmit} className="w-full mb-3">
-          <Share2 className="w-4 h-4 mr-2" />
-          Share Proof
-        </PrimaryButton>
-        <button
-          onClick={() => navigate('/shame')}
-          className="text-sm text-text-muted font-medium"
-        >
-          Skip
-        </button>
+        <div className="w-full max-w-xs space-y-3">
+          <PrimaryButton onClick={handleShareAfterSubmit} className="w-full">
+            <Share2 className="w-4 h-4 mr-2" />
+            Share Proof
+          </PrimaryButton>
+          <button
+            onClick={() => navigate('/profile')}
+            className="w-full py-3 rounded-xl bg-bg-elevated border border-border-subtle text-text-primary text-sm font-bold"
+          >
+            View My Player Card
+          </button>
+          <button
+            onClick={() => navigate('/shame')}
+            className="w-full text-sm text-text-muted font-medium py-2"
+          >
+            Go to Hall of Shame
+          </button>
+        </div>
 
         <ShareSheet
           open={shareSheetOpen}

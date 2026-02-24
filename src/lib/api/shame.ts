@@ -114,6 +114,35 @@ function getExt(file: File): string {
   return mimeMap[file.type] ?? ''
 }
 
+/**
+ * Record that this bet's punishment was taken by the loser (outcome first resolved).
+ * Uses localStorage for idempotency so we only increment once per device.
+ * This is separate from punishments_completed, which only increments when proof is submitted.
+ */
+export async function recordPunishmentTaken(userId: string, betId: string): Promise<void> {
+  try {
+    const key = `forfeit_pt_${userId}`
+    const counted: string[] = JSON.parse(localStorage.getItem(key) ?? '[]')
+    if (counted.includes(betId)) return // already recorded on this device
+
+    // Mark locally first to prevent duplicate calls
+    localStorage.setItem(key, JSON.stringify([...counted, betId]))
+
+    const { data: prof } = await supabase
+      .from('profiles')
+      .select('punishments_taken')
+      .eq('id', userId)
+      .single()
+
+    await supabase
+      .from('profiles')
+      .update({ punishments_taken: (prof?.punishments_taken ?? 0) + 1 })
+      .eq('id', userId)
+  } catch {
+    // Non-critical stat tracking — don't surface errors
+  }
+}
+
 /** Upload files to shame bucket and create hall_of_shame record */
 export async function submitShameProof(
   betId: string,

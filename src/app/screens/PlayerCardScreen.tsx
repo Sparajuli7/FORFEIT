@@ -171,9 +171,14 @@ function TradingCard({
   const completedBets = stats.completedBets
   const total = t.wins + t.losses
   const winRate = total > 0 ? Math.round((t.wins / total) * 100) : 0
+
+  // Use the larger of stored punishments_taken or dynamically-computed punishmentsLost
+  // so the card is always accurate regardless of when recordPunishmentTaken ran
+  const punishmentsTaken = Math.max(profile.punishments_taken, t.punishmentsLost)
+  const pendingPunishments = Math.max(0, punishmentsTaken - profile.punishments_completed)
   const completionRate =
-    profile.punishments_taken > 0
-      ? Math.round((profile.punishments_completed / profile.punishments_taken) * 100)
+    punishmentsTaken > 0
+      ? Math.round((profile.punishments_completed / punishmentsTaken) * 100)
       : 100
 
   const playerTitle = getPlayerTitle(t.wins, t.losses, profile.punishments_taken, profile.current_streak, t.moneyWon)
@@ -418,9 +423,19 @@ function TradingCard({
                   </div>
                 )}
                 <div className="flex justify-between items-center">
-                  <span className="text-[10px] text-white/50">💀 Punishments taken</span>
-                  <span className="text-[11px] font-black text-accent-coral">{profile.punishments_taken}</span>
+                  <span className="text-[10px] text-white/50">💀 Punishments owed</span>
+                  <span className="text-[11px] font-black text-accent-coral">{punishmentsTaken}</span>
                 </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] text-white/50">✅ Proofs submitted</span>
+                  <span className="text-[11px] font-black text-accent-green">{profile.punishments_completed}</span>
+                </div>
+                {pendingPunishments > 0 && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] text-amber-400/80">⏳ Awaiting proof</span>
+                    <span className="text-[11px] font-black text-amber-400">{pendingPunishments}</span>
+                  </div>
+                )}
                 <div className="flex justify-between items-center">
                   <span className="text-[10px] text-white/50">🎯 Signature style</span>
                   <span className="text-[11px] font-black text-white/80">{favCategory}</span>
@@ -572,6 +587,32 @@ export function PlayerCardScreen() {
         <div ref={cardRef}>
           <TradingCard profile={profile} stats={stats} />
         </div>
+
+        {/* Pending punishment CTA — shown below the card, not captured in screenshot */}
+        {(() => {
+          const taken = Math.max(profile.punishments_taken, stats.totals.punishmentsLost)
+          const pending = Math.max(0, taken - profile.punishments_completed)
+          if (pending === 0) return null
+          return (
+            <div
+              className="w-full max-w-[310px] rounded-2xl border p-4"
+              style={{ background: 'rgba(245,158,11,0.08)', borderColor: 'rgba(245,158,11,0.35)' }}
+            >
+              <p className="text-sm font-black text-amber-400 mb-1">
+                ⏳ {pending} punishment{pending > 1 ? 's' : ''} awaiting proof
+              </p>
+              <p className="text-xs text-text-muted mb-3">
+                Submit proof to officially close {pending > 1 ? 'them' : 'it'} and earn +10 REP each.
+              </p>
+              <button
+                onClick={() => navigate('/journal')}
+                className="text-xs font-bold text-amber-400 underline underline-offset-2"
+              >
+                Find the bet in Journal →
+              </button>
+            </div>
+          )
+        })()}
 
         {/* Action buttons */}
         <div className="w-full max-w-[310px] flex gap-3">
