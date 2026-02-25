@@ -382,16 +382,8 @@ export function TheBoard() {
         <h2 className="text-base font-bold text-white text-center pt-4 pb-3">
           Groups
         </h2>
-        <CircleGrid
-          items={groups.map((g) => ({
-            id: g.id,
-            icon: g.avatar_emoji,
-            label: g.name,
-          }))}
-          onItemClick={(id) => navigate(`/group/${id}`)}
-        />
         {/* Create group / Join with code */}
-        <div className="flex gap-3 pt-4 pb-2">
+        <div className="flex gap-3 pb-4">
           <button
             onClick={() => navigate('/group/create')}
             className="flex-1 h-12 rounded-xl bg-accent-green text-bg-primary font-bold flex items-center justify-center gap-2"
@@ -405,6 +397,14 @@ export function TheBoard() {
             Join with code
           </button>
         </div>
+        <CircleGrid
+          items={groups.map((g) => ({
+            id: g.id,
+            icon: g.avatar_emoji,
+            label: g.name,
+          }))}
+          onItemClick={(id) => navigate(`/group/${id}`)}
+        />
       </div>
 
       <NotificationPanel open={notificationOpen} onOpenChange={setNotificationOpen} />
