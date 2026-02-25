@@ -9,9 +9,7 @@ import { useRealtime } from '@/lib/hooks/useRealtime'
 import { getProfilesByIds } from '@/lib/api/profiles'
 import { formatMoney } from '@/lib/utils/formatters'
 import { formatOdds } from '@/lib/utils/formatters'
-import { BET_CATEGORIES } from '@/lib/utils/constants'
 import { CircleGrid } from '../components/CircleGrid'
-import type { CircleGridItem } from '../components/CircleGrid'
 import type { BetWithSides } from '@/stores/betStore'
 
 const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop'
@@ -19,7 +17,7 @@ const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1535713875002-d1d0cf37
 function formatStake(bet: BetWithSides): string {
   if (bet.stake_money) return formatMoney(bet.stake_money)
   if (bet.stake_custom_punishment) return bet.stake_custom_punishment
-  if (bet.stake_punishment_id) return '🔥 Punishment'
+  if (bet.stake_punishment_id) return 'Forfeit'
   return '—'
 }
 
@@ -57,32 +55,32 @@ function getBetPriority(bet: BetWithSides, userId: string | undefined): BetPrior
 
   // Claimant submitted the proof — they can't vote, they wait
   if (bet.status === 'proof_submitted' && isClaimant)
-    return { level: 1, label: '👀 Proof out', labelColor: 'text-amber-400', urgent: true }
+    return { level: 1, label: 'Proof Out', labelColor: 'text-amber-400', urgent: true }
 
   // Any other participant (rider OR doubter) needs to vote
   if (bet.status === 'proof_submitted' && mySide !== null)
-    return { level: 0, label: '🗳️ Vote now', labelColor: 'text-amber-400', urgent: true }
+    return { level: 0, label: 'Vote Needed', labelColor: 'text-amber-400', urgent: true }
 
   if (bet.status === 'pending' && bet.bet_type === 'h2h' && bet.h2h_opponent_id === userId)
-    return { level: 2, label: '✍️ Accept', labelColor: 'text-accent-green', urgent: true }
+    return { level: 2, label: 'Accept Required', labelColor: 'text-accent-green', urgent: true }
 
   if (bet.status === 'disputed')
-    return { level: 3, label: '⚡ Disputed', labelColor: 'text-destructive', urgent: true }
+    return { level: 3, label: 'Disputed', labelColor: 'text-destructive', urgent: true }
 
   if (bet.status === 'active' && hoursLeft > 0 && hoursLeft < 6)
-    return { level: 4, label: '🔥 < 6h left', labelColor: 'text-amber-400', urgent: true }
+    return { level: 4, label: '< 6h Left', labelColor: 'text-amber-400', urgent: true }
 
   if (bet.status === 'active' && hoursLeft >= 6 && hoursLeft < 24)
-    return { level: 5, label: '⏰ Today', labelColor: 'text-amber-300', urgent: false }
+    return { level: 5, label: 'Due Today', labelColor: 'text-amber-300', urgent: false }
 
   if (mySide === 'doubter')
-    return { level: 6, label: '👎 Doubter', labelColor: 'text-accent-coral', urgent: false }
+    return { level: 6, label: 'Doubting', labelColor: 'text-accent-coral', urgent: false }
 
   if (isClaimant)
-    return { level: 7, label: '🙋 Your bet', labelColor: 'text-text-muted', urgent: false }
+    return { level: 7, label: 'Your Bet', labelColor: 'text-text-muted', urgent: false }
 
   if (mySide === 'rider')
-    return { level: 8, label: '🤝 Riding', labelColor: 'text-text-muted', urgent: false }
+    return { level: 8, label: 'Riding', labelColor: 'text-text-muted', urgent: false }
 
   return { level: 9, label: '', labelColor: '', urgent: false }
 }
@@ -113,39 +111,66 @@ function BoardBetCard({
   const { riderPct, doubterPct } = formatOdds(riderCount, doubterCount)
   const priority = getBetPriority(bet, userId)
 
+  // Left border accent by status
   const borderColor =
     bet.status === 'proof_submitted' ? 'border-status-proof'
     : bet.status === 'disputed'      ? 'border-status-disputed'
     : 'border-status-active'
 
-  const ringClass = priority.urgent
-    ? 'ring-1 ring-amber-400/50'
-    : ''
+  // Subtle card bg tint per stage
+  const cardBg =
+    priority.level === 0 ? 'bg-amber-400/[0.04]'
+    : priority.level === 2 ? 'bg-accent-green/[0.04]'
+    : priority.level === 3 ? 'bg-red-400/[0.04]'
+    : 'bg-bg-card'
 
-  // For level 0-6 show the priority label instead of the countdown; for 7+ show countdown
-  const rightSlot =
-    priority.level <= 6 && priority.label ? (
-      <span className={`text-[10px] font-black shrink-0 ${priority.labelColor}`}>
-        {priority.label}
-      </span>
-    ) : (
-      <span className="text-xs font-bold tabular-nums text-text-primary shrink-0">
-        {bet.status === 'proof_submitted' ? '👀' : countdown.formatted || '—'}
-      </span>
-    )
+  // Status badge — informational pill, not a CTA
+  const statusBadge = (() => {
+    if (priority.level === 0) return { text: 'Vote Needed', cls: 'bg-amber-400/20 text-amber-400 border-amber-400/40 animate-pulse' }
+    if (priority.level === 1) return { text: 'Proof Out', cls: 'bg-amber-400/15 text-amber-400 border-amber-400/30' }
+    if (priority.level === 2) return { text: 'Accept Required', cls: 'bg-accent-green/15 text-accent-green border-accent-green/30' }
+    if (priority.level === 3) return { text: 'Disputed', cls: 'bg-red-400/15 text-red-400 border-red-400/30' }
+    if (priority.level === 4) return { text: '< 6h Left', cls: 'bg-amber-400/15 text-amber-400 border-amber-400/30' }
+    if (priority.level === 5) return { text: 'Due Today', cls: 'bg-amber-300/10 text-amber-300 border-amber-300/20' }
+    if (priority.level === 6) return { text: 'Doubting', cls: 'bg-accent-coral/10 text-accent-coral border-accent-coral/20' }
+    return null
+  })()
+
+  // Action button — styled pill with clear intent per state
+  const actionBtn = (() => {
+    if (priority.level === 0) return { text: 'Vote Now', cls: 'bg-amber-400 text-bg-primary font-black' }
+    if (priority.level === 2) return { text: 'Accept', cls: 'bg-accent-green text-bg-primary font-black' }
+    if (priority.level === 3) return { text: 'Review', cls: 'border border-red-400/50 text-red-400 font-bold' }
+    return { text: 'View', cls: 'border border-border-subtle text-text-muted font-bold' }
+  })()
+
+  // Countdown in top-right (always present)
+  const countdownText =
+    bet.status === 'proof_submitted' ? 'Judging'
+    : bet.status === 'disputed' ? 'On hold'
+    : countdown.formatted || '—'
 
   return (
     <button
       onClick={() => onNavigate(bet.id)}
-      className={`shrink-0 w-[280px] text-left bg-bg-card rounded-xl border-l-status ${borderColor} border border-border-subtle ${ringClass} p-3 transition-all hover:shadow-md`}
+      className={`shrink-0 w-[280px] text-left ${cardBg} rounded-xl border-l-status ${borderColor} border border-border-subtle p-3 transition-all hover:shadow-md active:scale-[0.98]`}
     >
-      {/* Top row: group chip + priority/countdown */}
-      <div className="flex items-center justify-between gap-2 mb-1.5">
-        <span className="text-[10px] font-bold px-2 py-0.5 bg-bg-elevated rounded-full uppercase tracking-wide truncate">
+      {/* Top row: group chip + countdown */}
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <span className="text-[10px] font-bold px-2 py-0.5 bg-bg-elevated rounded-full uppercase tracking-wide truncate max-w-[160px]">
           {groupName}
         </span>
-        {rightSlot}
+        <span className="text-[10px] font-bold tabular-nums text-text-muted shrink-0">
+          {countdownText}
+        </span>
       </div>
+
+      {/* Status badge — only for notable stages */}
+      {statusBadge && (
+        <div className={`inline-flex items-center px-2 py-0.5 rounded-full border text-[9px] font-black uppercase tracking-wider mb-2 ${statusBadge.cls}`}>
+          {statusBadge.text}
+        </div>
+      )}
 
       {/* Claim */}
       <h3 className="text-sm font-bold text-text-primary line-clamp-2 leading-snug mb-2">
@@ -154,28 +179,31 @@ function BoardBetCard({
 
       {/* Claimant */}
       <div className="flex items-center gap-1.5 mb-2">
-        <div className="w-4 h-4 rounded-full bg-bg-elevated overflow-hidden">
+        <div className="w-4 h-4 rounded-full bg-bg-elevated overflow-hidden shrink-0">
           <img src={claimantAvatar} alt={claimantName} className="w-full h-full object-cover" />
         </div>
         <span className="text-[11px] text-text-muted truncate">{claimantName}</span>
       </div>
 
-      {/* Odds bar */}
-      <div className="h-1.5 overflow-hidden flex rounded-full mb-1.5">
-        <div className="bg-accent-green" style={{ width: `${riderPct}%` }} />
-        <div className="bg-accent-coral" style={{ width: `${doubterPct}%` }} />
+      {/* Odds bar + labels */}
+      <div className="mb-2">
+        <div className="h-1.5 overflow-hidden flex rounded-full mb-1">
+          <div className="bg-accent-green" style={{ width: `${riderPct}%` }} />
+          <div className="bg-accent-coral" style={{ width: `${doubterPct}%` }} />
+        </div>
+        <div className="flex justify-between">
+          <span className="text-[9px] font-bold text-accent-green uppercase tracking-wide">Riders {riderPct}%</span>
+          <span className="text-[9px] font-bold text-accent-coral uppercase tracking-wide">{doubterPct}% Doubters</span>
+        </div>
       </div>
 
-      {/* Bottom: stake + CTA */}
-      <div className="flex items-center justify-between mt-1">
-        <span className="text-[10px] font-bold bg-bg-elevated px-2 py-0.5 rounded-full">
+      {/* Bottom: stake + action button */}
+      <div className="flex items-center justify-between pt-1.5 border-t border-border-subtle/50">
+        <span className="text-[10px] font-bold bg-bg-elevated px-2 py-0.5 rounded-full text-text-muted">
           {formatStake(bet)}
         </span>
-        <span className={`text-[10px] font-bold uppercase tracking-wider ${priority.urgent ? priority.labelColor : 'text-accent-green'}`}>
-          {priority.level === 0 ? 'VOTE →'
-            : priority.level === 1 ? 'VIEW →'
-            : priority.level === 2 ? 'ACCEPT →'
-            : 'VIEW →'}
+        <span className={`text-[10px] px-3 py-1 rounded-full uppercase tracking-wider ${actionBtn.cls}`}>
+          {actionBtn.text}
         </span>
       </div>
     </button>
@@ -238,22 +266,6 @@ export function TheBoard() {
       return pa - pb
     })
   }, [bets, userId])
-
-  /** Count of bets that need immediate action from this user */
-  const actionCount = useMemo(
-    () => stripBets.filter((b) => getBetPriority(b, userId).level <= 3).length,
-    [stripBets, userId],
-  )
-
-  function formatGroupDate(iso: string) {
-    const d = new Date(iso)
-    const now = new Date()
-    const diffDays = Math.floor((now.getTime() - d.getTime()) / (24 * 60 * 60 * 1000))
-    if (diffDays === 0) return 'Today'
-    if (diffDays === 1) return 'Yesterday'
-    if (diffDays < 7) return d.toLocaleDateString('en-US', { weekday: 'short' })
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-  }
 
   if (groups.length === 0 && !isLoading) {
     return (

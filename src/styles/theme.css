@@ -207,7 +207,7 @@
 }
 
 .border-status-proof {
-  border-left-color: var(--live-indicator);
+  border-left-color: var(--gold);
 }
 
 .border-status-completed {
