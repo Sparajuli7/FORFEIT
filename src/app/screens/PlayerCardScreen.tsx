@@ -192,99 +192,33 @@ function TradingCard({
 
   return (
     <>
-      {/* Inject keyframe animations */}
-      <style>{`
-        @keyframes holo-rotate {
-          0%   { --holo-angle: 135deg; }
-          25%  { --holo-angle: 225deg; }
-          50%  { --holo-angle: 315deg; }
-          75%  { --holo-angle: 45deg; }
-          100% { --holo-angle: 135deg; }
-        }
-        @keyframes shimmer-slide {
-          0%   { transform: translateX(-120%) rotate(-30deg); opacity: 0; }
-          15%  { opacity: 1; }
-          85%  { opacity: 1; }
-          100% { transform: translateX(320%) rotate(-30deg); opacity: 0; }
-        }
-        @keyframes shimmer-slide-2 {
-          0%   { transform: translateX(-120%) rotate(-30deg) translateY(40px); opacity: 0; }
-          20%  { opacity: 0.7; }
-          80%  { opacity: 0.7; }
-          100% { transform: translateX(320%) rotate(-30deg) translateY(40px); opacity: 0; }
-        }
-        @keyframes pulse-glow {
-          0%, 100% { box-shadow: 0 0 20px 4px ${cfg.glowColor}, 0 0 60px 12px ${cfg.glowColorFaint}; }
-          50%       { box-shadow: 0 0 30px 8px ${cfg.glowColor}, 0 0 80px 20px ${cfg.glowColorFaint}; }
-        }
-        .holo-border {
-          background: ${borderGradient};
-          animation: holo-rotate 4s linear infinite;
-          background-size: 300% 300%;
-        }
-        .card-glow {
-          animation: pulse-glow 3s ease-in-out infinite;
-        }
-        .shimmer-1 {
-          animation: shimmer-slide 3.5s ease-in-out infinite;
-          animation-delay: 0.5s;
-        }
-        .shimmer-2 {
-          animation: shimmer-slide-2 3.5s ease-in-out infinite;
-          animation-delay: 1.2s;
-        }
-      `}</style>
-
-      {/* Outer glow wrapper */}
-      <div className="card-glow rounded-[20px]">
-        {/* Gradient border shell */}
+      {/* Gradient border shell */}
+      <div
+        className="rounded-[20px] p-[3px]"
+        style={{ background: borderGradient }}
+      >
+        {/* Inner card */}
         <div
-          className="holo-border rounded-[20px] p-[3px]"
-          style={{ background: borderGradient }}
+          className="relative rounded-[18px] overflow-hidden"
+          style={{
+            background: cfg.cardBg,
+            width: '310px',
+            minHeight: '480px',
+          }}
         >
-          {/* Inner card */}
+          {/* Diagonal texture overlay */}
           <div
-            className="relative rounded-[18px] overflow-hidden"
+            className="absolute inset-0 pointer-events-none"
             style={{
-              background: cfg.cardBg,
-              width: '310px',
-              minHeight: '480px',
+              backgroundImage: `repeating-linear-gradient(
+                45deg,
+                rgba(255,255,255,0.012) 0px,
+                rgba(255,255,255,0.012) 1px,
+                transparent 1px,
+                transparent 8px
+              )`,
             }}
-          >
-            {/* Diagonal texture overlay */}
-            <div
-              className="absolute inset-0 pointer-events-none"
-              style={{
-                backgroundImage: `repeating-linear-gradient(
-                  45deg,
-                  rgba(255,255,255,0.012) 0px,
-                  rgba(255,255,255,0.012) 1px,
-                  transparent 1px,
-                  transparent 8px
-                )`,
-              }}
-            />
-
-            {/* Shimmer overlays */}
-            <div
-              className="shimmer-1 absolute inset-0 pointer-events-none"
-              style={{
-                background: `linear-gradient(90deg, transparent 0%, ${cfg.shimmer1} 45%, ${cfg.shimmer2} 55%, transparent 100%)`,
-                width: '60%',
-                top: 0,
-                bottom: 0,
-              }}
-            />
-            <div
-              className="shimmer-2 absolute inset-0 pointer-events-none"
-              style={{
-                background: `linear-gradient(90deg, transparent 0%, ${cfg.shimmer1} 50%, transparent 100%)`,
-                width: '40%',
-                top: 0,
-                bottom: 0,
-                opacity: 0.6,
-              }}
-            />
+          />
 
             {/* ── CARD CONTENT ── */}
             <div className="relative z-10 p-4 flex flex-col gap-3">
@@ -322,14 +256,9 @@ function TradingCard({
               {/* Avatar */}
               <div className="flex justify-center">
                 <div className="relative">
-                  {/* Outer glow ring */}
-                  <div
-                    className="absolute -inset-2 rounded-full blur-md"
-                    style={{ background: cfg.glowColor, opacity: 0.6 }}
-                  />
                   {/* Border ring */}
                   <div
-                    className="relative rounded-full p-[2.5px]"
+                    className="rounded-full p-[2.5px]"
                     style={{ background: borderGradient }}
                   >
                     <div className="w-[88px] h-[88px] rounded-full overflow-hidden bg-black">
@@ -477,7 +406,6 @@ function TradingCard({
             </div>
           </div>
         </div>
-      </div>
     </>
   )
 }

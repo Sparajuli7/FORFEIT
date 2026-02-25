@@ -1,16 +1,101 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
-import { MessageCircle, Loader2, Archive } from 'lucide-react'
+import { MessageCircle, Loader2, Archive, Camera } from 'lucide-react'
 import { useAuthStore, useChatStore } from '@/stores'
 import { getMyBets, getUserBetStats } from '@/lib/api/bets'
 import type { UserBetStats } from '@/lib/api/bets'
 import { getProfilesByIds, getProfile as fetchProfile } from '@/lib/api/profiles'
-import { AvatarWithRepBadge } from '@/app/components/RepBadge'
 import { formatRecord } from '@/lib/utils/formatters'
 import { BET_CATEGORIES } from '@/lib/utils/constants'
 import { CircleGrid } from '@/app/components/CircleGrid'
 import type { BetWithSides } from '@/stores/betStore'
 import type { Profile } from '@/lib/database.types'
+
+// ---------------------------------------------------------------------------
+// Circular proof-rate ring frame around the avatar
+// ---------------------------------------------------------------------------
+
+function ProofRingAvatar({
+  src,
+  alt,
+  pct,
+  onEdit,
+}: {
+  src: string | null
+  alt: string
+  /** Completion % (0–100) — drives the green arc */
+  pct: number
+  onEdit?: () => void
+}) {
+  const strokeWidth = 3
+  const imageSize = 80
+  const gap = 3
+  const dim = imageSize + (strokeWidth + gap) * 2
+  const center = dim / 2
+  const radius = center - strokeWidth / 2 - 1
+  const circumference = 2 * Math.PI * radius
+  const dashOffset = circumference * (1 - Math.min(pct, 100) / 100)
+
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <div className="relative" style={{ width: dim, height: dim }}>
+        {/* Avatar image */}
+        <div
+          className="absolute rounded-full overflow-hidden bg-bg-elevated"
+          style={{ top: strokeWidth + gap, left: strokeWidth + gap, width: imageSize, height: imageSize }}
+        >
+          {src ? (
+            <img src={src} alt={alt} className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-accent-green/50 via-gold/50 to-purple/50" />
+          )}
+        </div>
+
+        {/* SVG progress ring */}
+        <svg
+          className="absolute inset-0 -rotate-90 pointer-events-none"
+          width={dim}
+          height={dim}
+        >
+          {/* Track */}
+          <circle
+            cx={center} cy={center} r={radius}
+            stroke="rgba(255,255,255,0.1)"
+            strokeWidth={strokeWidth}
+            fill="none"
+          />
+          {/* Arc */}
+          <circle
+            cx={center} cy={center} r={radius}
+            stroke="var(--accent-green)"
+            strokeWidth={strokeWidth}
+            fill="none"
+            strokeDasharray={circumference}
+            strokeDashoffset={dashOffset}
+            strokeLinecap="round"
+          />
+        </svg>
+
+        {/* Tap-to-edit overlay (own profile only) */}
+        {onEdit && (
+          <button
+            onClick={onEdit}
+            className="absolute rounded-full flex items-center justify-center group"
+            style={{ top: strokeWidth + gap, left: strokeWidth + gap, width: imageSize, height: imageSize }}
+            aria-label="Change profile photo"
+          >
+            <div className="w-full h-full rounded-full flex items-center justify-center bg-black/0 group-hover:bg-black/35 transition-colors">
+              <Camera className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+            </div>
+          </button>
+        )}
+      </div>
+
+      {/* Percentage label below ring */}
+      <span className="text-[11px] font-bold text-accent-green tabular-nums">{pct}% proof rate</span>
+    </div>
+  )
+}
 
 function formatCompletionRate(completed: number, taken: number): string {
   if (taken === 0) return '—'
@@ -59,17 +144,21 @@ function ProfileContent({
     }
   })
 
+  const proofPct =
+    profile.punishments_taken > 0
+      ? Math.round((profile.punishments_completed / profile.punishments_taken) * 100)
+      : 100
+
   return (
     <div className="h-full bg-bg-primary overflow-y-auto pb-6">
       {/* Header */}
       <div className="px-6 pt-12 pb-8 text-center">
-        <div className="flex justify-center mb-4">
-          <AvatarWithRepBadge
+        <div className="flex justify-center mb-3">
+          <ProofRingAvatar
             src={profile.avatar_url}
             alt={profile.display_name}
-            score={profile.rep_score}
-            name={profile.display_name}
-            size={80}
+            pct={proofPct}
+            onEdit={isOwnProfile ? () => navigate('/profile/edit') : undefined}
           />
         </div>
         <h2 className="text-2xl font-bold text-text-primary mb-1">{profile.display_name}</h2>
