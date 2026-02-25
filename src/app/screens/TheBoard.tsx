@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useNavigate } from 'react-router'
-import { Bell, MessageCircle, Plus, LogIn, UserPlus } from 'lucide-react'
+import { Bell, MessageCircle, Plus, LogIn, UserPlus, Star } from 'lucide-react'
 import { NotificationPanel } from '../components/NotificationPanel'
 import { PushPermissionBanner } from '../components/PushPermissionBanner'
 import { useGroupStore, useBetStore, useAuthStore, useNotificationStore, useChatStore } from '@/stores'
@@ -9,6 +9,7 @@ import { useRealtime } from '@/lib/hooks/useRealtime'
 import { getProfilesByIds } from '@/lib/api/profiles'
 import { formatMoney } from '@/lib/utils/formatters'
 import { formatOdds } from '@/lib/utils/formatters'
+import { loadPinned, togglePin, PIN_BETS_KEY } from '@/lib/utils/pinStorage'
 import { CircleGrid } from '../components/CircleGrid'
 import type { BetWithSides } from '@/stores/betStore'
 
@@ -95,14 +96,18 @@ function BoardBetCard({
   claimantName,
   claimantAvatar,
   userId,
+  isPinned,
   onNavigate,
+  onPin,
 }: {
   bet: BetWithSides
   groupName: string
   claimantName: string
   claimantAvatar: string
   userId: string | undefined
+  isPinned: boolean
   onNavigate: (betId: string) => void
+  onPin: (betId: string) => void
 }) {
   const countdown = useCountdown(bet.deadline)
   const sides = bet.bet_sides ?? []
@@ -143,18 +148,27 @@ function BoardBetCard({
     : countdown.formatted || '—'
 
   return (
-    <button
+    <div
       onClick={() => onNavigate(bet.id)}
-      className={`shrink-0 w-[280px] text-left ${cardBg} rounded-xl border border-border-subtle p-3 transition-all hover:shadow-md active:scale-[0.98]`}
+      className={`shrink-0 w-[280px] cursor-pointer ${cardBg} rounded-xl border border-border-subtle p-3 transition-all hover:shadow-md active:scale-[0.98]`}
     >
-      {/* Top row: group chip + countdown */}
+      {/* Top row: group chip + countdown + pin */}
       <div className="flex items-center justify-between gap-2 mb-2">
-        <span className="text-[10px] font-bold px-2 py-0.5 bg-bg-elevated rounded-full uppercase tracking-wide truncate max-w-[160px]">
+        <span className="text-[10px] font-bold px-2 py-0.5 bg-bg-elevated rounded-full uppercase tracking-wide truncate max-w-[140px]">
           {groupName}
         </span>
-        <span className="text-[10px] font-bold tabular-nums text-text-muted shrink-0">
-          {countdownText}
-        </span>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className="text-[10px] font-bold tabular-nums text-text-muted">
+            {countdownText}
+          </span>
+          <button
+            onClick={(e) => { e.stopPropagation(); onPin(bet.id) }}
+            className="p-0.5 hover:scale-110 transition-transform"
+            aria-label={isPinned ? 'Unpin' : 'Pin'}
+          >
+            <Star className={`w-3 h-3 transition-colors ${isPinned ? 'text-yellow-400 fill-yellow-400' : 'text-text-muted'}`} />
+          </button>
+        </div>
       </div>
 
       {/* Status badge — only for notable stages */}
@@ -198,7 +212,7 @@ function BoardBetCard({
           {actionBtn.text}
         </span>
       </div>
-    </button>
+    </div>
   )
 }
 
@@ -222,6 +236,17 @@ export function TheBoard() {
 
   const [notificationOpen, setNotificationOpen] = useState(false)
   const [claimantMap, setClaimantMap] = useState<Map<string, { display_name: string; avatar_url: string | null }>>(new Map())
+  const [pinBets, setPinBets] = useState<Set<string>>(() => loadPinned(PIN_BETS_KEY))
+
+  const handlePinBet = (betId: string) => {
+    const isPinned = togglePin(PIN_BETS_KEY, betId)
+    setPinBets((prev) => {
+      const next = new Set(prev)
+      if (isPinned) next.add(betId)
+      else next.delete(betId)
+      return next
+    })
+  }
 
   useEffect(() => { fetchGroups() }, [fetchGroups])
 
@@ -377,7 +402,9 @@ export function TheBoard() {
                   claimantName={claimant?.display_name ?? 'Anonymous'}
                   claimantAvatar={claimant?.avatar_url ?? DEFAULT_AVATAR}
                   userId={userId}
+                  isPinned={pinBets.has(bet.id)}
                   onNavigate={(id) => navigate(`/bet/${id}`)}
+                  onPin={handlePinBet}
                 />
               )
             })

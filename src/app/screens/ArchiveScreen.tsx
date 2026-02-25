@@ -6,29 +6,9 @@ import { getMyBets } from '@/lib/api/bets'
 import { supabase } from '@/lib/supabase'
 import { BET_CATEGORIES } from '@/lib/utils/constants'
 import { formatMoney } from '@/lib/utils/formatters'
+import { loadPinned, savePinned, PIN_BETS_KEY, PIN_GROUPS_KEY } from '@/lib/utils/pinStorage'
 import type { BetWithSides } from '@/stores/betStore'
 import type { Group } from '@/lib/database.types'
-
-// ---------------------------------------------------------------------------
-// Favourites persistence via localStorage
-// ---------------------------------------------------------------------------
-
-const FAV_BETS_KEY = 'forfeit-fav-bets'
-const FAV_GROUPS_KEY = 'forfeit-fav-groups'
-
-function loadFavs(key: string): Set<string> {
-  try {
-    const raw = localStorage.getItem(key)
-    if (!raw) return new Set()
-    return new Set(JSON.parse(raw) as string[])
-  } catch {
-    return new Set()
-  }
-}
-
-function saveFavs(key: string, favs: Set<string>): void {
-  localStorage.setItem(key, JSON.stringify([...favs]))
-}
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -77,8 +57,8 @@ export function ArchiveScreen() {
   const [betsLoading, setBetsLoading] = useState(true)
   const [groupsLoading, setGroupsLoading] = useState(false)
 
-  const [favBets, setFavBets] = useState<Set<string>>(() => loadFavs(FAV_BETS_KEY))
-  const [favGroups, setFavGroups] = useState<Set<string>>(() => loadFavs(FAV_GROUPS_KEY))
+  const [favBets, setFavBets] = useState<Set<string>>(() => loadPinned(PIN_BETS_KEY))
+  const [favGroups, setFavGroups] = useState<Set<string>>(() => loadPinned(PIN_GROUPS_KEY))
   const [punishmentTexts, setPunishmentTexts] = useState<Map<string, string>>(new Map())
 
   useEffect(() => {
@@ -119,7 +99,7 @@ export function ArchiveScreen() {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
       else next.add(id)
-      saveFavs(FAV_BETS_KEY, next)
+      savePinned(PIN_BETS_KEY, next)
       return next
     })
   }, [])
@@ -129,7 +109,7 @@ export function ArchiveScreen() {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
       else next.add(id)
-      saveFavs(FAV_GROUPS_KEY, next)
+      savePinned(PIN_GROUPS_KEY, next)
       return next
     })
   }, [])

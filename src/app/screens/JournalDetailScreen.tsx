@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import {
-  ChevronLeft, Plus, X, Check, Search, Trophy, MinusCircle,
+  ChevronLeft, Plus, X, Check, Search, Trophy, MinusCircle, Star,
 } from 'lucide-react'
 import { useAuthStore, useGroupStore } from '@/stores'
 import { getMyBets, getGroupBets } from '@/lib/api/bets'
@@ -11,6 +11,7 @@ import {
   renameJournal,
   type JournalCollection,
 } from '@/lib/utils/journalStorage'
+import { loadPinned, togglePin, PIN_BETS_KEY } from '@/lib/utils/pinStorage'
 import { BET_CATEGORIES } from '@/lib/utils/constants'
 import { formatMoney } from '@/lib/utils/formatters'
 import type { BetWithSides } from '@/stores/betStore'
@@ -339,8 +340,19 @@ export function JournalDetailScreen() {
   const [showPicker, setShowPicker] = useState(false)
   const [showRename, setShowRename] = useState(false)
   const [expanded, setExpanded] = useState(false)
+  const [pinBets, setPinBets] = useState<Set<string>>(() => loadPinned(PIN_BETS_KEY))
 
   const PREVIEW_COUNT = 5
+
+  const handlePinBet = useCallback((betId: string) => {
+    const isPinned = togglePin(PIN_BETS_KEY, betId)
+    setPinBets((prev) => {
+      const next = new Set(prev)
+      if (isPinned) next.add(betId)
+      else next.delete(betId)
+      return next
+    })
+  }, [])
 
   // Load collection from localStorage
   useEffect(() => {
@@ -525,6 +537,13 @@ export function JournalDetailScreen() {
                         </p>
                       </div>
                       <StatusPill status={bet.status} />
+                    </button>
+                    <button
+                      onClick={() => handlePinBet(bet.id)}
+                      className="px-2.5 flex items-center justify-center border-l border-border-subtle hover:bg-bg-elevated transition-colors"
+                      aria-label={pinBets.has(bet.id) ? 'Unpin' : 'Pin'}
+                    >
+                      <Star className={`w-4 h-4 transition-colors ${pinBets.has(bet.id) ? 'text-yellow-400 fill-yellow-400' : 'text-text-muted'}`} />
                     </button>
                     <button
                       onClick={() => removeBet(bet.id)}

@@ -108,6 +108,9 @@ export function JournalScreen() {
   const [betsLoading, setBetsLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
 
+  const [pinBets, setPinBets] = useState<Set<string>>(() => loadPinned(PIN_BETS_KEY))
+  const [pinGroups, setPinGroups] = useState<Set<string>>(() => loadPinned(PIN_GROUPS_KEY))
+
   useEffect(() => {
     fetchGroups()
     setJournals(loadJournals())
@@ -128,6 +131,38 @@ export function JournalScreen() {
     navigate(`/journal/${col.id}`)
   }
 
+  const handlePinBet = (id: string) => {
+    const isPinned = togglePin(PIN_BETS_KEY, id)
+    setPinBets((prev) => {
+      const next = new Set(prev)
+      if (isPinned) next.add(id)
+      else next.delete(id)
+      return next
+    })
+  }
+
+  const handlePinGroup = (id: string) => {
+    const isPinned = togglePin(PIN_GROUPS_KEY, id)
+    setPinGroups((prev) => {
+      const next = new Set(prev)
+      if (isPinned) next.add(id)
+      else next.delete(id)
+      return next
+    })
+  }
+
+  // Items for the unified Pinned section at top
+  const pinnedGroupItems = groups
+    .filter((g) => pinGroups.has(g.id))
+    .map((g) => ({ id: `g:${g.id}`, icon: g.avatar_emoji, label: g.name, _groupId: g.id }))
+  const pinnedBetItems = personalBets
+    .filter((b) => pinBets.has(b.id))
+    .map((b) => {
+      const category = BET_CATEGORIES[b.category]
+      return { id: `b:${b.id}`, icon: category?.emoji ?? '🎯', label: b.title, _betId: b.id }
+    })
+  const hasPinned = pinnedGroupItems.length > 0 || pinnedBetItems.length > 0
+
   return (
     <div className="relative h-full bg-bg-primary overflow-y-auto pb-8">
       {/* ── Header ── */}
@@ -135,6 +170,25 @@ export function JournalScreen() {
         <h1 className="text-2xl font-black text-text-primary">Journal</h1>
         <p className="text-text-muted text-sm mt-0.5">Your bets, groups &amp; collections</p>
       </div>
+
+      {/* ══════════════════════════════════════
+          SECTION 0 — Pinned (shown when any items are pinned)
+          ══════════════════════════════════════ */}
+      {hasPinned && (
+        <div className="px-6 pt-5 pb-4 border-b border-border-subtle">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-text-muted flex items-center gap-1.5 mb-3">
+            <span>⭐</span> Pinned
+          </p>
+          <CircleGrid
+            items={[...pinnedGroupItems, ...pinnedBetItems]}
+            onItemClick={(id) => {
+              if (id.startsWith('g:')) navigate(`/journal/group/${id.slice(2)}`)
+              else navigate(`/bet/${id.slice(2)}`)
+            }}
+            labelLines={2}
+          />
+        </div>
+      )}
 
       {/* ══════════════════════════════════════
           SECTION 1 — My Journals
@@ -220,6 +274,8 @@ export function JournalScreen() {
               label: g.name,
             }))}
             onItemClick={(id) => navigate(`/journal/group/${id}`)}
+            pinnedIds={pinGroups}
+            onPinItem={handlePinGroup}
           />
         )}
       </div>
@@ -261,6 +317,8 @@ export function JournalScreen() {
             })}
             onItemClick={(id) => navigate(`/bet/${id}`)}
             labelLines={2}
+            pinnedIds={pinBets}
+            onPinItem={handlePinBet}
           />
         )}
       </div>
