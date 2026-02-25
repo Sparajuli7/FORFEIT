@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import { getOutcome } from '@/lib/api/outcomes'
-import type { Bet, BetSideEntry, BetInsert, BetSide, BetCategory, BetType, BetStatus } from '@/lib/database.types'
+import type { Bet, BetSideEntry, BetInsert, BetSide, BetCategory, BetType, BetStatus, Outcome } from '@/lib/database.types'
 
 export type RematchStakeOption = 'double_or_nothing' | 'double_wager' | 'worse_punishment'
 
@@ -237,4 +237,71 @@ export async function createRematchBet(
   }
 
   return newBet as Bet
+}
+
+export interface UserBetStats {
+  wins: number
+  losses: number
+  voids: number
+  totalCompleted: number
+  winPct: number
+}
+
+/**
+ * Compute actual W/L/V stats for a user from completed bets.
+ * Rider + claimant_succeeded = win, Rider + claimant_failed = loss.
+ * Doubter + claimant_failed = win, Doubter + claimant_succeeded = loss.
+ * Voided outcomes count as voids.
+ */
+export async function getUserBetStats(userId: string): Promise<UserBetStats> {
+  // Get all bet IDs this user participated in
+  const { data: sideEntries, error: sidesErr } = await supabase
+    .from('bet_sides')
+    .select('*')
+    .eq('user_id', userId)
+
+  if (sidesErr) throw sidesErr
+  if (!sideEntries || sideEntries.length === 0) {
+    return { wins: 0, losses: 0, voids: 0, totalCompleted: 0, winPct: 0 }
+  }
+
+  const sideByBet = new Map<string, BetSide>()
+  for (const entry of sideEntries as BetSideEntry[]) {
+    sideByBet.set(entry.bet_id, entry.side as BetSide)
+  }
+
+  const betIds = [...sideByBet.keys()]
+
+  // Get outcomes for these bets (only completed bets have outcomes)
+  const { data: outcomes, error: outErr } = await supabase
+    .from('outcomes')
+    .select('*')
+    .in('bet_id', betIds)
+
+  if (outErr) throw outErr
+
+  let wins = 0
+  let losses = 0
+  let voids = 0
+
+  for (const outcome of (outcomes ?? []) as Outcome[]) {
+    const side = sideByBet.get(outcome.bet_id)
+    if (!side) continue
+
+    if (outcome.result === 'voided') {
+      voids++
+    } else if (
+      (side === 'rider' && outcome.result === 'claimant_succeeded') ||
+      (side === 'doubter' && outcome.result === 'claimant_failed')
+    ) {
+      wins++
+    } else {
+      losses++
+    }
+  }
+
+  const totalCompleted = wins + losses + voids
+  const winPct = wins + losses > 0 ? Math.round((wins / (wins + losses)) * 100) : 0
+
+  return { wins, losses, voids, totalCompleted, winPct }
 }

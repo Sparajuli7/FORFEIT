@@ -160,20 +160,16 @@ export function BetCreationWizard() {
       const deadline = computeDeadline()
       if (!deadline || deadline <= new Date()) return
       if (!wizard.selectedGroup) return
-      updateWizardStep(2, { deadline: deadline.toISOString() })
+      updateWizardStep(2, { deadline: deadline.toISOString(), stakeType: wizard.stakeType ?? 'punishment' })
     }
     nextStep()
   }
 
   const handleDropIt = async () => {
-    const effectiveStakeType = wizard.stakeType ?? 'punishment'
-    // Ensure stakeType is set in the wizard (defaults to punishment)
-    if (!wizard.stakeType) {
-      updateWizardStep(currentStep, { stakeType: 'punishment' })
-    }
-    if ((effectiveStakeType === 'money' || effectiveStakeType === 'both') && (!wizard.stakeMoney || wizard.stakeMoney <= 0)) return
+    if (!wizard.stakeType) return
+    if ((wizard.stakeType === 'money' || wizard.stakeType === 'both') && (!wizard.stakeMoney || wizard.stakeMoney <= 0)) return
     // Always sync punishment text to wizard before submitting
-    if (effectiveStakeType === 'punishment' || effectiveStakeType === 'both') {
+    if (wizard.stakeType === 'punishment' || wizard.stakeType === 'both') {
       const text = punishmentText.trim()
       if (!text) return
       updateWizardStep(currentStep, { stakeCustomPunishment: text })
@@ -461,7 +457,7 @@ export function BetCreationWizard() {
                 </div>
               )}
 
-              {(wizard.stakeType === 'punishment' || wizard.stakeType === 'both' || wizard.stakeType === null) && (
+              {(wizard.stakeType === 'punishment' || wizard.stakeType === 'both') && (
                 <div className="space-y-4">
                   {/* Editable punishment card */}
                   <div className="bg-bg-elevated dark:bg-bg-card rounded-2xl border-2 border-border-subtle p-6 min-h-[200px] flex flex-col relative overflow-hidden">
@@ -520,7 +516,7 @@ export function BetCreationWizard() {
 
               <PrimaryButton
                 onClick={handleDropIt}
-                disabled={isLoading}
+                disabled={isLoading || !wizard.stakeType}
               >
                 {isLoading ? 'Creating...' : 'Drop It 🔥'}
               </PrimaryButton>

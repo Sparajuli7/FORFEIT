@@ -1,21 +1,16 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { MessageCircle, Loader2, Archive } from 'lucide-react'
-import { useAuthStore, useBetStore, useChatStore } from '@/stores'
-import { getMyBets } from '@/lib/api/bets'
+import { useAuthStore, useChatStore } from '@/stores'
+import { getMyBets, getUserBetStats } from '@/lib/api/bets'
+import type { UserBetStats } from '@/lib/api/bets'
 import { getProfilesByIds, getProfile as fetchProfile } from '@/lib/api/profiles'
 import { AvatarWithRepBadge } from '@/app/components/RepBadge'
-import { formatRecord, formatMoney } from '@/lib/utils/formatters'
+import { formatRecord } from '@/lib/utils/formatters'
+import { BET_CATEGORIES } from '@/lib/utils/constants'
+import { CircleGrid } from '@/app/components/CircleGrid'
 import type { BetWithSides } from '@/stores/betStore'
 import type { Profile } from '@/lib/database.types'
-
-const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop'
-
-function formatWinRate(wins: number, losses: number): string {
-  const total = wins + losses
-  if (total === 0) return '—'
-  return `${Math.round((wins / total) * 100)}%`
-}
 
 function formatCompletionRate(completed: number, taken: number): string {
   if (taken === 0) return '—'
@@ -25,29 +20,44 @@ function formatCompletionRate(completed: number, taken: number): string {
 function ProfileContent({
   profile,
   recentBets,
-  claimantMap,
   isOwnProfile,
+  stats,
 }: {
   profile: Profile
   recentBets: BetWithSides[]
-  claimantMap: Map<string, { display_name: string; avatar_url: string | null }>
   isOwnProfile: boolean
+  stats: UserBetStats
 }) {
   const navigate = useNavigate()
   const [openingDM, setOpeningDM] = useState(false)
-  const winRate = formatWinRate(profile.wins, profile.losses)
-  // pending = taken but proof not yet submitted; both fields are 0 until first outcome
   const pendingPunishments = Math.max(0, profile.punishments_taken - profile.punishments_completed)
   const completionRate = formatCompletionRate(
     profile.punishments_completed,
     profile.punishments_taken,
   )
-  const biggestWin = typeof profile.biggest_win === 'number'
-    ? profile.biggest_win
-    : parseInt(String(profile.biggest_win), 10) || 0
-  const biggestLoss = typeof profile.biggest_loss === 'number'
-    ? profile.biggest_loss
-    : parseInt(String(profile.biggest_loss), 10) || 0
+
+  const winRateDisplay = stats.wins + stats.losses > 0
+    ? `${stats.winPct}%`
+    : '—'
+  const winRateFraction = stats.wins + stats.losses > 0
+    ? stats.wins / (stats.wins + stats.losses)
+    : 0
+
+  // Recent bets as CircleGrid items (limited to 3)
+  const recentBetItems = recentBets.slice(0, 3).map((bet) => {
+    const category = BET_CATEGORIES[bet.category]
+    return {
+      id: bet.id,
+      icon: category?.emoji ?? '🎯',
+      label: bet.title,
+      sublabel:
+        bet.status === 'active'
+          ? '🟢 Live'
+          : bet.status === 'completed'
+            ? '✅ Done'
+            : bet.status.replace(/_/g, ' '),
+    }
+  })
 
   return (
     <div className="h-full bg-bg-primary overflow-y-auto pb-6">
@@ -65,7 +75,7 @@ function ProfileContent({
         <h2 className="text-2xl font-bold text-text-primary mb-1">{profile.display_name}</h2>
         <p className="text-text-muted">@{profile.username}</p>
         <p className="text-sm text-text-muted mt-2">
-          {formatRecord(profile.wins, profile.losses, profile.voids)}
+          {formatRecord(stats.wins, stats.losses, stats.voids)}
         </p>
       </div>
 
@@ -92,14 +102,12 @@ function ProfileContent({
                   strokeWidth="8"
                   fill="none"
                   strokeDasharray={2 * Math.PI * 34}
-                  strokeDashoffset={
-                    2 * Math.PI * 34 * (1 - (profile.wins + profile.losses > 0 ? profile.wins / (profile.wins + profile.losses) : 0))
-                  }
+                  strokeDashoffset={2 * Math.PI * 34 * (1 - winRateFraction)}
                   strokeLinecap="round"
                 />
               </svg>
               <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-xl font-bold text-accent-green">{winRate}</span>
+                <span className="text-xl font-bold text-accent-green">{winRateDisplay}</span>
               </div>
             </div>
           </div>
@@ -121,7 +129,7 @@ function ProfileContent({
           </div>
           <div className="glass-card rounded-2xl p-4 text-center">
             <p className="text-text-muted text-xs uppercase tracking-wider mb-1">Punishments Owed</p>
-            <p className="text-3xl font-black text-text-primary">{profile.punishments_taken} 💀</p>
+            <p className="text-3xl font-black text-text-primary">{profile.punishments_taken}</p>
             {pendingPunishments > 0 && (
               <p className="text-[11px] text-amber-400 mt-1 font-semibold">
                 {pendingPunishments} pending proof
@@ -129,7 +137,7 @@ function ProfileContent({
             )}
             {pendingPunishments === 0 && profile.punishments_taken > 0 && (
               <p className="text-[11px] text-accent-green mt-1 font-semibold">
-                all proved ✓
+                all proved
               </p>
             )}
           </div>
@@ -140,69 +148,31 @@ function ProfileContent({
               {profile.punishments_completed}/{profile.punishments_taken} proved
             </p>
           </div>
-          <div className="glass-card rounded-2xl p-4 text-center col-span-2">
-            <p className="text-text-muted text-xs uppercase tracking-wider mb-1">Biggest Win / Loss</p>
-            <p className="text-lg font-black text-accent-green">{formatMoney(biggestWin)}</p>
-            <p className="text-lg font-black text-accent-coral">{formatMoney(biggestLoss)}</p>
-          </div>
         </div>
       </div>
 
-      {/* Recent Bets */}
+      {/* Recent Bets — circle layout, limited to 3 */}
       <div className="px-6">
         <h3 className="text-lg font-bold text-white mb-4">Recent Bets</h3>
         {recentBets.length === 0 ? (
           <p className="text-text-muted text-sm">No bets yet.</p>
         ) : (
-          <div className="space-y-2">
-            {recentBets.slice(0, 5).map((bet) => {
-              const claimant = claimantMap.get(bet.claimant_id)
-              const statusLabel =
-                bet.status === 'completed'
-                  ? 'Completed'
-                  : bet.status === 'active'
-                    ? 'Active'
-                    : bet.status === 'proof_submitted'
-                      ? 'Proof'
-                      : bet.status
-              return (
-                <button
-                  key={bet.id}
-                  onClick={() => navigate(`/bet/${bet.id}`)}
-                  className="w-full bg-bg-card rounded-xl border border-border-subtle p-3 flex items-center justify-between text-left hover:bg-bg-elevated transition-colors"
-                >
-                  <div>
-                    <p className="text-white text-sm font-medium mb-1">{bet.title}</p>
-                    <p className="text-text-muted text-xs">
-                      {new Date(bet.created_at).toLocaleDateString()} · {claimant?.display_name ?? 'Unknown'}
-                    </p>
-                  </div>
-                  <div
-                    className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                      bet.status === 'completed'
-                        ? 'bg-accent-green/20 text-accent-green'
-                        : bet.status === 'active'
-                          ? 'bg-accent-green/20 text-accent-green'
-                          : 'bg-bg-elevated text-text-muted'
-                    }`}
-                  >
-                    {statusLabel}
-                  </div>
-                </button>
-              )
-            })}
-          </div>
+          <CircleGrid
+            items={recentBetItems}
+            onItemClick={(id) => navigate(`/bet/${id}`)}
+            labelLines={2}
+          />
         )}
       </div>
 
       {isOwnProfile && pendingPunishments > 0 && (
-        <div className="px-6 mb-2">
+        <div className="px-6 mb-2 mt-6">
           <div
             className="rounded-2xl border p-4"
             style={{ background: 'rgba(245,158,11,0.08)', borderColor: 'rgba(245,158,11,0.35)' }}
           >
             <p className="text-sm font-black text-amber-400 mb-0.5">
-              ⏳ {pendingPunishments} punishment{pendingPunishments > 1 ? 's' : ''} awaiting proof
+              {pendingPunishments} punishment{pendingPunishments > 1 ? 's' : ''} awaiting proof
             </p>
             <p className="text-xs text-text-muted mb-3">
               Submit proof to officially close {pendingPunishments > 1 ? 'them' : 'it'} and earn +10 REP each.
@@ -229,7 +199,7 @@ function ProfileContent({
               color: '#FFD700',
             }}
           >
-            🃏 My Player Card
+            My Player Card
           </button>
           <button
             onClick={() => navigate('/journal')}
@@ -310,7 +280,7 @@ export function ProfileScreen({ activeScreen, userId }: ProfileScreenProps) {
 
   const [profile, setProfile] = useState<Profile | null>(null)
   const [recentBets, setRecentBets] = useState<BetWithSides[]>([])
-  const [claimantMap, setClaimantMap] = useState<Map<string, { display_name: string; avatar_url: string | null }>>(new Map())
+  const [stats, setStats] = useState<UserBetStats>({ wins: 0, losses: 0, voids: 0, totalCompleted: 0, winPct: 0 })
   const [loading, setLoading] = useState(true)
 
   const isOwnProfile = !userId || userId === currentUser?.id
@@ -337,25 +307,23 @@ export function ProfileScreen({ activeScreen, userId }: ProfileScreenProps) {
 
   useEffect(() => {
     if (!targetUserId) return
-    getMyBets(targetUserId).then((bets) => {
-      // When viewing another user's profile, hide private competitions
-      // the viewer isn't a participant of
+
+    // Fetch bets and compute real W/L/V stats in parallel
+    Promise.all([
+      getMyBets(targetUserId),
+      getUserBetStats(targetUserId),
+    ]).then(([bets, betStats]) => {
       const filtered = isOwnProfile
         ? bets
         : bets.filter((b) => {
             if (b.bet_type !== 'competition') return true
             if (b.is_public) return true
-            // Private competition — only show if viewer is a participant
             return b.bet_sides?.some((s: { user_id: string }) => s.user_id === currentUser?.id)
           })
       setRecentBets(filtered)
-      const ids = [...new Set(filtered.map((b) => b.claimant_id))]
-      if (ids.length > 0) {
-        getProfilesByIds(ids).then(setClaimantMap)
-      }
+      setStats(betStats)
     })
   }, [targetUserId, isOwnProfile, currentUser?.id])
-
 
   if (loading && !profile) {
     return (
@@ -388,8 +356,8 @@ export function ProfileScreen({ activeScreen, userId }: ProfileScreenProps) {
     <ProfileContent
       profile={profile}
       recentBets={recentBets}
-      claimantMap={claimantMap}
       isOwnProfile={isOwnProfile}
+      stats={stats}
     />
   )
 }
