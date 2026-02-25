@@ -1,16 +1,14 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router'
-import { ChevronLeft, Shuffle } from 'lucide-react'
+import { ChevronLeft, Shuffle, BookOpen } from 'lucide-react'
 import { format } from 'date-fns'
 import { motion, AnimatePresence } from 'motion/react'
-import useEmblaCarousel from 'embla-carousel-react'
 import { useBetStore, useGroupStore, useAuthStore } from '@/stores'
-import { getApprovedPunishments, getPunishmentStats, createPunishment } from '@/lib/api/punishments'
+import { getApprovedPunishments, createPunishment } from '@/lib/api/punishments'
 import { QUICK_TEMPLATES, STAKE_PRESETS } from '@/lib/utils/constants'
 import { formatMoney } from '@/lib/utils/formatters'
 import { validateClaim } from '@/lib/utils/validators'
 import { PrimaryButton } from '../components/PrimaryButton'
-import { PlayingCardPunishment } from '../components/PlayingCardPunishment'
 import { Calendar } from '../components/ui/calendar'
 import {
   Select,
@@ -26,7 +24,7 @@ import {
   DialogTitle,
 } from '../components/ui/dialog'
 import { Input } from '../components/ui/input'
-import type { PunishmentCard, PunishmentDifficulty, PunishmentCategory, Bet } from '@/lib/database.types'
+import type { PunishmentCard, Bet } from '@/lib/database.types'
 import { getBetDetail } from '@/lib/api/bets'
 import { FunContractModal } from '../components/FunContractModal'
 
@@ -58,31 +56,16 @@ export function BetCreationWizard() {
   })
   const [selectedTime, setSelectedTime] = useState('17:00')
   const [punishments, setPunishments] = useState<PunishmentCard[]>([])
-  const [punishmentStats, setPunishmentStats] = useState<Record<string, { completionRate: number; timesAssigned: number }>>({})
+  const [punishmentText, setPunishmentText] = useState('')
+  const [punishmentEdited, setPunishmentEdited] = useState(false)
+  const [libraryOpen, setLibraryOpen] = useState(false)
 
   // Templates dialog
   const [templatesOpen, setTemplatesOpen] = useState(false)
 
-  // Custom punishment dialog
-  const [customPunishmentOpen, setCustomPunishmentOpen] = useState(false)
-  const [customPunishmentText, setCustomPunishmentText] = useState('')
-  const [customDifficulty, setCustomDifficulty] = useState<PunishmentDifficulty>('medium')
-  const [customCategory, setCustomCategory] = useState<PunishmentCategory>('social')
-  const [customIsCommunity, setCustomIsCommunity] = useState(true)
-
   // Fun contract
   const [createdBet, setCreatedBet] = useState<Bet | null>(null)
   const [contractOpen, setContractOpen] = useState(false)
-
-  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true, align: 'center' })
-  const [selectedPunishmentIndex, setSelectedPunishmentIndex] = useState(0)
-
-  useEffect(() => {
-    if (!emblaApi) return
-    const onSelect = () => setSelectedPunishmentIndex(emblaApi.selectedScrollSnap())
-    emblaApi.on('select', onSelect)
-    return () => emblaApi.off('select', onSelect)
-  }, [emblaApi])
 
   // Reset wizard every time this screen mounts so stale step/side state never leaks in
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -134,23 +117,16 @@ export function BetCreationWizard() {
   }, [templateBet, groups, loadWizardFromTemplate])
 
   useEffect(() => {
-    getApprovedPunishments().then(setPunishments)
-  }, [])
-
-  useEffect(() => {
-    if (punishments.length === 0) return
-    Promise.all(
-      punishments.map((p) =>
-        getPunishmentStats(p.id).then((s) => ({ id: p.id, ...s })),
-      ),
-    ).then((stats) => {
-      const map: Record<string, { completionRate: number; timesAssigned: number }> = {}
-      stats.forEach((s) => {
-        map[s.id] = { completionRate: s.completionRate, timesAssigned: s.timesAssigned }
-      })
-      setPunishmentStats(map)
+    getApprovedPunishments().then((p) => {
+      setPunishments(p)
+      // Seed with a random punishment if user hasn't edited yet
+      if (p.length > 0 && !punishmentEdited) {
+        const random = p[Math.floor(Math.random() * p.length)]
+        setPunishmentText(random.text)
+        updateWizardStep(3, { stakePunishment: random, stakeCustomPunishment: null })
+      }
     })
-  }, [punishments])
+  }, [])
 
   const handleBack = () => {
     if (currentStep === 1) navigate(-1)
@@ -200,7 +176,35 @@ export function BetCreationWizard() {
   }
 
   const progressPct = (currentStep / 3) * 100
-  const currentPunishment = punishments[selectedPunishmentIndex]
+
+  const randomizePunishment = () => {
+    if (punishments.length === 0) return
+    const random = punishments[Math.floor(Math.random() * punishments.length)]
+    setPunishmentText(random.text)
+    setPunishmentEdited(false)
+    updateWizardStep(3, { stakePunishment: random, stakeCustomPunishment: null })
+  }
+
+  const savePunishmentToLibrary = async () => {
+    const text = punishmentText.trim()
+    if (!text) return
+    try {
+      const card = await createPunishment({
+        text,
+        category: 'social',
+        difficulty: 'medium',
+        times_assigned: 0,
+        times_completed: 0,
+        times_disputed: 0,
+        is_community: true,
+      })
+      setPunishments((prev) => [...prev, card])
+      updateWizardStep(3, { stakePunishment: card, stakeCustomPunishment: null })
+    } catch {
+      // Still use the text even if saving fails
+      updateWizardStep(3, { stakeCustomPunishment: text, stakePunishment: null })
+    }
+  }
 
   return (
     <div className="h-full bg-bg-primary grain-texture flex flex-col">
@@ -437,54 +441,58 @@ export function BetCreationWizard() {
 
               {(wizard.stakeType === 'punishment' || wizard.stakeType === 'both') && (
                 <div className="space-y-4">
-                  <div ref={emblaRef} className="overflow-hidden">
-                    <div className="flex gap-4">
-                      {punishments.map((p) => (
-                        <div key={p.id} className="flex-[0_0_100%] min-w-0">
-                          <PlayingCardPunishment
-                            punishment={p.text}
-                            difficulty={p.difficulty as PunishmentDifficulty}
-                            category={p.category ? p.category.charAt(0).toUpperCase() + p.category.slice(1) : undefined}
-                            completionRate={punishmentStats[p.id]?.completionRate}
-                            timesAssigned={punishmentStats[p.id]?.timesAssigned}
-                          />
-                        </div>
-                      ))}
-                    </div>
+                  {/* Editable punishment card */}
+                  <div className="bg-bg-elevated dark:bg-bg-card rounded-2xl border-2 border-border-subtle p-6 min-h-[200px] flex flex-col relative overflow-hidden">
+                    <div className="text-center text-4xl mb-4">🔥</div>
+                    <textarea
+                      value={punishmentText}
+                      onChange={(e) => {
+                        const val = e.target.value.slice(0, 120)
+                        setPunishmentText(val)
+                        setPunishmentEdited(true)
+                        updateWizardStep(3, { stakeCustomPunishment: val.trim() || null, stakePunishment: null })
+                      }}
+                      onFocus={() => {
+                        if (!punishmentEdited) {
+                          const el = document.activeElement as HTMLTextAreaElement
+                          el?.select()
+                        }
+                      }}
+                      placeholder="Enter a punishment for the loser..."
+                      className={`w-full flex-1 bg-transparent text-center font-bold text-base leading-snug resize-none border-none outline-none ${
+                        punishmentEdited ? 'text-text-primary' : 'text-text-muted'
+                      }`}
+                      maxLength={120}
+                    />
+                    <p className="text-right text-xs text-text-muted mt-2">{punishmentText.length}/120</p>
                   </div>
+
+                  {/* Action buttons */}
                   <div className="flex gap-2">
                     <button
-                      onClick={() => {
-                        const idx = Math.floor(Math.random() * punishments.length)
-                        setSelectedPunishmentIndex(idx)
-                        emblaApi?.scrollTo(idx)
-                        updateWizardStep(3, { stakePunishment: punishments[idx], stakeCustomPunishment: null })
-                      }}
+                      onClick={randomizePunishment}
                       className="flex-1 py-3 rounded-xl border-2 border-border-subtle text-text-primary font-bold flex items-center justify-center gap-2"
                     >
                       <Shuffle className="w-4 h-4" />
                       Randomize 🎲
                     </button>
                     <button
-                      onClick={() => setCustomPunishmentOpen(true)}
-                      className="flex-1 py-3 rounded-xl text-accent-green font-bold text-sm"
+                      onClick={savePunishmentToLibrary}
+                      disabled={!punishmentText.trim()}
+                      className="flex-1 py-3 rounded-xl bg-accent-green text-white font-bold text-sm disabled:opacity-50"
                     >
-                      Create Your Own +
+                      Save
                     </button>
                   </div>
-                  {currentPunishment && (
-                    <button
-                      onClick={() => updateWizardStep(3, { stakePunishment: currentPunishment, stakeCustomPunishment: null })}
-                      className="w-full py-2 rounded-xl bg-accent-green/20 text-accent-green font-bold text-sm"
-                    >
-                      Select this card
-                    </button>
-                  )}
-                  {wizard.stakeCustomPunishment && (
-                    <p className="text-sm text-accent-green font-medium">
-                      Custom: {wizard.stakeCustomPunishment}
-                    </p>
-                  )}
+
+                  {/* Library button */}
+                  <button
+                    onClick={() => setLibraryOpen(true)}
+                    className="w-full py-2.5 rounded-xl border border-border-subtle text-text-muted text-sm font-bold flex items-center justify-center gap-2"
+                  >
+                    <BookOpen className="w-4 h-4" />
+                    Punishment Library
+                  </button>
                 </div>
               )}
 
@@ -535,118 +543,35 @@ export function BetCreationWizard() {
         </DialogContent>
       </Dialog>
 
-      {/* Custom punishment dialog */}
-      <Dialog open={customPunishmentOpen} onOpenChange={setCustomPunishmentOpen}>
-        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+      {/* Punishment library dialog */}
+      <Dialog open={libraryOpen} onOpenChange={setLibraryOpen}>
+        <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Create your own punishment</DialogTitle>
+            <DialogTitle>🔥 Punishment Library</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-text-muted mb-2">
-                Punishment text
-              </label>
-              <Input
-                value={customPunishmentText}
-                onChange={(e) => setCustomPunishmentText(e.target.value.slice(0, 120))}
-                placeholder="e.g. Post an embarrassing throwback..."
-                className="mb-1"
-              />
-              <p className="text-xs text-text-muted">{customPunishmentText.length}/120</p>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-text-muted mb-2">
-                Difficulty
-              </label>
-              <div className="flex gap-2">
-                {(['mild', 'medium', 'savage'] as const).map((d) => (
-                  <button
-                    key={d}
-                    onClick={() => setCustomDifficulty(d)}
-                    className={`flex-1 py-2 rounded-xl font-bold text-xs uppercase ${
-                      customDifficulty === d ? 'bg-accent-green text-white' : 'bg-bg-elevated text-text-muted'
-                    }`}
-                  >
-                    {d}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-text-muted mb-2">
-                Category
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {(['physical', 'social', 'financial', 'humiliating'] as const).map((c) => (
-                  <button
-                    key={c}
-                    onClick={() => setCustomCategory(c)}
-                    className={`px-3 py-2 rounded-xl font-bold text-xs ${
-                      customCategory === c ? 'bg-accent-green text-white' : 'bg-bg-elevated text-text-muted'
-                    }`}
-                  >
-                    {c.charAt(0).toUpperCase() + c.slice(1)}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-text-primary">Community</span>
-              <button
-                onClick={() => setCustomIsCommunity(!customIsCommunity)}
-                className={`relative w-11 h-6 rounded-full transition-colors ${
-                  customIsCommunity ? 'bg-accent-green' : 'bg-bg-elevated'
-                }`}
-              >
-                <span
-                  className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
-                    customIsCommunity ? 'left-6' : 'left-1'
+          <div className="space-y-2 pt-2">
+            {punishments.length === 0 ? (
+              <p className="text-sm text-text-muted text-center py-4">No saved punishments yet.</p>
+            ) : (
+              punishments.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => {
+                    setPunishmentText(p.text)
+                    setPunishmentEdited(false)
+                    updateWizardStep(3, { stakePunishment: p, stakeCustomPunishment: null })
+                    setLibraryOpen(false)
+                  }}
+                  className={`w-full text-left p-3 rounded-xl text-sm transition-colors ${
+                    wizard.stakePunishment?.id === p.id
+                      ? 'bg-accent-green/20 text-accent-green border border-accent-green/40'
+                      : 'bg-bg-elevated text-text-primary hover:bg-accent-green/10 hover:text-accent-green'
                   }`}
-                />
-              </button>
-            </div>
-            <p className="text-xs text-text-muted">
-              {customIsCommunity ? 'Others can use this punishment' : 'Keep private (only you can use it)'}
-            </p>
-
-            {customPunishmentText.trim() && (
-              <div className="border border-border-subtle rounded-xl p-4 bg-bg-elevated">
-                <p className="text-xs font-bold text-text-muted mb-2">Preview</p>
-                <PlayingCardPunishment
-                  punishment={customPunishmentText.trim()}
-                  difficulty={customDifficulty}
-                  category={customCategory.charAt(0).toUpperCase() + customCategory.slice(1)}
-                />
-              </div>
+                >
+                  {p.text}
+                </button>
+              ))
             )}
-
-            <PrimaryButton
-              onClick={async () => {
-                const text = customPunishmentText.trim()
-                if (text) {
-                  try {
-                    const card = await createPunishment({
-                      text,
-                      category: customCategory,
-                      difficulty: customDifficulty,
-                      is_community: customIsCommunity,
-                    })
-                    updateWizardStep(3, { stakePunishment: card, stakeCustomPunishment: null })
-                  } catch {
-                    updateWizardStep(3, { stakeCustomPunishment: text, stakePunishment: null })
-                  }
-                } else {
-                  updateWizardStep(3, { stakeCustomPunishment: null, stakePunishment: null })
-                }
-                setCustomPunishmentOpen(false)
-                setCustomPunishmentText('')
-              }}
-            >
-              {customPunishmentText.trim() ? 'Create & Use' : 'Use as custom text'}
-            </PrimaryButton>
           </div>
         </DialogContent>
       </Dialog>
