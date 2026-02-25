@@ -1,11 +1,11 @@
 import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router'
-import { ChevronLeft, Shuffle, BookOpen } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Shuffle, BookOpen } from 'lucide-react'
 import { format } from 'date-fns'
 import { motion, AnimatePresence } from 'motion/react'
 import { useBetStore, useGroupStore, useAuthStore } from '@/stores'
 import { getApprovedPunishments, createPunishment } from '@/lib/api/punishments'
-import { QUICK_TEMPLATES, STAKE_PRESETS } from '@/lib/utils/constants'
+import { TEMPLATE_CATEGORIES, STAKE_PRESETS, type TemplateCategoryId, type BetTemplate } from '@/lib/utils/constants'
 import { formatMoney } from '@/lib/utils/formatters'
 import { validateClaim } from '@/lib/utils/validators'
 import { PrimaryButton } from '../components/PrimaryButton'
@@ -63,6 +63,7 @@ export function BetCreationWizard() {
 
   // Templates dialog
   const [templatesOpen, setTemplatesOpen] = useState(false)
+  const [activeCategory, setActiveCategory] = useState<TemplateCategoryId>(TEMPLATE_CATEGORIES[0].id)
 
   // Fun contract
   const [createdBet, setCreatedBet] = useState<Bet | null>(null)
@@ -189,6 +190,16 @@ export function BetCreationWizard() {
     setPunishmentText(random.text)
     setPunishmentEdited(false)
     updateWizardStep(currentStep, { stakePunishment: random, stakeCustomPunishment: null })
+  }
+
+  const handleTemplateSelect = (template: BetTemplate) => {
+    updateWizardStep(1, {
+      claim: template.claim,
+      creatorSide: template.suggestedSide,
+      category: template.betCategory,
+    })
+    setStep1Error(null)
+    setTemplatesOpen(false)
   }
 
   const [isSaving, setIsSaving] = useState(false)
@@ -536,25 +547,63 @@ export function BetCreationWizard() {
         </div>
       )}
 
-      {/* Browse Templates dialog */}
+      {/* Browse Templates dialog — categorized */}
       <Dialog open={templatesOpen} onOpenChange={setTemplatesOpen}>
-        <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>✨ Quick Templates</DialogTitle>
+        <DialogContent className="max-w-md max-h-[80vh] flex flex-col p-0 overflow-hidden">
+          <DialogHeader className="px-6 pt-6 pb-0">
+            <DialogTitle>Browse Templates</DialogTitle>
           </DialogHeader>
-          <div className="space-y-2 pt-2">
-            {QUICK_TEMPLATES.map((t) => (
+
+          {/* Category pills — horizontally scrollable */}
+          <div className="flex gap-2 overflow-x-auto no-scrollbar px-6 py-3">
+            {TEMPLATE_CATEGORIES.map((cat) => (
               <button
-                key={t}
-                onClick={() => {
-                  updateWizardStep(1, { claim: t })
-                  setTemplatesOpen(false)
-                }}
-                className="w-full text-left p-3 rounded-xl bg-bg-elevated text-text-primary text-sm hover:bg-accent-green/20 hover:text-accent-green transition-colors"
+                key={cat.id}
+                onClick={() => setActiveCategory(cat.id)}
+                className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
+                  activeCategory === cat.id
+                    ? 'bg-accent-green/20 text-accent-green border border-accent-green/40'
+                    : 'bg-bg-elevated text-text-muted'
+                }`}
               >
-                {t}
+                {cat.emoji} {cat.label}
               </button>
             ))}
+          </div>
+
+          {/* Template list for active category */}
+          <div className="flex-1 overflow-y-auto px-6 pb-6">
+            {TEMPLATE_CATEGORIES
+              .filter((cat) => cat.id === activeCategory)
+              .map((cat) => (
+                <div key={cat.id} className="space-y-2">
+                  <p className="text-xs text-text-muted mb-3">{cat.description}</p>
+                  {cat.templates.map((t) => (
+                    <button
+                      key={t.id}
+                      onClick={() => handleTemplateSelect(t)}
+                      className="w-full text-left p-3 rounded-xl bg-bg-elevated text-text-primary text-sm hover:bg-accent-green/20 hover:text-accent-green transition-colors flex items-center gap-3"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="leading-snug">{t.claim}</p>
+                        <div className="flex items-center gap-2 mt-1.5">
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                            t.suggestedSide === 'rider'
+                              ? 'bg-accent-green/15 text-accent-green'
+                              : 'bg-accent-coral/15 text-accent-coral'
+                          }`}>
+                            {t.suggestedSide === 'rider' ? '🤝 Rider' : '💀 Doubter'}
+                          </span>
+                          <span className="text-[10px] text-text-muted capitalize">
+                            {t.difficulty}
+                          </span>
+                        </div>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-text-muted shrink-0" />
+                    </button>
+                  ))}
+                </div>
+              ))}
           </div>
         </DialogContent>
       </Dialog>
