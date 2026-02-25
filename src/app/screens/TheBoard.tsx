@@ -340,10 +340,10 @@ export function TheBoard() {
 
       {/* ── My Bets strip ── */}
       <div className="px-4 pt-4 pb-2">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-[11px] font-bold uppercase tracking-[0.1em] text-text-muted">My Bets</h2>
+        <div className="flex flex-col items-center mb-3">
+          <h2 className="text-base font-bold text-white">My Bets</h2>
           {actionCount > 0 && (
-            <span className="text-[10px] font-black text-amber-400 bg-amber-400/10 border border-amber-400/30 px-2 py-0.5 rounded-full animate-pulse">
+            <span className="text-[10px] font-black text-amber-400 bg-amber-400/10 border border-amber-400/30 px-2 py-0.5 rounded-full animate-pulse mt-1">
               {actionCount} need{actionCount === 1 ? 's' : ''} action
             </span>
           )}
@@ -377,25 +377,9 @@ export function TheBoard() {
         </div>
       </div>
 
-      {/* Create group / Join with code */}
-      <div className="px-6 py-4 flex flex-col gap-3">
-        <button
-          onClick={() => navigate('/group/create')}
-          className="w-full h-12 rounded-xl bg-accent-green text-bg-primary font-bold flex items-center justify-center gap-2"
-        >
-          <span className="text-lg">+</span> Create group
-        </button>
-        <button
-          onClick={() => navigate('/group/join')}
-          className="w-full h-12 rounded-xl bg-bg-elevated border border-border-subtle text-text-primary font-bold"
-        >
-          Join with code
-        </button>
-      </div>
-
       {/* Groups grid */}
       <div className="px-4 border-t border-border-subtle">
-        <h2 className="text-[11px] font-bold uppercase tracking-[0.1em] text-text-muted pt-4 pb-3 px-2">
+        <h2 className="text-base font-bold text-white text-center pt-4 pb-3">
           Groups
         </h2>
         <CircleGrid
@@ -406,6 +390,21 @@ export function TheBoard() {
           }))}
           onItemClick={(id) => navigate(`/group/${id}`)}
         />
+        {/* Create group / Join with code */}
+        <div className="flex gap-3 pt-4 pb-2">
+          <button
+            onClick={() => navigate('/group/create')}
+            className="flex-1 h-12 rounded-xl bg-accent-green text-bg-primary font-bold flex items-center justify-center gap-2"
+          >
+            <span className="text-lg">+</span> Create group
+          </button>
+          <button
+            onClick={() => navigate('/group/join')}
+            className="flex-1 h-12 rounded-xl bg-bg-elevated border border-border-subtle text-text-primary font-bold"
+          >
+            Join with code
+          </button>
+        </div>
       </div>
 
       <NotificationPanel open={notificationOpen} onOpenChange={setNotificationOpen} />
