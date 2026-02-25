@@ -267,6 +267,12 @@ export function TheBoard() {
     })
   }, [bets, userId])
 
+  /** Count of bets that need immediate action from this user */
+  const actionCount = useMemo(
+    () => stripBets.filter((b) => getBetPriority(b, userId).level <= 3).length,
+    [stripBets, userId],
+  )
+
   if (groups.length === 0 && !isLoading) {
     return (
       <div className="h-full bg-bg-primary grain-texture flex flex-col items-center justify-center px-6 pb-6">
