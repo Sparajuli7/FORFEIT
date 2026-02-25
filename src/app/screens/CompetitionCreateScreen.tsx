@@ -71,10 +71,9 @@ export function CompetitionCreateScreen() {
   const [stakeType, setStakeType] = useState<StakeType>('money')
   const [stakeMoney, setStakeMoney] = useState(2000)
   const [stakePunishmentId, setStakePunishmentId] = useState<string | null>(null)
-  const [stakeCustomPunishment, setStakeCustomPunishment] = useState<string | null>(null)
   const [punishments, setPunishments] = useState<{ id: string; text: string }[]>([])
-  const [customPunishmentOpen, setCustomPunishmentOpen] = useState(false)
-  const [customPunishmentText, setCustomPunishmentText] = useState('')
+  const [punishmentText, setPunishmentText] = useState('')
+  const [punishmentEdited, setPunishmentEdited] = useState(false)
   const [isPublic, setIsPublic] = useState(true)
 
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -115,9 +114,16 @@ export function CompetitionCreateScreen() {
   }, [participantSource])
 
   useEffect(() => {
-    getApprovedPunishments().then((p) =>
-      setPunishments(p.map((x) => ({ id: x.id, text: x.text }))),
-    )
+    getApprovedPunishments().then((p) => {
+      const mapped = p.map((x) => ({ id: x.id, text: x.text }))
+      setPunishments(mapped)
+      // Seed the punishment input with a random punishment if user hasn't edited yet
+      if (mapped.length > 0 && !punishmentEdited) {
+        const random = mapped[Math.floor(Math.random() * mapped.length)]
+        setPunishmentText(random.text)
+        setStakePunishmentId(random.id)
+      }
+    })
   }, [])
 
   // ── Participant helpers ──────────────────────────────────────────────────────
@@ -135,6 +141,14 @@ export function CompetitionCreateScreen() {
       const existing = new Set(prev.map((p) => p.user_id))
       return [...prev, ...groupMembers.filter((m) => !existing.has(m.user_id))]
     })
+  }
+
+  const randomizePunishment = () => {
+    if (punishments.length === 0) return
+    const random = punishments[Math.floor(Math.random() * punishments.length)]
+    setPunishmentText(random.text)
+    setStakePunishmentId(random.id)
+    setPunishmentEdited(false)
   }
 
   const memberList = participantSource === 'groups' ? groupMembers : friendsList
@@ -182,8 +196,8 @@ export function CompetitionCreateScreen() {
     if ((stakeType === 'money' || stakeType === 'both') && (!stakeMoney || stakeMoney <= 0)) {
       setError('Please set a money stake.'); return
     }
-    if ((stakeType === 'punishment' || stakeType === 'both') && !stakePunishmentId && !stakeCustomPunishment) {
-      setError('Please select a punishment.'); return
+    if ((stakeType === 'punishment' || stakeType === 'both') && !stakePunishmentId && !punishmentText.trim()) {
+      setError('Please enter a punishment.'); return
     }
 
     setIsSubmitting(true)
@@ -201,7 +215,7 @@ export function CompetitionCreateScreen() {
         stakeType,
         stakeMoney: stakeType === 'money' || stakeType === 'both' ? stakeMoney : undefined,
         stakePunishmentId: stakePunishmentId ?? undefined,
-        stakeCustomPunishment,
+        stakeCustomPunishment: stakePunishmentId ? null : punishmentText.trim() || null,
         isPublic,
       })
       setCreatedComp(comp)
@@ -607,34 +621,40 @@ export function CompetitionCreateScreen() {
                 </div>
               )}
 
-              {/* Punishment chips */}
+              {/* Punishment text input */}
               {(stakeType === 'punishment' || stakeType === 'both') && (
-                <div className="flex flex-wrap gap-2">
-                  {punishments.slice(0, 6).map((p) => (
-                    <button
-                      key={p.id}
-                      onClick={() => {
-                        setStakePunishmentId(p.id)
-                        setStakeCustomPunishment(null)
+                <div className="space-y-3">
+                  <div className="relative">
+                    <textarea
+                      value={punishmentText}
+                      onChange={(e) => {
+                        const val = e.target.value.slice(0, 120)
+                        setPunishmentText(val)
+                        setPunishmentEdited(true)
+                        // User is typing custom text
+                        setStakePunishmentId(null)
                       }}
-                      className={`px-3 py-2 rounded-xl text-xs font-bold ${
-                        stakePunishmentId === p.id ? 'bg-accent-green text-white' : 'bg-bg-elevated text-text-muted'
+                      placeholder="Enter a punishment for the loser..."
+                      className={`w-full h-24 rounded-xl bg-bg-elevated border border-border-subtle p-4 text-sm resize-none ${
+                        punishmentEdited ? 'text-text-primary' : 'text-text-muted'
                       }`}
-                    >
-                      {p.text.slice(0, 35)}…
-                    </button>
-                  ))}
+                      onFocus={() => {
+                        if (!punishmentEdited) {
+                          // Select all text so user can easily overwrite
+                          const el = document.activeElement as HTMLTextAreaElement
+                          el?.select()
+                        }
+                      }}
+                      maxLength={120}
+                    />
+                    <p className="text-right text-xs text-text-muted mt-1">{punishmentText.length}/120</p>
+                  </div>
                   <button
-                    onClick={() => setCustomPunishmentOpen(true)}
-                    className="px-3 py-2 rounded-xl text-xs font-bold bg-bg-elevated text-accent-green"
+                    onClick={randomizePunishment}
+                    className="w-full py-2.5 rounded-xl border border-border-subtle text-text-muted text-sm font-bold flex items-center justify-center gap-2"
                   >
-                    Custom +
+                    🎲 Randomize punishment
                   </button>
-                  {stakeCustomPunishment && (
-                    <div className="w-full text-xs text-accent-green font-medium px-1">
-                      Custom: {stakeCustomPunishment}
-                    </div>
-                  )}
                 </div>
               )}
 
@@ -720,38 +740,6 @@ export function CompetitionCreateScreen() {
         </DialogContent>
       </Dialog>
 
-      {/* ─── Custom punishment dialog ─── */}
-      <Dialog open={customPunishmentOpen} onOpenChange={setCustomPunishmentOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Custom Punishment</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 pt-2">
-            <Input
-              value={customPunishmentText}
-              onChange={(e) => setCustomPunishmentText(e.target.value.slice(0, 120))}
-              placeholder="e.g. Loser buys everyone dinner..."
-              className="h-12"
-            />
-            <p className="text-xs text-text-muted">{customPunishmentText.length}/120</p>
-            <PrimaryButton
-              onClick={() => {
-                const text = customPunishmentText.trim()
-                if (text) {
-                  setStakePunishmentId(null)
-                  setStakeCustomPunishment(text)
-                }
-                setCustomPunishmentOpen(false)
-                setCustomPunishmentText('')
-              }}
-              disabled={!customPunishmentText.trim()}
-            >
-              Use Punishment
-            </PrimaryButton>
-          </div>
-        </DialogContent>
-      </Dialog>
-
       {/* ─── Fun Contract modal ─── */}
       {createdComp && (
         <FunContractModal
@@ -760,9 +748,7 @@ export function CompetitionCreateScreen() {
           title={title}
           wager={{
             money: stakeType === 'money' || stakeType === 'both' ? stakeMoney : null,
-            punishment:
-              stakeCustomPunishment ??
-              (stakePunishmentId ? punishments.find((p) => p.id === stakePunishmentId)?.text ?? null : null),
+            punishment: punishmentText.trim() || null,
           }}
           validUntil={endDate.toISOString()}
           participants={participants.map((m) => ({
