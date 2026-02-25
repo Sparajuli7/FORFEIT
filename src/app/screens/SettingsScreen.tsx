@@ -375,6 +375,18 @@ export function SettingsScreen() {
             )}
           </div>
 
+          {/* Give Feedback */}
+          <button
+            onClick={() => navigate('/feedback')}
+            className="w-full flex items-center justify-between px-4 py-3.5 rounded-xl bg-bg-card border border-border-subtle hover:bg-bg-elevated transition-colors"
+          >
+            <div className="text-left">
+              <p className="text-sm font-bold text-text-primary">Give Feedback</p>
+              <p className="text-xs text-text-muted mt-0.5">Help us build something worth using</p>
+            </div>
+            <span className="text-text-muted text-lg leading-none">›</span>
+          </button>
+
           {/* Sign out */}
           <button
             onClick={() => setShowSignOutConfirm(true)}

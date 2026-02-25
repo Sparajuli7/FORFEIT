@@ -39,6 +39,7 @@ import { JournalScreen } from './screens/JournalScreen'
 import { JournalDetailScreen } from './screens/JournalDetailScreen'
 import { GroupJournalScreen } from './screens/GroupJournalScreen'
 import { ArchiveScreen } from './screens/ArchiveScreen'
+import { FeedbackScreen } from './screens/FeedbackScreen'
 
 // ---------------------------------------------------------------------------
 // Placeholder for screens not yet built
@@ -237,6 +238,7 @@ export function AppRouter() {
 
             {/* Settings & Punishments */}
             <Route path="settings" element={<SettingsScreen />} />
+            <Route path="feedback" element={<FeedbackScreen />} />
             <Route path="punishment/:id" element={<PunishmentStatsScreen />} />
 
             {/* Player Card */}
