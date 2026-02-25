@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { MessageCircle, Loader2, Archive, Camera } from 'lucide-react'
 import { useAuthStore, useChatStore } from '@/stores'
-import { getMyBets, getUserBetStats } from '@/lib/api/bets'
+import { getMyBets, getUserBetStats, getUserCurrentStreak } from '@/lib/api/bets'
 import type { UserBetStats } from '@/lib/api/bets'
 import { getProfilesByIds, getProfile as fetchProfile } from '@/lib/api/profiles'
 import { formatRecord } from '@/lib/utils/formatters'
@@ -364,7 +364,6 @@ interface ProfileScreenProps {
 export function ProfileScreen({ activeScreen, userId }: ProfileScreenProps) {
   const navigate = useNavigate()
   const currentUser = useAuthStore((s) => s.user)
-  const currentProfile = useAuthStore((s) => s.profile)
   const authLoading = useAuthStore((s) => s.isLoading)
 
   const [profile, setProfile] = useState<Profile | null>(null)
@@ -381,27 +380,32 @@ export function ProfileScreen({ activeScreen, userId }: ProfileScreenProps) {
       return
     }
 
+    // For own profile: wait for auth to initialise, then show cached value instantly
     if (isOwnProfile) {
-      if (!authLoading) {
-        setProfile(currentProfile)
+      if (authLoading) return
+      const cached = useAuthStore.getState().profile
+      if (cached) {
+        setProfile(cached)
         setLoading(false)
       }
-    } else {
-      fetchProfile(targetUserId).then((p) => {
-        setProfile(p)
-        setLoading(false)
-      })
     }
-  }, [targetUserId, isOwnProfile, currentProfile, authLoading])
 
-  useEffect(() => {
-    if (!targetUserId) return
-
-    // Fetch bets and compute real W/L/V stats in parallel
+    // Always re-fetch everything fresh in parallel
     Promise.all([
+      fetchProfile(targetUserId),
       getMyBets(targetUserId),
       getUserBetStats(targetUserId),
-    ]).then(([bets, betStats]) => {
+      getUserCurrentStreak(targetUserId),
+    ]).then(([freshProfile, bets, betStats, streak]) => {
+      const base = freshProfile ?? (isOwnProfile ? useAuthStore.getState().profile : null)
+      if (base) {
+        // Patch in live-computed values that the profile row may not reflect
+        setProfile({ ...base, total_bets: bets.length, current_streak: streak })
+        // Keep the auth store in sync with the fresh DB data
+        if (isOwnProfile && freshProfile) {
+          useAuthStore.getState().setProfile(freshProfile)
+        }
+      }
       const filtered = isOwnProfile
         ? bets
         : bets.filter((b) => {
@@ -411,8 +415,9 @@ export function ProfileScreen({ activeScreen, userId }: ProfileScreenProps) {
           })
       setRecentBets(filtered)
       setStats(betStats)
-    })
-  }, [targetUserId, isOwnProfile, currentUser?.id])
+      setLoading(false)
+    }).catch(() => setLoading(false))
+  }, [targetUserId, isOwnProfile, authLoading, currentUser?.id])
 
   if (loading && !profile) {
     return (

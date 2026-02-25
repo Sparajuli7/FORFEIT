@@ -239,6 +239,74 @@ export async function createRematchBet(
   return newBet as Bet
 }
 
+/**
+ * Compute the user's current win/loss streak from live outcomes.
+ * Positive = win streak, negative = loss streak. Voids are skipped.
+ */
+export async function getUserCurrentStreak(userId: string): Promise<number> {
+  const { data: sideEntries } = await supabase
+    .from('bet_sides')
+    .select('bet_id, side')
+    .eq('user_id', userId)
+
+  if (!sideEntries?.length) return 0
+
+  const sideByBet = new Map<string, BetSide>()
+  for (const s of sideEntries as { bet_id: string; side: string }[]) {
+    sideByBet.set(s.bet_id, s.side as BetSide)
+  }
+
+  const betIds = [...sideByBet.keys()]
+
+  // Completed bets ordered most-recent first
+  const { data: completedBets } = await supabase
+    .from('bets')
+    .select('id, claimant_id')
+    .in('id', betIds)
+    .eq('status', 'completed')
+    .order('created_at', { ascending: false })
+
+  if (!completedBets?.length) return 0
+
+  const completedIds = (completedBets as { id: string; claimant_id: string }[]).map((b) => b.id)
+
+  const { data: outcomes } = await supabase
+    .from('outcomes')
+    .select('bet_id, result')
+    .in('bet_id', completedIds)
+
+  if (!outcomes?.length) return 0
+
+  const outcomeByBet = new Map<string, string>()
+  for (const o of outcomes as { bet_id: string; result: string }[]) {
+    outcomeByBet.set(o.bet_id, o.result)
+  }
+
+  let streak = 0
+  let streakDir: 'won' | 'lost' | null = null
+
+  for (const bet of completedBets as { id: string; claimant_id: string }[]) {
+    const result = outcomeByBet.get(bet.id)
+    if (!result || result === 'voided') continue
+
+    const side = sideByBet.get(bet.id)
+    const isRider = side === 'rider' || bet.claimant_id === userId
+    const userResult: 'won' | 'lost' =
+      result === 'claimant_succeeded'
+        ? isRider ? 'won' : 'lost'
+        : isRider ? 'lost' : 'won'
+
+    if (streakDir === null) streakDir = userResult
+    if (userResult === streakDir) {
+      streak += streakDir === 'won' ? 1 : -1
+    } else {
+      break
+    }
+  }
+
+  return streak
+}
+
 export interface UserBetStats {
   wins: number
   losses: number
