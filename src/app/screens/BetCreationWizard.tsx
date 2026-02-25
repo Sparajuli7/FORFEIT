@@ -166,10 +166,14 @@ export function BetCreationWizard() {
   }
 
   const handleDropIt = async () => {
-    if (!wizard.stakeType) return
-    if ((wizard.stakeType === 'money' || wizard.stakeType === 'both') && (!wizard.stakeMoney || wizard.stakeMoney <= 0)) return
+    const effectiveStakeType = wizard.stakeType ?? 'punishment'
+    // Ensure stakeType is set in the wizard (defaults to punishment)
+    if (!wizard.stakeType) {
+      updateWizardStep(currentStep, { stakeType: 'punishment' })
+    }
+    if ((effectiveStakeType === 'money' || effectiveStakeType === 'both') && (!wizard.stakeMoney || wizard.stakeMoney <= 0)) return
     // Always sync punishment text to wizard before submitting
-    if (wizard.stakeType === 'punishment' || wizard.stakeType === 'both') {
+    if (effectiveStakeType === 'punishment' || effectiveStakeType === 'both') {
       const text = punishmentText.trim()
       if (!text) return
       updateWizardStep(currentStep, { stakeCustomPunishment: text })
@@ -395,9 +399,9 @@ export function BetCreationWizard() {
                 {(['money', 'punishment', 'both'] as const).map((t) => (
                   <button
                     key={t}
-                    onClick={() => updateWizardStep(3, { stakeType: t })}
+                    onClick={() => updateWizardStep(currentStep, { stakeType: t })}
                     className={`flex-1 py-3 rounded-xl font-bold text-sm ${
-                      wizard.stakeType === t ? 'bg-accent-green text-white' : 'bg-bg-elevated text-text-muted'
+                      (wizard.stakeType ?? 'punishment') === t ? 'bg-accent-green text-white' : 'bg-bg-elevated text-text-muted'
                     }`}
                   >
                     {t === 'money' ? '💵 Money' : t === 'punishment' ? '🔥 Punishment' : '💵🔥 Both'}
@@ -457,7 +461,7 @@ export function BetCreationWizard() {
                 </div>
               )}
 
-              {(wizard.stakeType === 'punishment' || wizard.stakeType === 'both') && (
+              {(wizard.stakeType === 'punishment' || wizard.stakeType === 'both' || wizard.stakeType === null) && (
                 <div className="space-y-4">
                   {/* Editable punishment card */}
                   <div className="bg-bg-elevated dark:bg-bg-card rounded-2xl border-2 border-border-subtle p-6 min-h-[200px] flex flex-col relative overflow-hidden">
@@ -516,7 +520,7 @@ export function BetCreationWizard() {
 
               <PrimaryButton
                 onClick={handleDropIt}
-                disabled={isLoading || !wizard.stakeType}
+                disabled={isLoading}
               >
                 {isLoading ? 'Creating...' : 'Drop It 🔥'}
               </PrimaryButton>
