@@ -77,7 +77,7 @@ function getMostCreativePunishment(completedBets: BetStatsForUser['completedBets
 const TIER = {
   legendary: {
     label: 'LEGENDARY',
-    borderColor: '#FFD700',
+    borderColor: '#2C2C2C',
     accentColor: '#FFD700',
     badgeBg: '#FFD700',
     badgeText: '#000000',
@@ -86,7 +86,7 @@ const TIER = {
   },
   reliable: {
     label: 'RELIABLE',
-    borderColor: '#FFD700',
+    borderColor: '#2C2C2C',
     accentColor: '#FFD700',
     badgeBg: '#111111',
     badgeText: '#FFD700',
@@ -95,7 +95,7 @@ const TIER = {
   },
   sketchy: {
     label: 'SKETCHY',
-    borderColor: '#FF3D57',
+    borderColor: '#2C2C2C',
     accentColor: '#FF3D57',
     badgeBg: '#111111',
     badgeText: '#FF3D57',
@@ -221,7 +221,7 @@ function TradingCard({
           <div className="relative">
             <div
               className="rounded-full p-[2px]"
-              style={{ background: cfg.borderColor }}
+              style={{ background: '#2C2C2C' }}
             >
               <div className="w-[88px] h-[88px] rounded-full overflow-hidden bg-black">
                 <img
