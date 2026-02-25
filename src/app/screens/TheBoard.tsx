@@ -346,8 +346,15 @@ export function TheBoard() {
 
       {/* ── My Bets strip ── */}
       <div className="px-4 pt-4 pb-2">
-        <div className="mb-3">
+        <div className="flex items-center justify-center gap-3 mb-3">
           <h2 className="text-base font-bold text-white">My Bets</h2>
+          <button
+            onClick={() => navigate('/bet/create')}
+            className="h-8 px-4 rounded-full bg-accent-green text-bg-primary text-sm font-bold flex items-center gap-1.5"
+            aria-label="Create bet"
+          >
+            <Plus className="w-4 h-4" /> Create
+          </button>
         </div>
 
         <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2 -mx-4 px-4">
@@ -380,9 +387,9 @@ export function TheBoard() {
 
       {/* Groups grid */}
       <div className="px-4 border-t border-border-subtle">
-        <h2 className="text-base font-bold text-white text-center pt-4 pb-3">
-          Groups
-        </h2>
+        <div className="flex items-center justify-center pt-4 pb-3">
+          <h2 className="text-base font-bold text-white">Groups</h2>
+        </div>
         {/* Create / Join / Invite */}
         <div className="flex gap-6 pb-4 justify-center">
           <button
