@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useNavigate } from 'react-router'
-import { Bell, MessageCircle } from 'lucide-react'
+import { Bell, MessageCircle, Plus, LogIn, UserPlus } from 'lucide-react'
 import { NotificationPanel } from '../components/NotificationPanel'
 import { PushPermissionBanner } from '../components/PushPermissionBanner'
 import { useGroupStore, useBetStore, useAuthStore, useNotificationStore, useChatStore } from '@/stores'
@@ -400,19 +400,25 @@ export function TheBoard() {
         <h2 className="text-base font-bold text-white text-center pt-4 pb-3">
           Groups
         </h2>
-        {/* Create group / Join with code */}
-        <div className="flex gap-3 pb-4">
+        {/* Create / Join / Invite */}
+        <div className="flex gap-6 pb-4 justify-center">
           <button
             onClick={() => navigate('/group/create')}
-            className="flex-1 h-12 rounded-xl bg-accent-green text-bg-primary font-bold flex items-center justify-center gap-2"
+            className="h-6 px-3 rounded-full bg-accent-green text-bg-primary text-xs font-bold flex items-center gap-1"
           >
-            <span className="text-lg">+</span> Create group
+            <Plus className="w-3 h-3" /> Create
           </button>
           <button
             onClick={() => navigate('/group/join')}
-            className="flex-1 h-12 rounded-xl bg-bg-elevated border border-border-subtle text-text-primary font-bold"
+            className="h-6 px-3 rounded-full bg-bg-elevated border border-border-subtle text-text-primary text-xs font-bold flex items-center gap-1"
           >
-            Join with code
+            <LogIn className="w-3 h-3" /> Join
+          </button>
+          <button
+            onClick={() => navigate('/invite')}
+            className="h-6 px-3 rounded-full bg-bg-elevated border border-border-subtle text-text-primary text-xs font-bold flex items-center gap-1"
+          >
+            <UserPlus className="w-3 h-3" /> Invite
           </button>
         </div>
         <CircleGrid
