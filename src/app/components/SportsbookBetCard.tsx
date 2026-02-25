@@ -31,17 +31,10 @@ export function SportsbookBetCard({
   urgent = false,
   onClick
 }: SportsbookBetCardProps) {
-  const borderColor = {
-    active: 'border-l-accent-green',
-    proof: 'border-l-live-indicator',
-    completed: 'border-l-gold',
-    disputed: 'border-l-accent-coral'
-  }[status];
-
   return (
     <button 
       onClick={onClick}
-      className={`w-full text-left bg-bg-card rounded-xl border-l-status ${borderColor} border border-border-subtle p-4 transition-all hover:shadow-lg dark:hover:shadow-xl`}
+      className={`w-full text-left bg-bg-card rounded-xl border border-border-subtle p-4 transition-all hover:shadow-lg dark:hover:shadow-xl`}
     >
       {/* Top row */}
       <div className="flex items-center justify-between mb-2">

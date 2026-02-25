@@ -111,12 +111,6 @@ function BoardBetCard({
   const { riderPct, doubterPct } = formatOdds(riderCount, doubterCount)
   const priority = getBetPriority(bet, userId)
 
-  // Left border accent by status
-  const borderColor =
-    bet.status === 'proof_submitted' ? 'border-status-proof'
-    : bet.status === 'disputed'      ? 'border-status-disputed'
-    : 'border-status-active'
-
   // Subtle card bg tint per stage
   const cardBg =
     priority.level === 0 ? 'bg-amber-400/[0.04]'
@@ -151,7 +145,7 @@ function BoardBetCard({
   return (
     <button
       onClick={() => onNavigate(bet.id)}
-      className={`shrink-0 w-[280px] text-left ${cardBg} rounded-xl border-l-status ${borderColor} border border-border-subtle p-3 transition-all hover:shadow-md active:scale-[0.98]`}
+      className={`shrink-0 w-[280px] text-left ${cardBg} rounded-xl border border-border-subtle p-3 transition-all hover:shadow-md active:scale-[0.98]`}
     >
       {/* Top row: group chip + countdown */}
       <div className="flex items-center justify-between gap-2 mb-2">
@@ -251,25 +245,21 @@ export function TheBoard() {
 
   /**
    * Strip bets — include active, proof_submitted, pending (h2h awaiting), disputed.
-   * Sorted by priority level (ascending = highest priority first).
-   * Within the same priority level, original server order (newest first) is preserved.
+   * Sorted by most recent activity first: the latest of bet creation or any side joining.
    */
   const userId = profile?.id
   const stripBets = useMemo(() => {
     const VISIBLE_STATUSES = new Set(['active', 'proof_submitted', 'pending', 'disputed'])
     const filtered = bets.filter((b) => VISIBLE_STATUSES.has(b.status))
-    return [...filtered].sort((a, b) => {
-      const pa = getBetPriority(a, userId).level
-      const pb = getBetPriority(b, userId).level
-      return pa - pb
-    })
-  }, [bets, userId])
 
-  /** Count of bets that need immediate action from this user */
-  const actionCount = useMemo(
-    () => stripBets.filter((b) => getBetPriority(b, userId).level <= 3).length,
-    [stripBets, userId],
-  )
+    function lastActivity(bet: BetWithSides): number {
+      const base = new Date(bet.created_at).getTime()
+      const sideTs = (bet.bet_sides ?? []).map((s) => new Date(s.joined_at).getTime())
+      return Math.max(base, ...sideTs)
+    }
+
+    return [...filtered].sort((a, b) => lastActivity(b) - lastActivity(a))
+  }, [bets])
 
   if (groups.length === 0 && !isLoading) {
     return (

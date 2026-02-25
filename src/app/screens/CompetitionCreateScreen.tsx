@@ -51,8 +51,7 @@ export function CompetitionCreateScreen() {
   const [templatesOpen, setTemplatesOpen] = useState(false)
 
   // ── Step 2 ──────────────────────────────────────────────────────────────────
-  const [participantSource, setParticipantSource] = useState<'groups' | 'friends'>('groups')
-  const [groupSelectMode, setGroupSelectMode] = useState<'whole' | 'individuals'>('individuals')
+  const [addMode, setAddMode] = useState<'whole_group' | 'select_members' | 'friends'>('whole_group')
   const [selectedGroup, setSelectedGroup] = useState<{ id: string; name: string } | null>(null)
   const [groupMembers, setGroupMembers] = useState<GroupMemberWithProfile[]>([])
   const [friendsList, setFriendsList] = useState<GroupMemberWithProfile[]>([])
@@ -84,7 +83,7 @@ export function CompetitionCreateScreen() {
   const [contractOpen, setContractOpen] = useState(false)
 
   // The group ID used when creating the competition
-  const resolvedGroupId = participantSource === 'friends' ? competitionGroupId : selectedGroup?.id
+  const resolvedGroupId = addMode === 'friends' ? competitionGroupId : selectedGroup?.id
 
   const toDateString = (d: Date) => {
     const y = d.getFullYear()
@@ -106,12 +105,12 @@ export function CompetitionCreateScreen() {
     }
   }, [selectedGroup?.id])
 
-  // Load friends when source switches to friends
+  // Load friends when mode switches to friends
   useEffect(() => {
-    if (participantSource === 'friends') {
+    if (addMode === 'friends') {
       getAllGroupMembersForUser().then(setFriendsList)
     }
-  }, [participantSource])
+  }, [addMode])
 
   useEffect(() => {
     getApprovedPunishments().then((p) => {
@@ -151,7 +150,7 @@ export function CompetitionCreateScreen() {
     setPunishmentEdited(false)
   }
 
-  const memberList = participantSource === 'groups' ? groupMembers : friendsList
+  const memberList = addMode !== 'friends' ? groupMembers : friendsList
 
   // ── Navigation ───────────────────────────────────────────────────────────────
   const handleBack = () => {
@@ -170,7 +169,7 @@ export function CompetitionCreateScreen() {
       setError('Add at least one participant.')
       return
     }
-    if (participantSource === 'friends' && !competitionGroupId) {
+    if (addMode === 'friends' && !competitionGroupId) {
       setError('Select a group to post this competition to.')
       return
     }
@@ -329,31 +328,79 @@ export function CompetitionCreateScreen() {
                 Who's competing?
               </h2>
 
-              {/* Source toggle */}
+              {/* ── Three-tab participant source selector ── */}
               <div>
-                <p className="text-xs font-bold text-text-muted uppercase mb-2">Add from</p>
-                <div className="flex gap-2">
-                  {(['groups', 'friends'] as const).map((src) => (
+                <p className="text-xs font-bold text-text-muted uppercase tracking-wider mb-2">Add participants</p>
+                <div className="grid grid-cols-3 gap-1 bg-bg-elevated p-1 rounded-xl">
+                  {(
+                    [
+                      { mode: 'whole_group', icon: '👥', label: 'Entire Group' },
+                      { mode: 'select_members', icon: '✓', label: 'Pick Members' },
+                      { mode: 'friends', icon: '👤', label: 'Friends' },
+                    ] as const
+                  ).map(({ mode, icon, label }) => (
                     <button
-                      key={src}
+                      key={mode}
                       onClick={() => {
-                        setParticipantSource(src)
+                        setAddMode(mode)
                         setParticipants([])
                       }}
-                      className={`flex-1 py-3 rounded-xl font-bold text-sm ${
-                        participantSource === src ? 'bg-accent-green text-white' : 'bg-bg-elevated text-text-muted'
+                      className={`py-2.5 rounded-lg text-center transition-all ${
+                        addMode === mode
+                          ? 'bg-bg-card text-text-primary shadow-sm'
+                          : 'text-text-muted hover:text-text-primary'
                       }`}
                     >
-                      {src === 'groups' ? 'Within groups' : 'List of friends'}
+                      <span className="block text-base leading-none mb-1">{icon}</span>
+                      <span className="text-[10px] font-black uppercase tracking-wide leading-none">{label}</span>
                     </button>
                   ))}
                 </div>
               </div>
 
-              {/* ── Groups path ── */}
-              {participantSource === 'groups' && (
+              {/* ── Entire group ── */}
+              {addMode === 'whole_group' && (
                 <>
-                  {/* Group dropdown */}
+                  <div>
+                    <label className="text-xs font-bold text-text-muted block mb-2">Group to challenge</label>
+                    <Select
+                      value={selectedGroup?.id ?? ''}
+                      onValueChange={(id) => {
+                        const g = groups.find((x) => x.id === id)
+                        setSelectedGroup(g ? { id: g.id, name: g.name } : null)
+                        setParticipants([])
+                      }}
+                    >
+                      <SelectTrigger className="h-12">
+                        <SelectValue placeholder="Select group" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {groups.map((g) => (
+                          <SelectItem key={g.id} value={g.id}>
+                            {g.avatar_emoji} {g.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {selectedGroup && (
+                    <button
+                      onClick={addWholeGroup}
+                      disabled={groupMembers.length === 0}
+                      className="w-full py-3 rounded-xl font-bold text-sm bg-accent-green/20 text-accent-green border border-accent-green/40 disabled:opacity-50"
+                    >
+                      {groupMembers.length > 0
+                        ? `Add all ${groupMembers.length} members`
+                        : 'Loading members…'}
+                    </button>
+                  )}
+                </>
+              )}
+
+              {/* ── Select members from group ── */}
+              {addMode === 'select_members' && (
+                <>
                   <div>
                     <label className="text-xs font-bold text-text-muted block mb-2">Group</label>
                     <Select
@@ -377,54 +424,12 @@ export function CompetitionCreateScreen() {
                     </Select>
                   </div>
 
-                  {/* Select mode */}
                   {selectedGroup && (
                     <div>
-                      <p className="text-xs font-bold text-text-muted uppercase mb-2">Select by</p>
-                      <div className="flex gap-2">
-                        {(['whole', 'individuals'] as const).map((mode) => (
-                          <button
-                            key={mode}
-                            onClick={() => {
-                              setGroupSelectMode(mode)
-                              setParticipants([])
-                            }}
-                            className={`flex-1 py-3 rounded-xl font-bold text-sm ${
-                              groupSelectMode === mode ? 'bg-accent-green text-white' : 'bg-bg-elevated text-text-muted'
-                            }`}
-                          >
-                            {mode === 'whole' ? 'Whole group' : 'Individual members'}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Whole group */}
-                  {selectedGroup && groupSelectMode === 'whole' && (
-                    <div>
-                      <button
-                        onClick={addWholeGroup}
-                        disabled={groupMembers.length === 0}
-                        className="w-full py-3 rounded-xl font-bold text-sm bg-accent-green/20 text-accent-green border border-accent-green/40 disabled:opacity-50"
-                      >
-                        Add whole group{groupMembers.length > 0 ? ` (${groupMembers.length} members)` : ''}
-                      </button>
-                      {participants.length > 0 && (
-                        <p className="text-xs text-accent-green mt-2 font-medium">
-                          ✓ {participants.length} member{participants.length !== 1 ? 's' : ''} added
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Individual members */}
-                  {selectedGroup && groupSelectMode === 'individuals' && (
-                    <div>
                       <p className="text-xs font-bold text-text-muted uppercase mb-2">
-                        Select members ({participants.length} selected)
+                        Members — {participants.length} selected
                       </p>
-                      <div className="space-y-2 max-h-56 overflow-y-auto">
+                      <div className="space-y-2 max-h-52 overflow-y-auto">
                         {groupMembers.map((m) => {
                           const selected = participants.some((p) => p.user_id === m.user_id)
                           return (
@@ -432,14 +437,20 @@ export function CompetitionCreateScreen() {
                               key={m.user_id}
                               onClick={() => toggleParticipant(m)}
                               className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-colors ${
-                                selected ? 'border-accent-green bg-accent-green/10' : 'border-border-subtle bg-bg-card'
+                                selected
+                                  ? 'border-accent-green bg-accent-green/10'
+                                  : 'border-border-subtle bg-bg-card'
                               }`}
                             >
-                              <div className="w-10 h-10 rounded-full overflow-hidden bg-bg-elevated shrink-0">
+                              <div className="w-9 h-9 rounded-full overflow-hidden bg-bg-elevated shrink-0">
                                 <img src={m.profile.avatar_url ?? ''} alt="" className="w-full h-full object-cover" />
                               </div>
-                              <span className="font-bold text-text-primary text-sm">{m.profile.display_name}</span>
-                              {selected && <span className="text-accent-green ml-auto text-sm">✓</span>}
+                              <span className="font-bold text-text-primary text-sm flex-1 text-left">
+                                {m.profile.display_name}
+                              </span>
+                              <span className={`text-sm font-black ${selected ? 'text-accent-green' : 'text-border-subtle'}`}>
+                                {selected ? '✓' : '+'}
+                              </span>
                             </button>
                           )
                         })}
@@ -449,10 +460,9 @@ export function CompetitionCreateScreen() {
                 </>
               )}
 
-              {/* ── Friends path ── */}
-              {participantSource === 'friends' && (
+              {/* ── Individual participants (friends list) ── */}
+              {addMode === 'friends' && (
                 <>
-                  {/* Post to group */}
                   <div>
                     <label className="text-xs font-bold text-text-muted block mb-2">Post competition to group</label>
                     <Select
@@ -472,33 +482,63 @@ export function CompetitionCreateScreen() {
                     </Select>
                   </div>
 
-                  {/* Friends list */}
                   <div>
                     <p className="text-xs font-bold text-text-muted uppercase mb-2">
-                      Select friends ({participants.length} selected)
+                      Friends — {participants.length} selected
                     </p>
-                    <div className="space-y-2 max-h-56 overflow-y-auto">
-                      {friendsList.map((m) => {
-                        const selected = participants.some((p) => p.user_id === m.user_id)
-                        return (
-                          <button
-                            key={m.user_id}
-                            onClick={() => toggleParticipant(m)}
-                            className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-colors ${
-                              selected ? 'border-accent-green bg-accent-green/10' : 'border-border-subtle bg-bg-card'
-                            }`}
-                          >
-                            <div className="w-10 h-10 rounded-full overflow-hidden bg-bg-elevated shrink-0">
-                              <img src={m.profile.avatar_url ?? ''} alt="" className="w-full h-full object-cover" />
-                            </div>
-                            <span className="font-bold text-text-primary text-sm">{m.profile.display_name}</span>
-                            {selected && <span className="text-accent-green ml-auto text-sm">✓</span>}
-                          </button>
-                        )
-                      })}
+                    <div className="space-y-2 max-h-52 overflow-y-auto">
+                      {friendsList.length === 0 ? (
+                        <p className="text-sm text-text-muted py-4 text-center">Loading friends…</p>
+                      ) : (
+                        friendsList.map((m) => {
+                          const selected = participants.some((p) => p.user_id === m.user_id)
+                          return (
+                            <button
+                              key={m.user_id}
+                              onClick={() => toggleParticipant(m)}
+                              className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-colors ${
+                                selected
+                                  ? 'border-accent-green bg-accent-green/10'
+                                  : 'border-border-subtle bg-bg-card'
+                              }`}
+                            >
+                              <div className="w-9 h-9 rounded-full overflow-hidden bg-bg-elevated shrink-0">
+                                <img src={m.profile.avatar_url ?? ''} alt="" className="w-full h-full object-cover" />
+                              </div>
+                              <span className="font-bold text-text-primary text-sm flex-1 text-left">
+                                {m.profile.display_name}
+                              </span>
+                              <span className={`text-sm font-black ${selected ? 'text-accent-green' : 'text-border-subtle'}`}>
+                                {selected ? '✓' : '+'}
+                              </span>
+                            </button>
+                          )
+                        })
+                      )}
                     </div>
                   </div>
                 </>
+              )}
+
+              {/* ── Selected participants chip strip ── */}
+              {participants.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-2">
+                    Competing ({participants.length})
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {participants.map((p) => (
+                      <button
+                        key={p.user_id}
+                        onClick={() => toggleParticipant(p)}
+                        className="flex items-center gap-1.5 bg-accent-green/15 text-accent-green text-xs font-bold px-2.5 py-1 rounded-full border border-accent-green/30"
+                      >
+                        {p.profile.display_name}
+                        <span className="text-accent-green/60 text-[10px] font-black">×</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               )}
 
               {/* ── Dates ── */}
@@ -569,7 +609,7 @@ export function CompetitionCreateScreen() {
 
               <PrimaryButton
                 onClick={handleStep2Next}
-                disabled={participants.length === 0 || (participantSource === 'friends' && !competitionGroupId)}
+                disabled={participants.length === 0 || (addMode === 'friends' && !competitionGroupId)}
               >
                 Next
               </PrimaryButton>
@@ -757,7 +797,7 @@ export function CompetitionCreateScreen() {
             avatarUrl: m.profile.avatar_url,
           }))}
           groupName={
-            participantSource === 'groups'
+            addMode !== 'friends'
               ? selectedGroup?.name
               : groups.find((g) => g.id === competitionGroupId)?.name
           }

@@ -33,18 +33,11 @@ export function BetCard({
   compact = false,
   onClick
 }: BetCardProps) {
-  const borderColorClass = {
-    active: 'border-status-active',
-    proof: 'border-status-proof',
-    completed: 'border-status-completed',
-    disputed: 'border-status-disputed'
-  }[status];
-
   if (compact) {
     return (
       <button
         onClick={onClick}
-        className={`shrink-0 w-[280px] text-left bg-bg-card rounded-xl border-l-status ${borderColorClass} border border-border-subtle p-3 transition-all hover:shadow-md`}
+        className={`shrink-0 w-[280px] text-left bg-bg-card rounded-xl border border-border-subtle p-3 transition-all hover:shadow-md`}
       >
         <div className="flex items-center justify-between gap-2 mb-1.5">
           <span className="text-[10px] font-bold px-2 py-0.5 bg-bg-elevated rounded-full uppercase tracking-wide truncate">
@@ -82,7 +75,7 @@ export function BetCard({
   return (
     <button 
       onClick={onClick}
-      className={`w-full text-left bg-bg-card rounded-xl border-l-status ${borderColorClass} border border-border-subtle p-4 transition-all hover:shadow-lg card-shadow-light dark:card-inner-glow`}
+      className={`w-full text-left bg-bg-card rounded-xl border border-border-subtle p-4 transition-all hover:shadow-lg card-shadow-light dark:card-inner-glow`}
     >
       {/* Top row */}
       <div className="flex items-center justify-between mb-2">

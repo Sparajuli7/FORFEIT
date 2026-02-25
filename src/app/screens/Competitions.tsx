@@ -134,8 +134,8 @@ export function Competitions() {
                 <div
                   key={bet.id}
                   onClick={() => navigate(`/compete/${bet.id}`)}
-                  className={`bg-bg-card border-l-4 rounded-xl p-5 cursor-pointer transition-opacity hover:opacity-95 ${
-                    status === 'ENDED' ? 'opacity-75 border-l-accent-coral' : 'border-l-accent-green'
+                  className={`bg-bg-card border border-border-subtle rounded-xl p-5 cursor-pointer transition-opacity hover:opacity-95 ${
+                    status === 'ENDED' ? 'opacity-75' : ''
                   }`}
                 >
                   <div className="flex items-center justify-between mb-3">
@@ -216,8 +216,8 @@ export function Competitions() {
                 <div
                   key={competition.id}
                   onClick={() => navigate(`/compete/${competition.id}`)}
-                  className={`bg-bg-card border-l-4 rounded-xl p-5 cursor-pointer transition-opacity hover:opacity-95 ${
-                    status === 'ENDED' ? 'opacity-75 border-l-gold' : 'border-l-purple'
+                  className={`bg-bg-card border border-border-subtle rounded-xl p-5 cursor-pointer transition-opacity hover:opacity-95 ${
+                    status === 'ENDED' ? 'opacity-75' : ''
                   }`}
                 >
                   <div className="flex items-center justify-between mb-4">
