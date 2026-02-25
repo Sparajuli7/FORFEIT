@@ -127,7 +127,6 @@ function BoardBetCard({
   // Status badge — informational pill, not a CTA
   const statusBadge = (() => {
     if (priority.level === 0) return { text: 'Vote Needed', cls: 'bg-amber-400/20 text-amber-400 border-amber-400/40 animate-pulse' }
-    if (priority.level === 1) return { text: 'Proof Out', cls: 'bg-amber-400/15 text-amber-400 border-amber-400/30' }
     if (priority.level === 2) return { text: 'Accept Required', cls: 'bg-accent-green/15 text-accent-green border-accent-green/30' }
     if (priority.level === 3) return { text: 'Disputed', cls: 'bg-red-400/15 text-red-400 border-red-400/30' }
     if (priority.level === 4) return { text: '< 6h Left', cls: 'bg-amber-400/15 text-amber-400 border-amber-400/30' }
@@ -146,8 +145,7 @@ function BoardBetCard({
 
   // Countdown in top-right (always present)
   const countdownText =
-    bet.status === 'proof_submitted' ? 'Judging'
-    : bet.status === 'disputed' ? 'On hold'
+    bet.status === 'disputed' ? 'On hold'
     : countdown.formatted || '—'
 
   return (
@@ -358,13 +356,8 @@ export function TheBoard() {
 
       {/* ── My Bets strip ── */}
       <div className="px-4 pt-4 pb-2">
-        <div className="flex flex-col items-center mb-3">
+        <div className="mb-3">
           <h2 className="text-base font-bold text-white">My Bets</h2>
-          {actionCount > 0 && (
-            <span className="text-[10px] font-black text-amber-400 bg-amber-400/10 border border-amber-400/30 px-2 py-0.5 rounded-full animate-pulse mt-1">
-              {actionCount} need{actionCount === 1 ? 's' : ''} action
-            </span>
-          )}
         </div>
 
         <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2 -mx-4 px-4">
