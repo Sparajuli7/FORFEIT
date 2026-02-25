@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router'
 import { ChevronLeft, Shuffle, BookOpen } from 'lucide-react'
 import { format } from 'date-fns'
@@ -55,6 +55,7 @@ export function BetCreationWizard() {
     return d
   })
   const [selectedTime, setSelectedTime] = useState('17:00')
+  const [moneyInput, setMoneyInput] = useState('20.00')
   const [punishments, setPunishments] = useState<PunishmentCard[]>([])
   const [punishmentText, setPunishmentText] = useState('')
   const [punishmentEdited, setPunishmentEdited] = useState(false)
@@ -68,8 +69,9 @@ export function BetCreationWizard() {
   const [contractOpen, setContractOpen] = useState(false)
 
   // Reset wizard every time this screen mounts so stale step/side state never leaks in
+  // useLayoutEffect ensures reset fires before paint, preventing flash of stale step
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { resetWizard() }, [])
+  useLayoutEffect(() => { resetWizard() }, [])
 
   useEffect(() => {
     fetchGroups()
@@ -412,15 +414,25 @@ export function BetCreationWizard() {
                     <div className="relative">
                       <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-black text-text-muted">$</span>
                       <input
-                        type="number"
+                        type="text"
                         inputMode="decimal"
-                        min="0"
-                        step="0.01"
-                        value={((wizard.stakeMoney ?? 0) / 100).toFixed(2)}
+                        value={moneyInput}
                         onChange={(e) => {
-                          const dollars = parseFloat(e.target.value)
-                          if (isNaN(dollars) || dollars < 0) return
-                          updateWizardStep(3, { stakeMoney: Math.round(dollars * 100) })
+                          const raw = e.target.value.replace(/[^0-9.]/g, '')
+                          setMoneyInput(raw)
+                          const dollars = parseFloat(raw)
+                          if (!isNaN(dollars) && dollars >= 0) {
+                            updateWizardStep(currentStep, { stakeMoney: Math.round(dollars * 100) })
+                          }
+                        }}
+                        onBlur={() => {
+                          const dollars = parseFloat(moneyInput)
+                          if (!isNaN(dollars) && dollars >= 0) {
+                            setMoneyInput(dollars.toFixed(2))
+                          } else {
+                            setMoneyInput('0.00')
+                            updateWizardStep(currentStep, { stakeMoney: 0 })
+                          }
                         }}
                         className="w-full h-16 pl-12 pr-4 rounded-xl bg-bg-elevated border border-border-subtle text-3xl font-black text-text-primary tabular-nums text-center"
                       />
@@ -430,7 +442,10 @@ export function BetCreationWizard() {
                     {STAKE_PRESETS.map((cents) => (
                       <button
                         key={cents}
-                        onClick={() => updateWizardStep(3, { stakeMoney: cents })}
+                        onClick={() => {
+                          updateWizardStep(currentStep, { stakeMoney: cents })
+                          setMoneyInput((cents / 100).toFixed(2))
+                        }}
                         className={`px-4 py-2 rounded-full font-bold text-sm ${
                           wizard.stakeMoney === cents ? 'bg-accent-green text-white' : 'bg-bg-elevated text-text-primary'
                         }`}

@@ -73,6 +73,7 @@ export function CompetitionCreateScreen() {
   const [punishments, setPunishments] = useState<{ id: string; text: string }[]>([])
   const [punishmentText, setPunishmentText] = useState('')
   const [punishmentEdited, setPunishmentEdited] = useState(false)
+  const [moneyInput, setMoneyInput] = useState('20.00')
   const [isPublic, setIsPublic] = useState(true)
 
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -654,15 +655,25 @@ export function CompetitionCreateScreen() {
                     <div className="relative">
                       <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-black text-text-muted">$</span>
                       <input
-                        type="number"
+                        type="text"
                         inputMode="decimal"
-                        min="0"
-                        step="0.01"
-                        value={(stakeMoney / 100).toFixed(2)}
+                        value={moneyInput}
                         onChange={(e) => {
-                          const dollars = parseFloat(e.target.value)
-                          if (isNaN(dollars) || dollars < 0) return
-                          setStakeMoney(Math.round(dollars * 100))
+                          const raw = e.target.value.replace(/[^0-9.]/g, '')
+                          setMoneyInput(raw)
+                          const dollars = parseFloat(raw)
+                          if (!isNaN(dollars) && dollars >= 0) {
+                            setStakeMoney(Math.round(dollars * 100))
+                          }
+                        }}
+                        onBlur={() => {
+                          const dollars = parseFloat(moneyInput)
+                          if (!isNaN(dollars) && dollars >= 0) {
+                            setMoneyInput(dollars.toFixed(2))
+                          } else {
+                            setMoneyInput('0.00')
+                            setStakeMoney(0)
+                          }
                         }}
                         className="w-full h-16 pl-12 pr-4 rounded-xl bg-bg-elevated border border-border-subtle text-3xl font-black text-text-primary tabular-nums text-center"
                       />
@@ -672,7 +683,10 @@ export function CompetitionCreateScreen() {
                     {STAKE_PRESETS.map((c) => (
                       <button
                         key={c}
-                        onClick={() => setStakeMoney(c)}
+                        onClick={() => {
+                          setStakeMoney(c)
+                          setMoneyInput((c / 100).toFixed(2))
+                        }}
                         className={`px-4 py-2 rounded-full font-bold text-sm ${
                           stakeMoney === c ? 'bg-accent-green text-white' : 'bg-bg-elevated text-text-primary'
                         }`}
