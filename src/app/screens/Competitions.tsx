@@ -21,6 +21,47 @@ function getStatus(competition: Bet): 'OPEN' | 'LIVE' | 'ENDED' {
   return 'OPEN'
 }
 
+/** Priority for ordering: 0 = needs action, 1 = active, 2 = concluded */
+function challengePriority(bet: BetWithSides): number {
+  if (bet.status === 'proof_submitted' || bet.status === 'disputed') return 0
+  if (bet.status === 'completed' || bet.status === 'voided') return 2
+  return 1 // pending, active
+}
+
+/** Sort challenge bets: needs action first, then active, then concluded. Within each group, soonest deadline first for 0/1, most recent first for 2. */
+function sortChallengeBets(bets: BetWithSides[]): BetWithSides[] {
+  return [...bets].sort((a, b) => {
+    const pa = challengePriority(a)
+    const pb = challengePriority(b)
+    if (pa !== pb) return pa - pb
+    const da = new Date(a.deadline).getTime()
+    const db = new Date(b.deadline).getTime()
+    if (pa === 2) return db - da // concluded: most recent first
+    return da - db // needs action / active: soonest first
+  })
+}
+
+/** Priority for competitions: 0 = LIVE, 1 = OPEN, 2 = ENDED */
+function competitionPriority(competition: Bet): number {
+  const status = getStatus(competition)
+  if (status === 'LIVE') return 0
+  if (status === 'OPEN') return 1
+  return 2
+}
+
+/** Sort competitions: LIVE first, then OPEN, then ENDED. Within each group, soonest deadline first for LIVE/OPEN, most recent first for ENDED. */
+function sortCompetitions(comps: Bet[]): Bet[] {
+  return [...comps].sort((a, b) => {
+    const pa = competitionPriority(a)
+    const pb = competitionPriority(b)
+    if (pa !== pb) return pa - pb
+    const da = new Date(a.deadline).getTime()
+    const db = new Date(b.deadline).getTime()
+    if (pa === 2) return db - da // ended: most recent first
+    return da - db // live/open: soonest first
+  })
+}
+
 function formatStake(competition: Bet) {
   if (competition.stake_money) return formatMoney(competition.stake_money)
   if (competition.stake_custom_punishment) return competition.stake_custom_punishment
@@ -86,7 +127,9 @@ export function Competitions() {
     )
   }
 
-  const totalItems = competitions.length + challengeBets.length
+  const sortedChallenges = sortChallengeBets(challengeBets)
+  const sortedCompetitions = sortCompetitions(competitions)
+  const totalItems = sortedCompetitions.length + sortedChallenges.length
 
   return (
     <div className="h-full bg-bg-primary overflow-y-auto pb-6">
@@ -108,8 +151,8 @@ export function Competitions() {
           </div>
         ) : (
           <>
-            {/* Challenge bets (quick / long / rematches) */}
-            {challengeBets.map((bet) => {
+            {/* Challenge bets (quick / long / rematches) — ordered: needs action → active → concluded */}
+            {sortedChallenges.map((bet) => {
               const status = getStatus(bet)
               const riders = bet.bet_sides?.filter((s) => s.side === 'rider') ?? []
               const doubters = bet.bet_sides?.filter((s) => s.side === 'doubter') ?? []
@@ -205,8 +248,8 @@ export function Competitions() {
               )
             })}
 
-            {/* Score-based competitions */}
-            {competitions.map((competition) => {
+            {/* Score-based competitions — ordered: LIVE → OPEN → ENDED */}
+            {sortedCompetitions.map((competition) => {
               const status = getStatus(competition)
               const lb = leaderboards[competition.id] ?? []
               const top3 = lb.slice(0, 3)

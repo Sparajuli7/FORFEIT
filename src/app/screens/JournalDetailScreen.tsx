@@ -338,6 +338,9 @@ export function JournalDetailScreen() {
   const [betsLoading, setBetsLoading] = useState(false)
   const [showPicker, setShowPicker] = useState(false)
   const [showRename, setShowRename] = useState(false)
+  const [expanded, setExpanded] = useState(false)
+
+  const PREVIEW_COUNT = 5
 
   // Load collection from localStorage
   useEffect(() => {
@@ -493,41 +496,60 @@ export function JournalDetailScreen() {
               Add Bets
             </button>
           </div>
-        ) : (
-          <div className="space-y-2">
-            {bets.map((bet) => {
-              const category = BET_CATEGORIES[bet.category]
-              return (
-                <div
-                  key={bet.id}
-                  className="bg-bg-card rounded-xl border border-border-subtle flex items-stretch overflow-hidden"
+        ) : (() => {
+          const sorted = [...bets].sort(
+            (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+          )
+          const visible = expanded ? sorted : sorted.slice(0, PREVIEW_COUNT)
+          const hasMore = sorted.length > PREVIEW_COUNT
+
+          return (
+            <div className="space-y-2">
+              {visible.map((bet) => {
+                const category = BET_CATEGORIES[bet.category]
+                return (
+                  <div
+                    key={bet.id}
+                    className="bg-bg-card rounded-xl border border-border-subtle flex items-stretch overflow-hidden"
+                  >
+                    <button
+                      onClick={() => navigate(`/bet/${bet.id}`)}
+                      className="flex-1 px-3 py-3 flex items-center gap-3 text-left hover:bg-bg-elevated transition-colors"
+                    >
+                      <span className="text-xl shrink-0">{category?.emoji ?? '🎯'}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-text-primary truncate">{bet.title}</p>
+                        <p className="text-[11px] text-text-muted mt-0.5">
+                          {new Date(bet.created_at).toLocaleDateString()}
+                          {bet.stake_money ? ` · ${formatMoney(bet.stake_money)}` : ''}
+                        </p>
+                      </div>
+                      <StatusPill status={bet.status} />
+                    </button>
+                    <button
+                      onClick={() => removeBet(bet.id)}
+                      className="px-3 flex items-center justify-center border-l border-border-subtle text-text-muted hover:text-accent-coral hover:bg-accent-coral/10 transition-colors"
+                      aria-label="Remove from journal"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                )
+              })}
+
+              {hasMore && (
+                <button
+                  onClick={() => setExpanded((e) => !e)}
+                  className="w-full py-2.5 rounded-xl border border-border-subtle text-xs font-bold text-text-muted hover:text-text-primary hover:bg-bg-elevated transition-colors"
                 >
-                  <button
-                    onClick={() => navigate(`/bet/${bet.id}`)}
-                    className="flex-1 px-3 py-3 flex items-center gap-3 text-left hover:bg-bg-elevated transition-colors"
-                  >
-                    <span className="text-xl shrink-0">{category?.emoji ?? '🎯'}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-text-primary truncate">{bet.title}</p>
-                      <p className="text-[11px] text-text-muted mt-0.5">
-                        {new Date(bet.created_at).toLocaleDateString()}
-                        {bet.stake_money ? ` · ${formatMoney(bet.stake_money)}` : ''}
-                      </p>
-                    </div>
-                    <StatusPill status={bet.status} />
-                  </button>
-                  <button
-                    onClick={() => removeBet(bet.id)}
-                    className="px-3 flex items-center justify-center border-l border-border-subtle text-text-muted hover:text-accent-coral hover:bg-accent-coral/10 transition-colors"
-                    aria-label="Remove from journal"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              )
-            })}
-          </div>
-        )}
+                  {expanded
+                    ? 'Show less'
+                    : `Show all ${sorted.length} bets`}
+                </button>
+              )}
+            </div>
+          )
+        })()}
       </div>
 
       {/* Bet picker overlay */}

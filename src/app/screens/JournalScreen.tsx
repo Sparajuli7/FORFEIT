@@ -9,6 +9,7 @@ import {
   createJournal,
   type JournalCollection,
 } from '@/lib/utils/journalStorage'
+import { loadPinned, togglePin, PIN_BETS_KEY, PIN_GROUPS_KEY } from '@/lib/utils/pinStorage'
 import { CircleGrid } from '../components/CircleGrid'
 import type { BetWithSides } from '@/stores/betStore'
 

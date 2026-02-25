@@ -25,6 +25,43 @@ In Supabase Dashboard → Storage, create these three buckets:
 
 Set appropriate RLS policies on each bucket (allow authenticated uploads, public reads).
 
+## Step 2b: Run database migrations (required for verdict / “Declare your verdict”)
+
+The **Declare your verdict** flow (submit proof and choose YES/NO) requires the `proofs` table to have `ruling` and `ruling_deadline` columns. If you see:
+
+**“Could not find the 'ruling' column of 'proofs' in the schema cache”**
+
+run the migration that adds these columns:
+
+**Option A — Supabase CLI (recommended)**
+
+```bash
+supabase link --project-ref YOUR_PROJECT_REF
+supabase db push
+```
+
+**Option B — SQL Editor (quick fix)**
+
+In Supabase Dashboard → **SQL Editor**, run the contents of:
+
+`supabase/migrations/20260224100000_add_proof_ruling_columns_idempotent.sql`
+
+Or paste and run:
+
+```sql
+ALTER TABLE proofs ADD COLUMN IF NOT EXISTS ruling TEXT;
+ALTER TABLE proofs ADD COLUMN IF NOT EXISTS ruling_deadline TIMESTAMPTZ;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'proofs_ruling_check') THEN
+    ALTER TABLE proofs ADD CONSTRAINT proofs_ruling_check
+    CHECK (ruling IS NULL OR ruling IN ('riders_win', 'doubters_win'));
+  END IF;
+END $$;
+```
+
+Then reload the schema cache: **Settings → API → “Reload schema cache”** (if available).
+
 ## Step 3: Enable Phone Auth
 
 1. Go to Authentication → Providers → Phone

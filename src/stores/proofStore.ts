@@ -266,7 +266,11 @@ const useProofStore = create<ProofStore>()((set, get) => ({
       .single()
 
     if (error || !proof) {
-      set({ error: error?.message ?? 'Proof upload failed.', isSubmitting: false })
+      const message =
+        error?.message && /ruling|schema cache/i.test(error.message)
+          ? "Verdict feature isn't set up yet. Add the ruling columns to your database — see DEPLOY.md (Step 2b) or run the migration in supabase/migrations/20260224100000_add_proof_ruling_columns_idempotent.sql"
+          : error?.message ?? 'Proof upload failed.'
+      set({ error: message, isSubmitting: false })
       return null
     }
 
