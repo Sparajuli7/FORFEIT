@@ -404,21 +404,21 @@ export function TheBoard() {
         <div className="flex gap-6 pb-4 justify-center">
           <button
             onClick={() => navigate('/group/create')}
-            className="h-6 px-3 rounded-full bg-accent-green text-bg-primary text-xs font-bold flex items-center gap-1"
+            className="h-8 px-4 rounded-full bg-accent-green text-bg-primary text-sm font-bold flex items-center gap-1.5"
           >
-            <Plus className="w-3 h-3" /> Create
+            <Plus className="w-4 h-4" /> Create
           </button>
           <button
             onClick={() => navigate('/group/join')}
-            className="h-6 px-3 rounded-full bg-bg-elevated border border-border-subtle text-text-primary text-xs font-bold flex items-center gap-1"
+            className="h-8 px-4 rounded-full bg-bg-elevated border border-border-subtle text-text-primary text-sm font-bold flex items-center gap-1.5"
           >
-            <LogIn className="w-3 h-3" /> Join
+            <LogIn className="w-4 h-4" /> Join
           </button>
           <button
             onClick={() => navigate('/invite')}
-            className="h-6 px-3 rounded-full bg-bg-elevated border border-border-subtle text-text-primary text-xs font-bold flex items-center gap-1"
+            className="h-8 px-4 rounded-full bg-bg-elevated border border-border-subtle text-text-primary text-sm font-bold flex items-center gap-1.5"
           >
-            <UserPlus className="w-3 h-3" /> Invite
+            <UserPlus className="w-4 h-4" /> Invite
           </button>
         </div>
         <CircleGrid

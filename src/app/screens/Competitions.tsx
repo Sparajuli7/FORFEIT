@@ -90,26 +90,21 @@ export function Competitions() {
 
   return (
     <div className="h-full bg-bg-primary overflow-y-auto pb-6">
-      <div className="px-6 pt-12 pb-6">
+      <div className="px-6 pt-12 pb-4">
         <h1 className="text-3xl font-black text-text-primary mb-2">⚔️ COMPETE</h1>
         <p className="text-sm text-text-muted">Challenges, competitions, rematches.</p>
+      </div>
+
+      <div className="px-6 mb-4">
+        <SportsbookButton onClick={() => navigate('/compete/create')}>
+          CREATE COMPETITION
+        </SportsbookButton>
       </div>
 
       <div className="px-6 space-y-4">
         {totalItems === 0 ? (
           <div className="bg-bg-card border border-border-subtle rounded-xl p-8 text-center">
-            <p className="text-text-muted mb-4">No bets yet. Create a challenge or competition.</p>
-            <div className="flex flex-col gap-3">
-              <SportsbookButton onClick={() => navigate('/bet/create')}>
-                CREATE CHALLENGE
-              </SportsbookButton>
-              <button
-                onClick={() => navigate('/compete/create')}
-                className="w-full py-3 rounded-xl border border-border-subtle text-text-muted text-sm font-bold uppercase tracking-wide"
-              >
-                CREATE COMPETITION
-              </button>
-            </div>
+            <p className="text-text-muted">No competitions yet. Create one above to get started.</p>
           </div>
         ) : (
           <>
@@ -318,19 +313,6 @@ export function Competitions() {
         )}
       </div>
 
-      {totalItems > 0 && (
-        <div className="px-6 mt-6 flex flex-col gap-3">
-          <SportsbookButton onClick={() => navigate('/bet/create')}>
-            CREATE CHALLENGE
-          </SportsbookButton>
-          <button
-            onClick={() => navigate('/compete/create')}
-            className="w-full py-3 rounded-xl border border-border-subtle text-text-muted text-sm font-bold uppercase tracking-wide"
-          >
-            CREATE COMPETITION
-          </button>
-        </div>
-      )}
     </div>
   )
 }
