@@ -119,11 +119,10 @@ export function BetCreationWizard() {
   useEffect(() => {
     getApprovedPunishments().then((p) => {
       setPunishments(p)
-      // Seed with a random punishment if user hasn't edited yet
+      // Seed with a random punishment text (don't touch wizard step yet)
       if (p.length > 0 && !punishmentEdited) {
         const random = p[Math.floor(Math.random() * p.length)]
         setPunishmentText(random.text)
-        updateWizardStep(3, { stakePunishment: random, stakeCustomPunishment: null })
       }
     })
   }, [])
@@ -167,7 +166,12 @@ export function BetCreationWizard() {
   const handleDropIt = async () => {
     if (!wizard.stakeType) return
     if ((wizard.stakeType === 'money' || wizard.stakeType === 'both') && (!wizard.stakeMoney || wizard.stakeMoney <= 0)) return
-    if ((wizard.stakeType === 'punishment' || wizard.stakeType === 'both') && !wizard.stakePunishment && !wizard.stakeCustomPunishment) return
+    // Always sync punishment text to wizard before submitting
+    if (wizard.stakeType === 'punishment' || wizard.stakeType === 'both') {
+      const text = punishmentText.trim()
+      if (!text) return
+      updateWizardStep(currentStep, { stakeCustomPunishment: text })
+    }
     const bet = await createBet()
     if (bet) {
       setCreatedBet(bet)
@@ -182,12 +186,15 @@ export function BetCreationWizard() {
     const random = punishments[Math.floor(Math.random() * punishments.length)]
     setPunishmentText(random.text)
     setPunishmentEdited(false)
-    updateWizardStep(3, { stakePunishment: random, stakeCustomPunishment: null })
+    updateWizardStep(currentStep, { stakePunishment: random, stakeCustomPunishment: null })
   }
+
+  const [isSaving, setIsSaving] = useState(false)
 
   const savePunishmentToLibrary = async () => {
     const text = punishmentText.trim()
-    if (!text) return
+    if (!text || isSaving) return
+    setIsSaving(true)
     try {
       const card = await createPunishment({
         text,
@@ -196,13 +203,15 @@ export function BetCreationWizard() {
         times_assigned: 0,
         times_completed: 0,
         times_disputed: 0,
-        is_community: true,
+        is_community: false,
       })
       setPunishments((prev) => [...prev, card])
-      updateWizardStep(3, { stakePunishment: card, stakeCustomPunishment: null })
+      updateWizardStep(currentStep, { stakePunishment: card, stakeCustomPunishment: null })
     } catch {
       // Still use the text even if saving fails
-      updateWizardStep(3, { stakeCustomPunishment: text, stakePunishment: null })
+      updateWizardStep(currentStep, { stakeCustomPunishment: text, stakePunishment: null })
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -395,33 +404,27 @@ export function BetCreationWizard() {
               </div>
 
               {(wizard.stakeType === 'money' || wizard.stakeType === 'both') && (
-                <div className="bg-bg-card border border-border-subtle rounded-2xl p-8 text-center">
-                  <div className="relative w-40 h-40 mx-auto mb-6">
-                    <div className="absolute inset-0 rounded-full bg-accent-green flex items-center justify-center border-8 border-bg-primary shadow-2xl">
-                      <span className="text-5xl font-black text-white tabular-nums">
-                        {formatMoney(wizard.stakeMoney ?? 0)}
-                      </span>
+                <div className="space-y-4">
+                  <div className="bg-bg-card border border-border-subtle rounded-2xl p-6">
+                    <label className="text-xs font-bold text-text-muted uppercase tracking-wider block mb-3">
+                      Stake amount
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-black text-text-muted">$</span>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        min="0"
+                        step="0.01"
+                        value={((wizard.stakeMoney ?? 0) / 100).toFixed(2)}
+                        onChange={(e) => {
+                          const dollars = parseFloat(e.target.value)
+                          if (isNaN(dollars) || dollars < 0) return
+                          updateWizardStep(3, { stakeMoney: Math.round(dollars * 100) })
+                        }}
+                        className="w-full h-16 pl-12 pr-4 rounded-xl bg-bg-elevated border border-border-subtle text-3xl font-black text-text-primary tabular-nums text-center"
+                      />
                     </div>
-                    <button
-                      onClick={() =>
-                        updateWizardStep(3, {
-                          stakeMoney: Math.min(5000, (wizard.stakeMoney ?? 0) + 500),
-                        })
-                      }
-                      className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-bg-elevated border-2 border-border-subtle text-text-primary font-bold"
-                    >
-                      +
-                    </button>
-                    <button
-                      onClick={() =>
-                        updateWizardStep(3, {
-                          stakeMoney: Math.max(0, (wizard.stakeMoney ?? 0) - 500),
-                        })
-                      }
-                      className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-10 h-10 rounded-full bg-bg-elevated border-2 border-border-subtle text-text-primary font-bold"
-                    >
-                      −
-                    </button>
                   </div>
                   <div className="flex gap-2 justify-center">
                     {STAKE_PRESETS.map((cents) => (
@@ -450,7 +453,7 @@ export function BetCreationWizard() {
                         const val = e.target.value.slice(0, 120)
                         setPunishmentText(val)
                         setPunishmentEdited(true)
-                        updateWizardStep(3, { stakeCustomPunishment: val.trim() || null, stakePunishment: null })
+                        updateWizardStep(currentStep, { stakeCustomPunishment: val.trim() || null, stakePunishment: null })
                       }}
                       onFocus={() => {
                         if (!punishmentEdited) {
@@ -459,9 +462,7 @@ export function BetCreationWizard() {
                         }
                       }}
                       placeholder="Enter a punishment for the loser..."
-                      className={`w-full flex-1 bg-transparent text-center font-bold text-base leading-snug resize-none border-none outline-none ${
-                        punishmentEdited ? 'text-text-primary' : 'text-text-muted'
-                      }`}
+                      className="w-full flex-1 bg-transparent text-center font-bold text-base leading-snug resize-none border-none outline-none text-text-primary"
                       maxLength={120}
                     />
                     <p className="text-right text-xs text-text-muted mt-2">{punishmentText.length}/120</p>
@@ -478,10 +479,10 @@ export function BetCreationWizard() {
                     </button>
                     <button
                       onClick={savePunishmentToLibrary}
-                      disabled={!punishmentText.trim()}
+                      disabled={!punishmentText.trim() || isSaving}
                       className="flex-1 py-3 rounded-xl bg-accent-green text-white font-bold text-sm disabled:opacity-50"
                     >
-                      Save
+                      {isSaving ? 'Saving...' : 'Save'}
                     </button>
                   </div>
 
@@ -559,7 +560,7 @@ export function BetCreationWizard() {
                   onClick={() => {
                     setPunishmentText(p.text)
                     setPunishmentEdited(false)
-                    updateWizardStep(3, { stakePunishment: p, stakeCustomPunishment: null })
+                    updateWizardStep(currentStep, { stakePunishment: p, stakeCustomPunishment: null })
                     setLibraryOpen(false)
                   }}
                   className={`w-full text-left p-3 rounded-xl text-sm transition-colors ${

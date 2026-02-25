@@ -644,20 +644,43 @@ export function CompetitionCreateScreen() {
                 ))}
               </div>
 
-              {/* Money presets */}
+              {/* Money input + presets */}
               {(stakeType === 'money' || stakeType === 'both') && (
-                <div className="flex gap-2 flex-wrap">
-                  {STAKE_PRESETS.map((c) => (
-                    <button
-                      key={c}
-                      onClick={() => setStakeMoney(c)}
-                      className={`px-4 py-2 rounded-full font-bold text-sm ${
-                        stakeMoney === c ? 'bg-accent-green text-white' : 'bg-bg-elevated text-text-primary'
-                      }`}
-                    >
-                      {formatMoney(c)}
-                    </button>
-                  ))}
+                <div className="space-y-4">
+                  <div className="bg-bg-card border border-border-subtle rounded-2xl p-6">
+                    <label className="text-xs font-bold text-text-muted uppercase tracking-wider block mb-3">
+                      Stake amount
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-black text-text-muted">$</span>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        min="0"
+                        step="0.01"
+                        value={(stakeMoney / 100).toFixed(2)}
+                        onChange={(e) => {
+                          const dollars = parseFloat(e.target.value)
+                          if (isNaN(dollars) || dollars < 0) return
+                          setStakeMoney(Math.round(dollars * 100))
+                        }}
+                        className="w-full h-16 pl-12 pr-4 rounded-xl bg-bg-elevated border border-border-subtle text-3xl font-black text-text-primary tabular-nums text-center"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2 flex-wrap">
+                    {STAKE_PRESETS.map((c) => (
+                      <button
+                        key={c}
+                        onClick={() => setStakeMoney(c)}
+                        className={`px-4 py-2 rounded-full font-bold text-sm ${
+                          stakeMoney === c ? 'bg-accent-green text-white' : 'bg-bg-elevated text-text-primary'
+                        }`}
+                      >
+                        {formatMoney(c)}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
 
@@ -675,9 +698,7 @@ export function CompetitionCreateScreen() {
                         setStakePunishmentId(null)
                       }}
                       placeholder="Enter a punishment for the loser..."
-                      className={`w-full h-24 rounded-xl bg-bg-elevated border border-border-subtle p-4 text-sm resize-none ${
-                        punishmentEdited ? 'text-text-primary' : 'text-text-muted'
-                      }`}
+                      className="w-full h-24 rounded-xl bg-bg-elevated border border-border-subtle p-4 text-sm resize-none text-text-primary"
                       onFocus={() => {
                         if (!punishmentEdited) {
                           // Select all text so user can easily overwrite
