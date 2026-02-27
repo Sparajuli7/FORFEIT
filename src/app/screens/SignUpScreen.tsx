@@ -16,6 +16,8 @@ export function SignUpScreen() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   const isNewUser = useAuthStore((s) => s.isNewUser)
   const profile = useAuthStore((s) => s.profile)
+  const pendingEmailConfirmation = useAuthStore((s) => s.pendingEmailConfirmation)
+  const clearPendingEmailConfirmation = useAuthStore((s) => s.clearPendingEmailConfirmation)
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -65,6 +67,45 @@ export function SignUpScreen() {
   const passValid = validatePassword(password).valid
   const matchValid = confirmPassword.length > 0 && validatePasswordMatch(password, confirmPassword).valid
   const canSubmit = emailValid && passValid && matchValid && !isLoading
+
+  // Show a confirmation-pending screen when Supabase requires email verification
+  // before creating a session. The user must click the link in their inbox.
+  if (pendingEmailConfirmation) {
+    return (
+      <div className="h-full bg-bg-primary grain-texture flex flex-col px-6">
+        <div className="flex-1 flex flex-col justify-center items-center text-center">
+          <div className="text-6xl mb-6">📧</div>
+          <h1 className="text-2xl font-black text-text-primary mb-3">
+            Check your email
+          </h1>
+          <p className="text-text-muted text-sm mb-2">
+            We sent a confirmation link to:
+          </p>
+          <p className="text-text-primary font-semibold text-sm mb-4">
+            {pendingEmailConfirmation}
+          </p>
+          <p className="text-text-muted text-sm mb-8 max-w-xs">
+            Click the link in that email to verify your account, then come back here to log in.
+          </p>
+          <Button
+            onClick={() => {
+              clearPendingEmailConfirmation()
+              navigate('/auth/login', { replace: true })
+            }}
+            className="w-full h-14 rounded-2xl bg-accent-green text-white font-bold text-base hover:bg-accent-green/90"
+          >
+            Go to Login
+          </Button>
+          <button
+            onClick={() => clearPendingEmailConfirmation()}
+            className="text-sm text-text-muted mt-5 hover:underline"
+          >
+            Use a different email
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="h-full bg-bg-primary grain-texture flex flex-col px-6">

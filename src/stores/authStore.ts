@@ -18,6 +18,12 @@ interface AuthState {
   /** True when user has signed in but has no profile row yet */
   isNewUser: boolean
   error: string | null
+  /**
+   * Set to the email address after a successful signUp when Supabase requires
+   * email confirmation before creating a session. The user must click the link
+   * in their inbox — once they do, SIGNED_IN fires and this is cleared.
+   */
+  pendingEmailConfirmation: string | null
 }
 
 interface AuthActions {
@@ -42,6 +48,8 @@ interface AuthActions {
   /** Directly set profile in store (used after profile creation) */
   setProfile: (profile: Profile | null) => void
   clearError: () => void
+  /** Clear the pending email confirmation state (e.g. user wants to use a different email) */
+  clearPendingEmailConfirmation: () => void
 }
 
 export type AuthStore = AuthState & AuthActions
@@ -71,6 +79,7 @@ const useAuthStore = create<AuthStore>()((set, get) => ({
   isAuthenticated: false,
   isNewUser: false,
   error: null,
+  pendingEmailConfirmation: null,
 
   // ---- actions ----
 
@@ -118,6 +127,7 @@ const useAuthStore = create<AuthStore>()((set, get) => ({
           isNewUser: !profile,
           isLoading: false,
           error: null,
+          pendingEmailConfirmation: null,
         })
       } else if (event === 'TOKEN_REFRESHED' && session?.user) {
         set({ user: session.user })
@@ -136,21 +146,42 @@ const useAuthStore = create<AuthStore>()((set, get) => ({
   },
 
   signUp: async (email, password) => {
-    set({ isLoading: true, error: null })
-    const { error } = await supabase.auth.signUp({ email, password })
+    set({ isLoading: true, error: null, pendingEmailConfirmation: null })
+    const { data, error } = await supabase.auth.signUp({ email, password })
     if (error) {
-      set({ error: error.message, isLoading: false })
-    } else {
-      set({ isLoading: false })
+      // Surface a user-friendly message for the most common error cases.
+      const raw = error.message.toLowerCase()
+      let message = error.message
+      if (raw.includes('user already registered') || raw.includes('already been registered')) {
+        message = 'An account with this email already exists. Try logging in instead.'
+      }
+      set({ error: message, isLoading: false })
+      return
     }
-    // On success, onAuthStateChange fires SIGNED_IN and updates the store
+
+    if (!data.session) {
+      // Supabase requires email confirmation before creating a session.
+      // The SIGNED_IN event will fire once the user clicks the link in their inbox.
+      set({ isLoading: false, pendingEmailConfirmation: email })
+      return
+    }
+
+    set({ isLoading: false })
+    // Session exists → onAuthStateChange fires SIGNED_IN and updates the store
   },
 
   signIn: async (email, password) => {
     set({ isLoading: true, error: null })
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) {
-      set({ error: error.message, isLoading: false })
+      const raw = error.message.toLowerCase()
+      let message = error.message
+      if (raw.includes('invalid login credentials')) {
+        message = 'Incorrect email or password. Please try again.'
+      } else if (raw.includes('email not confirmed')) {
+        message = 'Please verify your email first. Check your inbox for the confirmation link we sent you.'
+      }
+      set({ error: message, isLoading: false })
     } else {
       set({ isLoading: false })
     }
@@ -261,6 +292,8 @@ const useAuthStore = create<AuthStore>()((set, get) => ({
   setProfile: (profile) => set({ profile, isNewUser: false }),
 
   clearError: () => set({ error: null }),
+
+  clearPendingEmailConfirmation: () => set({ pendingEmailConfirmation: null }),
 }))
 
 export default useAuthStore
