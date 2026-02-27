@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useNavigate } from 'react-router'
-import { Bell, MessageCircle, Plus, LogIn, UserPlus, Star } from 'lucide-react'
+import { Bell, MessageCircle, Plus, LogIn, UserPlus, Star, Megaphone } from 'lucide-react'
 import { NotificationPanel } from '../components/NotificationPanel'
 import { PushPermissionBanner } from '../components/PushPermissionBanner'
 import { useGroupStore, useBetStore, useAuthStore, useNotificationStore, useChatStore } from '@/stores'
@@ -328,6 +328,14 @@ export function TheBoard() {
           aria-label="Settings"
         >
           <span className="text-lg">⚙️</span>
+        </button>
+        {/* Feedback — quick entry point from the main board */}
+        <button
+          onClick={() => navigate('/feedback')}
+          className="p-2 rounded-lg hover:bg-bg-elevated transition-colors"
+          aria-label="Give feedback"
+        >
+          <Megaphone className="w-5 h-5 text-text-primary" />
         </button>
         <button
           onClick={() => navigate('/chat')}

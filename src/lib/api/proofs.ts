@@ -140,3 +140,87 @@ export async function getVotes(proofId: string): Promise<ProofVote[]> {
   if (error) throw error
   return data ?? []
 }
+
+// ---------------------------------------------------------------------------
+// Public proof feed — for Profile screens
+// ---------------------------------------------------------------------------
+
+/**
+ * A proof eligible to appear on a user's public profile grid.
+ * Only included when the parent bet has `is_public = true`.
+ */
+export interface PublicProof {
+  id: string
+  betId: string
+  betTitle: string
+  /**
+   * Visual kind used to colour the corner badge in the grid:
+   *   'punishment_proof' → red   (loser submitted shame/punishment proof)
+   *   'evidence'         → green (claimant evidence / win proof)
+   */
+  kind: 'punishment_proof' | 'evidence'
+  /** Best available still-image URL from the proof record. */
+  primaryImageUrl: string
+  submittedAt: string
+}
+
+/**
+ * Fetch all proofs submitted by `userId` whose parent bet is public, normalised
+ * for a 3-column profile grid.
+ *
+ * Visibility rule: the `bets!inner` join with `.eq('bets.is_public', true)`
+ * ensures private bets are never surfaced, even to the profile owner.
+ * Only proofs with at least one image media asset are included (video-only or
+ * document-only proofs are skipped because they have no thumbnail to display).
+ */
+export async function getPublicProofsForUser(userId: string): Promise<PublicProof[]> {
+  // Use unknown[] cast because the joined-table select infers 'never' for row type
+  const { data, error } = await supabase
+    .from('proofs')
+    .select(
+      'id, submitted_at, proof_type, front_camera_url, back_camera_url, screenshot_urls, bets!inner(id, title, is_public)',
+    )
+    .eq('submitted_by', userId)
+    .eq('bets.is_public', true)
+    .order('submitted_at', { ascending: false })
+
+  if (error) throw error
+  if (!data) return []
+
+  const results: PublicProof[] = []
+
+  for (const row of data as unknown as Array<{
+    id: string
+    submitted_at: string
+    proof_type: string
+    front_camera_url: string | null
+    back_camera_url: string | null
+    screenshot_urls: string[] | null
+    bets: { id: string; title: string; is_public: boolean }
+  }>) {
+    // Pick the best still-image URL; skip if no image available
+    const primaryImageUrl: string | null =
+      (row.front_camera_url as string | null) ??
+      (row.back_camera_url as string | null) ??
+      (Array.isArray(row.screenshot_urls)
+        ? ((row.screenshot_urls as string[])[0] ?? null)
+        : null)
+
+    if (!primaryImageUrl) continue
+
+    const bet = row.bets as { id: string; title: string; is_public: boolean }
+    const kind: PublicProof['kind'] =
+      (row.proof_type as string) === 'punishment' ? 'punishment_proof' : 'evidence'
+
+    results.push({
+      id: row.id as string,
+      betId: bet.id,
+      betTitle: bet.title,
+      kind,
+      primaryImageUrl,
+      submittedAt: row.submitted_at as string,
+    })
+  }
+
+  return results
+}
