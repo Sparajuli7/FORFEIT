@@ -7,7 +7,7 @@ import { AuthGuard } from './guards/AuthGuard'
 import { Splash } from './screens/Splash'
 import { Onboarding } from './screens/Onboarding'
 import { TheBoard } from './screens/TheBoard'
-import { BetCreationWizard } from './screens/BetCreationWizard'
+// BetCreationWizard merged into CompetitionCreateScreen
 import { BetDetail } from './screens/BetDetail'
 import { ProofSubmission } from './screens/ProofSubmission'
 import { ShameProofSubmission } from './screens/ShameProofSubmission'
@@ -89,7 +89,8 @@ function OnboardingRoute() {
 }
 
 function BetCreateRoute() {
-  return <BetCreationWizard />
+  // /bet/create redirects to /compete/create so location.state (templateBetId) is preserved
+  return <CompetitionCreateScreen />
 }
 
 function ProfileScreenWithId() {

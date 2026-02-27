@@ -139,7 +139,7 @@ export function Competitions() {
       </div>
 
       <div className="px-6 mb-4">
-        <SportsbookButton onClick={() => navigate('/bet/create')}>
+        <SportsbookButton onClick={() => navigate('/compete/create')}>
           CREATE COMPETITION
         </SportsbookButton>
       </div>

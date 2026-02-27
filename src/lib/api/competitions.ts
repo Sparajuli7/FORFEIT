@@ -48,6 +48,8 @@ export interface CompetitionData {
   stakePunishmentId?: string
   stakeCustomPunishment?: string | null
   isPublic?: boolean
+  /** Creator's side assignment; all other participants default to 'rider' */
+  creatorSide?: 'rider' | 'doubter'
 }
 
 export interface LeaderboardEntry {
@@ -92,7 +94,7 @@ export async function createCompetition(data: CompetitionData): Promise<Bet> {
       supabase.from('bet_sides').insert({
         bet_id: competition.id,
         user_id: uid,
-        side: 'rider',
+        side: uid === userId ? (data.creatorSide ?? 'rider') : 'rider',
       }),
     ),
     ...uniqueIds.map((uid) =>

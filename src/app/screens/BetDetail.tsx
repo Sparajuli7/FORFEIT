@@ -241,7 +241,7 @@ export function BetDetail({ onBack }: BetDetailProps) {
             </button>
           )}
           <button
-            onClick={() => navigate('/bet/create', { state: { templateBetId: id } })}
+            onClick={() => navigate('/compete/create', { state: { templateBetId: id } })}
             className="w-10 h-10 flex items-center justify-center btn-pressed rounded-lg hover:bg-bg-elevated transition-colors"
             aria-label="Remix"
           >

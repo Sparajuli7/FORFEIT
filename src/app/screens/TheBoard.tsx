@@ -374,7 +374,7 @@ export function TheBoard() {
         <div className="flex items-center justify-center gap-3 mb-3">
           <h2 className="text-base font-bold text-white">My Bets</h2>
           <button
-            onClick={() => navigate('/bet/create')}
+            onClick={() => navigate('/compete/create')}
             className="h-8 px-4 rounded-full bg-accent-green text-bg-primary text-sm font-bold flex items-center gap-1.5"
             aria-label="Create bet"
           >
@@ -457,7 +457,7 @@ export function TheBoard() {
           Quick Bet
         </span>
         <button
-          onClick={() => navigate('/bet/create')}
+          onClick={() => navigate('/compete/create')}
           className="pointer-events-auto w-14 h-14 rounded-full bg-accent-green text-bg-primary flex items-center justify-center text-2xl font-black shadow-[0_4px_20px_rgba(0,230,118,0.5)] active:scale-95 transition-transform"
           aria-label="Create bet"
         >
