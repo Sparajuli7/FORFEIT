@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
-import { Trophy, Lock, Swords } from 'lucide-react'
+import { Trophy, Lock, Users, User } from 'lucide-react'
 import { getCompetitionsForUser, getLeaderboard } from '@/lib/api/competitions'
 import { getMyBets } from '@/lib/api/bets'
 import { formatMoney } from '@/lib/utils/formatters'
 import type { Bet } from '@/lib/database.types'
 import type { LeaderboardEntry } from '@/lib/api/competitions'
 import type { BetWithSides } from '@/lib/api/bets'
-import { useAuthStore } from '@/stores'
+import { useAuthStore, useGroupStore } from '@/stores'
 import { SportsbookButton } from '../components/SportsbookButton'
-import { format, formatDistanceToNow } from 'date-fns'
+import { format } from 'date-fns'
 
 function getStatus(competition: Bet): 'OPEN' | 'LIVE' | 'ENDED' {
   const now = new Date()
@@ -84,10 +84,14 @@ const RANK_EMOJI: Record<number, string> = {
 export function Competitions() {
   const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
+  const groups = useGroupStore((s) => s.groups)
+  const fetchGroups = useGroupStore((s) => s.fetchGroups)
   const [competitions, setCompetitions] = useState<Bet[]>([])
   const [challengeBets, setChallengeBets] = useState<BetWithSides[]>([])
   const [leaderboards, setLeaderboards] = useState<Record<string, LeaderboardEntry[]>>({})
   const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => { fetchGroups() }, [fetchGroups])
 
   useEffect(() => {
     const fetchAll = async () => {
@@ -173,6 +177,9 @@ export function Competitions() {
                       ? 'coral'
                       : 'green'
 
+              const betGroup = groups.find((g) => g.id === bet.group_id)
+              const isSoloBet = (riders.length + doubters.length) <= 1
+
               return (
                 <div
                   key={bet.id}
@@ -181,48 +188,53 @@ export function Competitions() {
                     status === 'ENDED' ? 'opacity-75' : ''
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-text-muted">
-                        CHALLENGE
-                      </span>
+                  {/* Status badge */}
+                  <div className="mb-3">
+                    <div
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full ${
+                        statusColor === 'amber'
+                          ? 'bg-amber-500/20'
+                          : statusColor === 'coral'
+                            ? 'bg-accent-coral/20'
+                            : 'bg-accent-green/20'
+                      }`}
+                    >
                       <div
-                        className={`flex items-center gap-1 px-2 py-0.5 rounded-full ${
+                        className={`w-1.5 h-1.5 rounded-full ${
                           statusColor === 'amber'
-                            ? 'bg-amber-500/20'
+                            ? 'bg-amber-400'
                             : statusColor === 'coral'
-                              ? 'bg-accent-coral/20'
-                              : 'bg-accent-green/20'
+                              ? 'bg-accent-coral'
+                              : 'bg-accent-green'
+                        }`}
+                      />
+                      <span
+                        className={`text-[10px] font-bold uppercase ${
+                          statusColor === 'amber'
+                            ? 'text-amber-400'
+                            : statusColor === 'coral'
+                              ? 'text-accent-coral'
+                              : 'text-accent-green'
                         }`}
                       >
-                        <div
-                          className={`w-1.5 h-1.5 rounded-full ${
-                            statusColor === 'amber'
-                              ? 'bg-amber-400'
-                              : statusColor === 'coral'
-                                ? 'bg-accent-coral'
-                                : 'bg-accent-green'
-                          }`}
-                        />
-                        <span
-                          className={`text-[10px] font-bold uppercase ${
-                            statusColor === 'amber'
-                              ? 'text-amber-400'
-                              : statusColor === 'coral'
-                                ? 'text-accent-coral'
-                                : 'text-accent-green'
-                          }`}
-                        >
-                          {statusLabel}
-                        </span>
-                      </div>
+                        {statusLabel}
+                      </span>
                     </div>
-                    <Swords className="w-4 h-4 text-text-muted" />
                   </div>
 
-                  <h3 className="text-base font-black text-text-primary mb-3 leading-snug">{bet.title}</h3>
+                  {/* Title row with group/solo icon */}
+                  <div className="flex items-center gap-2 mb-3">
+                    {isSoloBet ? (
+                      <User className="w-4 h-4 text-text-muted shrink-0" />
+                    ) : betGroup ? (
+                      <span className="text-sm shrink-0">{betGroup.avatar_emoji}</span>
+                    ) : (
+                      <Users className="w-4 h-4 text-text-muted shrink-0" />
+                    )}
+                    <h3 className="text-base font-black text-text-primary leading-snug">{bet.title}</h3>
+                  </div>
 
-                  <div className="flex items-center gap-3 mb-3">
+                  <div className="flex items-center gap-3">
                     <div className="flex items-center gap-1.5">
                       <span className="text-sm">🤝</span>
                       <span className="text-xs font-bold text-accent-green">{riders.length} Rider{riders.length !== 1 ? 's' : ''}</span>
@@ -232,17 +244,6 @@ export function Competitions() {
                       <span className="text-sm">💀</span>
                       <span className="text-xs font-bold text-accent-coral">{doubters.length} Doubter{doubters.length !== 1 ? 's' : ''}</span>
                     </div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    <span className="text-xs font-semibold px-3 py-1.5 bg-bg-elevated rounded-full">
-                      {formatStake(bet)}
-                    </span>
-                    <span className="text-xs font-semibold px-3 py-1.5 bg-bg-elevated rounded-full text-text-muted">
-                      {status === 'ENDED'
-                        ? `Ended ${formatDistanceToNow(new Date(bet.deadline), { addSuffix: true })}`
-                        : `Ends ${formatDistanceToNow(new Date(bet.deadline), { addSuffix: true })}`}
-                    </span>
                   </div>
                 </div>
               )
