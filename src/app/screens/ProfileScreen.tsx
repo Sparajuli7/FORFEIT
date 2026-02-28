@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
-import { MessageCircle, Loader2, Archive } from 'lucide-react'
+import { MessageCircle, Loader2, Archive, IdCard, BookOpen, Pencil, Settings } from 'lucide-react'
 import { useAuthStore, useChatStore } from '@/stores'
 import { getMyBets, getUserBetStats, getUserCurrentStreak } from '@/lib/api/bets'
 import type { UserBetStats } from '@/lib/api/bets'
@@ -250,46 +250,26 @@ function ProfileContent({
           CTAs
           ══════════════════════════════════════ */}
       {isOwnProfile ? (
-        <div className="px-4 pb-4 space-y-2.5">
-          <button
-            onClick={() => navigate('/profile/card')}
-            className="w-full py-3 rounded-xl font-bold text-sm border flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
-            style={{
-              background: 'linear-gradient(135deg, #1a1200 0%, #0d0d0d 100%)',
-              borderColor: 'rgba(255,215,0,0.4)',
-              color: '#FFD700',
-            }}
-          >
-            My Player Card
-          </button>
-          <button
-            onClick={() => navigate('/journal')}
-            className="w-full py-3 rounded-xl bg-accent-green/20 text-accent-green font-bold text-sm border border-accent-green/40"
-          >
-            Journal — groups &amp; bet history
-          </button>
-          <div className="flex gap-2.5">
-            <button
-              onClick={() => navigate('/profile/edit')}
-              className="flex-1 py-3 rounded-xl bg-bg-elevated text-text-primary font-bold text-sm border border-border-subtle"
-            >
-              Edit Profile
-            </button>
-            <button
-              onClick={() => navigate('/archive')}
-              className="py-3 px-4 rounded-xl bg-bg-elevated text-text-muted font-bold text-sm border border-border-subtle flex items-center gap-2 hover:text-text-primary transition-colors"
-              aria-label="Archive"
-            >
-              <Archive className="w-4 h-4" />
-              Archive
-            </button>
+        <div className="px-4 pb-4">
+          <div className="flex items-center justify-center gap-3">
+            {([
+              { icon: IdCard, label: 'Player Card', path: '/profile/card' },
+              { icon: BookOpen, label: 'Journal', path: '/journal' },
+              { icon: Pencil, label: 'Edit Profile', path: '/profile/edit' },
+              { icon: Archive, label: 'Archive', path: '/archive' },
+              { icon: Settings, label: 'Settings', path: '/settings' },
+            ] as const).map(({ icon: Icon, label, path }) => (
+              <button
+                key={path}
+                onClick={() => navigate(path)}
+                className="w-12 h-12 rounded-xl bg-bg-elevated border border-border-subtle flex items-center justify-center text-text-muted hover:text-text-primary hover:border-accent-green/40 transition-colors active:scale-95"
+                aria-label={label}
+                title={label}
+              >
+                <Icon className="w-5 h-5" />
+              </button>
+            ))}
           </div>
-          <button
-            onClick={() => navigate('/settings')}
-            className="w-full py-3 rounded-xl bg-bg-elevated text-text-primary font-bold text-sm border border-border-subtle"
-          >
-            Settings
-          </button>
         </div>
       ) : (
         <div className="px-4 pb-4 flex gap-2.5">
