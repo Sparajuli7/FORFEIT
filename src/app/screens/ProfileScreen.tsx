@@ -159,9 +159,30 @@ function ProfileContent({
               onEdit={isOwnProfile ? () => navigate('/profile/edit') : undefined}
             />
             <div className="flex-1 min-w-0">
-              <h2 className="text-xl font-black text-text-primary leading-tight truncate">
-                {profile.display_name}
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl font-black text-text-primary leading-tight truncate">
+                  {profile.display_name}
+                </h2>
+                {isOwnProfile && (
+                  <button
+                    onClick={() => navigate('/profile/edit')}
+                    className="shrink-0 w-7 h-7 rounded-lg bg-bg-elevated border border-border-subtle flex items-center justify-center text-text-muted hover:text-text-primary transition-colors"
+                    aria-label="Edit Profile"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                <div className="flex-1" />
+                {isOwnProfile && (
+                  <button
+                    onClick={() => navigate('/settings')}
+                    className="shrink-0 w-7 h-7 rounded-lg bg-bg-elevated border border-border-subtle flex items-center justify-center text-text-muted hover:text-text-primary transition-colors"
+                    aria-label="Settings"
+                  >
+                    <Settings className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
               <p className="text-xs text-text-muted">@{profile.username}</p>
               <p className="text-xs text-text-muted mt-1">
                 {formatRecord(stats.wins, stats.losses, stats.voids)}
@@ -255,9 +276,7 @@ function ProfileContent({
             {([
               { icon: IdCard, label: 'Player Card', path: '/profile/card' },
               { icon: BookOpen, label: 'Journal', path: '/journal' },
-              { icon: Pencil, label: 'Edit Profile', path: '/profile/edit' },
               { icon: Archive, label: 'Archive', path: '/archive' },
-              { icon: Settings, label: 'Settings', path: '/settings' },
             ] as const).map(({ icon: Icon, label, path }) => (
               <button
                 key={path}
