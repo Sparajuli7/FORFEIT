@@ -72,7 +72,7 @@ const useUiStore = create<UiStore>()(
       closeSheet: () => set({ activeBottomSheet: null }),
     }),
     {
-      name: 'forfeit-ui',
+      name: 'lynk-ui',
       // Only persist the theme — modal/sheet state should reset on page load
       partialize: (state) => ({ theme: state.theme }),
       // Re-apply the theme class after localStorage is read on startup

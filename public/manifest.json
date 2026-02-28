@@ -1,7 +1,7 @@
 {
   "name": "LYNK",
   "short_name": "LYNK",
-  "description": "Social bets and challenges with friends.",
+  "description": "Make claims. Bet on friends. Face the consequences.",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",

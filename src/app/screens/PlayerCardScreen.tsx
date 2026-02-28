@@ -412,7 +412,7 @@ export function PlayerCardScreen() {
     setSaving(true)
     try {
       const blob = await captureElementAsImage(cardRef.current, { scale: 2 })
-      await shareImage(blob, 'forfeit-player-card.png', playerShareText)
+      await shareImage(blob, 'lynk-player-card.png', playerShareText)
     } catch {
       handleShare()
     } finally {

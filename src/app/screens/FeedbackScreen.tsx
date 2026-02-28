@@ -34,9 +34,15 @@ type SubmittedFeedback = {
 
 function saveFeedback(data: SubmittedFeedback) {
   try {
-    const existing = JSON.parse(localStorage.getItem('forfeit-feedback') ?? '[]') as SubmittedFeedback[]
+    // Migrate legacy 'forfeit-feedback' key to 'lynk-feedback' on first access
+    const legacyData = localStorage.getItem('forfeit-feedback')
+    if (legacyData && !localStorage.getItem('lynk-feedback')) {
+      localStorage.setItem('lynk-feedback', legacyData)
+      localStorage.removeItem('forfeit-feedback')
+    }
+    const existing = JSON.parse(localStorage.getItem('lynk-feedback') ?? '[]') as SubmittedFeedback[]
     existing.push(data)
-    localStorage.setItem('forfeit-feedback', JSON.stringify(existing))
+    localStorage.setItem('lynk-feedback', JSON.stringify(existing))
   } catch {
     // ignore
   }

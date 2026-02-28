@@ -155,7 +155,7 @@ export async function shareToInstagramStories(
   // This requires passing data through the pasteboard on native apps,
   // which web can't do directly. Instead, we use the Web Share API targeting IG,
   // or fall back to download + open IG.
-  const file = new File([imageBlob], 'forfeit-story.png', { type: 'image/png' })
+  const file = new File([imageBlob], 'lynk-story.png', { type: 'image/png' })
 
   // On mobile, try native share which shows IG Stories as an option
   if (
@@ -172,7 +172,7 @@ export async function shareToInstagramStories(
   }
 
   // Fallback: download image so user can pick it in IG
-  downloadBlobAsFile(imageBlob, 'forfeit-story.png')
+  downloadBlobAsFile(imageBlob, 'lynk-story.png')
   return false
 }
 
@@ -188,7 +188,7 @@ export async function shareToTikTok(
   caption: string,
 ): Promise<void> {
   await copyToClipboard(caption).catch(() => {})
-  downloadBlobAsFile(imageBlob, 'forfeit-tiktok.png')
+  downloadBlobAsFile(imageBlob, 'lynk-tiktok.png')
 
   // Try TikTok deep link on mobile, fall back to web
   const opened = tryOpenDeepLink('tiktok://') || tryOpenDeepLink('snssdk1233://')
@@ -295,7 +295,7 @@ export async function getProofShareFiles(proof: {
     proof.screenshot_urls?.[0] ??
     null
   if (!url) return []
-  const file = await fetchImageAsFile(url, 'forfeit-proof.jpg')
+  const file = await fetchImageAsFile(url, 'lynk-proof.jpg')
   return file ? [file] : []
 }
 

@@ -1,7 +1,7 @@
 
-  # FORFEIT Mobile App Mockup
+  # LYNK Mobile App Mockup
 
-  This is a code bundle for FORFEIT Mobile App Mockup. The original project is available at https://www.figma.com/design/Z81HG1fSQfAejobibVAGuV/FORFEIT-Mobile-App-Mockup.
+  This is a code bundle for LYNK Mobile App Mockup. The original project is available at https://www.figma.com/design/Z81HG1fSQfAejobibVAGuV/FORFEIT-Mobile-App-Mockup.
 
   ## Running the code
 

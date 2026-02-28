@@ -89,7 +89,7 @@ export const ProofCard = forwardRef<HTMLDivElement, ProofCardProps>(
     const handleShare = async (e: React.MouseEvent) => {
       e.stopPropagation()
       // Try to share the proof image directly via native share
-      const file = await fetchImageAsFile(imageUrl, 'forfeit-proof.jpg')
+      const file = await fetchImageAsFile(imageUrl, 'lynk-proof.jpg')
       const files = file ? [file] : []
       const usedNative = await shareWithNative({
         title: `LYNK ${config.badge}`,
@@ -107,8 +107,8 @@ export const ProofCard = forwardRef<HTMLDivElement, ProofCardProps>(
       try {
         if (cardRef.current) {
           const blob = await captureElementAsImage(cardRef.current, { scale: 2 })
-          const shared = await shareImage(blob, 'forfeit-proof.png', shareText)
-          if (!shared) downloadImage(blob, 'forfeit-proof.png')
+          const shared = await shareImage(blob, 'lynk-proof.png', shareText)
+          if (!shared) downloadImage(blob, 'lynk-proof.png')
         }
       } catch {
         /* ignore capture errors */

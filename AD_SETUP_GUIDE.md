@@ -1,4 +1,4 @@
-# FORFEIT — Ad Setup Guide
+# LYNK — Ad Setup Guide
 
 This guide covers everything you need to do to get ads working on web (now) and on iOS/Android (when you wrap the app with Capacitor).
 
@@ -13,7 +13,7 @@ This guide covers everything you need to do to get ads working on web (now) and 
 3. Google will review your site. This can take **1–3 days** for approval
 4. Once approved, go to **Ads → By ad unit → Display ads**
 5. Create a new ad unit:
-   - Name: `FORFEIT Banner`
+   - Name: `LYNK Banner`
    - Type: **Display ads** (responsive)
    - Click **Create**
 6. You'll get two values:
@@ -67,7 +67,7 @@ When you're ready to publish to the App Store and Play Store, you'll wrap the we
 
 ```bash
 npm install @capacitor/core @capacitor/cli
-npx cap init "FORFEIT" "com.forfeit.app" --web-dir dist
+npx cap init "LYNK" "com.lynk.app" --web-dir dist
 npm run build
 npx cap add ios
 npx cap add android

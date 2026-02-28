@@ -1,4 +1,4 @@
-# FORFEIT App — Project Audit
+# LYNK App — Project Audit
 
 **Date**: 2026-02-18
 **Source**: Figma Make export (https://www.figma.com/design/Z81HG1fSQfAejobibVAGuV/FORFEIT-Mobile-App-Mockup)
@@ -9,7 +9,7 @@
 ## 1. Directory Structure
 
 ```
-FORFEIT Mobile App Mockup (1)/
+LYNK Mobile App Mockup (1)/
 ├── src/
 │   ├── main.tsx                        # Entry point — mounts App
 │   ├── app/
@@ -42,7 +42,7 @@ FORFEIT Mobile App Mockup (1)/
 
 | # | File | Screen Name | What it represents |
 |---|------|-------------|-------------------|
-| 1 | `Splash.tsx` | Splash | **[ACTIVE]** Splash screen with FORFEIT wordmark, tagline pills (🤝 Ride · 💀 Doubt · 🔥 Forfeit), Enter/Log in buttons, scrolling ticker |
+| 1 | `Splash.tsx` | Splash | **[ACTIVE]** Splash screen with LYNK wordmark, tagline pills (🤝 Ride · 💀 Doubt · 🔥 Forfeit), Enter/Log in buttons, scrolling ticker |
 | 2 | `Onboarding.tsx` | Onboarding | **[ACTIVE]** Tutorial cards explaining "Riders vs Doubters" concept with illustrated steps |
 | 3 | `TheBoard.tsx` | The Board (Home) | **[ACTIVE]** Main feed of active bets with filter tabs, live indicator, notification bell, BetCard list, FAB |
 | 4 | `BetCreationStakes.tsx` | Bet Creation — Stakes | **[ACTIVE]** Step in bet creation: money tab (chip selector $5–$50), punishment tab (stacked PlayingCard components), combined Both tab |

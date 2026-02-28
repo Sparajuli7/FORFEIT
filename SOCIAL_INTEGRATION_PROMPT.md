@@ -1,6 +1,6 @@
-# FORFEIT — Social Media & Calendar Integration Build Prompt
+# LYNK — Social Media & Calendar Integration Build Prompt
 
-You are working on FORFEIT, a social betting app built with React 18 + TypeScript + Vite 6 + Tailwind CSS v4 + Supabase. Read `CLAUDE.md` in the project root for the full tech stack, project structure, patterns, and conventions before making any changes.
+You are working on LYNK, a social betting app built with React 18 + TypeScript + Vite 6 + Tailwind CSS v4 + Supabase. Read `CLAUDE.md` in the project root for the full tech stack, project structure, patterns, and conventions before making any changes.
 
 ## Context: What Already Exists
 
@@ -73,20 +73,20 @@ Place them in the grid alongside the existing X, Facebook, and Copy Link options
 **Goal:** Every major content screen should have a share action.
 
 1. **`RecordScreen.tsx` (Hall of Shame / Stats)**
-   - Add a share button in the header area that shares the user's stats: "I'm {wins}W-{losses}L on FORFEIT with a {winRate}% win rate. Think you can beat that? 🎯"
+   - Add a share button in the header area that shares the user's stats: "I'm {wins}W-{losses}L on LYNK with a {winRate}% win rate. Think you can beat that? 🎯"
    - Also add a share button on individual Hall of Shame posts so users can share specific punishment moments.
 
 2. **`CompetitionDetailScreen.tsx`**
-   - Add a share button that shares: "🏆 {title} competition on FORFEIT — I'm ranked #{rank}! Join and compete: {url}"
+   - Add a share button that shares: "🏆 {title} competition on LYNK — I'm ranked #{rank}! Join and compete: {url}"
    - Use the existing ShareSheet component.
 
 3. **`ShameProofSubmission.tsx`**
    - After successful proof submission (the success/completion state), show a "Share to Hall of Shame" prompt that encourages sharing the punishment publicly on social media.
-   - Share text: "😂 {loserName} just completed their punishment for losing "{betTitle}" on FORFEIT! Check it out: {url}"
+   - Share text: "😂 {loserName} just completed their punishment for losing "{betTitle}" on LYNK! Check it out: {url}"
 
 4. **`PunishmentReceipt.tsx`**
    - Add a small share icon button on the receipt itself (top-right corner, subtle but tappable).
-   - Share text: "📜 FORFEIT RECEIPT: {loserName} owes {punishment} for losing "{betTitle}". No refunds. 😤"
+   - Share text: "📜 LYNK RECEIPT: {loserName} owes {punishment} for losing "{betTitle}". No refunds. 😤"
 
 For all of these, reuse the existing `ShareSheet` component and sharing utilities from `src/lib/share.ts`. Add any new share text builder functions to `share.ts` following the existing pattern (`getXxxShareText()`).
 
@@ -118,15 +118,15 @@ interface CaptureOptions {
 
 2. **`PunishmentReceipt.tsx`** / **`OutcomeReveal.tsx`** — Add a "Save as Image" option. The receipt visual is specifically designed to look like a physical receipt — capturing it as an image is the primary use case for social sharing.
 
-3. **`RecordScreen.tsx`** — Add a "Share Stats Card" feature that captures the stats section as an image. Consider creating a dedicated `StatsCard` sub-component that renders a clean, branded stats summary optimized for image export (include the FORFEIT logo/watermark, user avatar, W/L record, win rate, and top stats).
+3. **`RecordScreen.tsx`** — Add a "Share Stats Card" feature that captures the stats section as an image. Consider creating a dedicated `StatsCard` sub-component that renders a clean, branded stats summary optimized for image export (include the LYNK logo/watermark, user avatar, W/L record, win rate, and top stats).
 
-For Instagram Story optimization, provide an option to render at 1080x1920 (9:16 aspect ratio) with appropriate padding and the FORFEIT branding/watermark at the bottom.
+For Instagram Story optimization, provide an option to render at 1080x1920 (9:16 aspect ratio) with appropriate padding and the LYNK branding/watermark at the bottom.
 
 ---
 
 ### Phase 5: Dynamic OG Images via Vercel OG
 
-**Goal:** When a bet or outcome link is shared on social media, show a rich preview card with dynamic content instead of a generic FORFEIT preview.
+**Goal:** When a bet or outcome link is shared on social media, show a rich preview card with dynamic content instead of a generic LYNK preview.
 
 **Create `api/og.tsx`** (Vercel Serverless Function with `@vercel/og`):
 
@@ -135,9 +135,9 @@ This is a Vercel API route (NOT a Supabase Edge Function) since the frontend is 
 - Install `@vercel/og` as a dependency.
 - The endpoint should accept query parameters: `type` (bet | outcome | competition | profile), `id`, and optionally `title`, `status`, `claimant`, `stake`, `result`.
 - Render a 1200x630 image using `@vercel/og`'s `ImageResponse` with JSX.
-- Use the FORFEIT brand colors (dark background, green/coral accents).
+- Use the LYNK brand colors (dark background, green/coral accents).
 - Layout should include:
-  - FORFEIT logo/text in the corner
+  - LYNK logo/text in the corner
   - Bet title or competition name (large text)
   - Key stats (stake amount, odds, result)
   - Status badge (LIVE, ENDED, WINNER, FORFEIT)

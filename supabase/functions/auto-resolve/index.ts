@@ -1,5 +1,5 @@
 /**
- * FORFEIT Auto-Resolution Edge Function
+ * LYNK Auto-Resolution Edge Function
  *
  * Runs on a cron schedule (every hour) to auto-resolve stale bets.
  *

@@ -1,4 +1,4 @@
-# FORFEIT — Ad Monetization Strategy
+# LYNK — Ad Monetization Strategy
 
 ## Recommended Solution: Google AdMob (native) + Google AdSense (web)
 
@@ -21,7 +21,7 @@ Your app is currently web-only. To publish on the App Store and Play Store, you 
 
 ```
 npm install @capacitor/core @capacitor/cli
-npx cap init "FORFEIT" "com.forfeit.app"
+npx cap init "LYNK" "com.lynk.app"
 npm run build
 npx cap add ios
 npx cap add android
@@ -198,6 +198,6 @@ Banners alone won't make significant money until you have thousands of DAU. To b
 
 ## Store Compliance Notes
 
-- **Apple App Store**: Requires ATT (App Tracking Transparency) prompt before showing personalized ads. Your app must include a privacy nutrition label disclosing ad tracking. Gambling-adjacent apps require extra review — frame FORFEIT as "social challenges" not "gambling" since no real money wagering occurs through the app.
+- **Apple App Store**: Requires ATT (App Tracking Transparency) prompt before showing personalized ads. Your app must include a privacy nutrition label disclosing ad tracking. Gambling-adjacent apps require extra review — frame LYNK as "social challenges" not "gambling" since no real money wagering occurs through the app.
 - **Google Play Store**: Must comply with Families Policy if targeting under-18 users. Include ad disclosure in your store listing. Ads must not mimic app UI or be deceptive.
 - **Both stores**: Banner ads must be clearly distinguishable from app content. No ad refresh rates faster than 30 seconds.

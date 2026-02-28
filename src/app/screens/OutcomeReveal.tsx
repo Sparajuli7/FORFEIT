@@ -221,7 +221,7 @@ export function OutcomeReveal({ onShare, onBack }: OutcomeRevealProps) {
     setSavingImage(true)
     try {
       const blob = await captureElementAsImage(receiptRef.current, { scale: 2 })
-      await shareImage(blob, 'forfeit-receipt.png', 'LYNK Punishment Receipt')
+      await shareImage(blob, 'lynk-receipt.png', 'LYNK Punishment Receipt')
     } catch { /* ignore */ }
     finally { setSavingImage(false) }
   }
@@ -231,7 +231,7 @@ export function OutcomeReveal({ onShare, onBack }: OutcomeRevealProps) {
     setSavingImage(true)
     try {
       const blob = await captureElementAsImage(winnerCardRef.current, { scale: 2 })
-      await shareImage(blob, 'forfeit-winner.png', 'I won the bet! 🏆')
+      await shareImage(blob, 'lynk-winner.png', 'I won the bet! 🏆')
     } catch { /* ignore */ }
     finally { setSavingImage(false) }
   }
