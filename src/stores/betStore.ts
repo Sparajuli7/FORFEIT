@@ -99,6 +99,8 @@ interface BetActions {
   nextStep: () => void
   prevStep: () => void
   clearError: () => void
+  /** Update a single field on the active bet (for optimistic local updates after API calls) */
+  updateActiveBetField: <K extends keyof Bet>(field: K, value: Bet[K]) => void
 }
 
 export type BetStore = BetState & BetActions
@@ -444,6 +446,13 @@ const useBetStore = create<BetStore>()(
     clearError: () =>
       set((draft) => {
         draft.error = null
+      }),
+
+    updateActiveBetField: (field, value) =>
+      set((draft) => {
+        if (draft.activeBet) {
+          ;(draft.activeBet as Record<string, unknown>)[field] = value
+        }
       }),
   })),
 )

@@ -444,11 +444,10 @@ export function ProfileScreen({ userId }: ProfileScreenProps) {
           useAuthStore.getState().setProfile(freshProfile)
         }
       }
-      // Visitors only see public competitions they're not part of via filter
+      // Visitors only see public bets; private bets are hidden unless viewer is a participant
       const filtered = isOwnProfile
         ? bets
         : bets.filter((b) => {
-            if (b.bet_type !== 'competition') return true
             if (b.is_public) return true
             return b.bet_sides?.some((s: { user_id: string }) => s.user_id === currentUser?.id)
           })

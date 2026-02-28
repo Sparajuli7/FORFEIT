@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useMemo } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router'
-import { ArrowLeft, Share2, Pencil, Check, X, MessageCircle, Repeat2 } from 'lucide-react'
+import { ArrowLeft, Share2, Pencil, Check, X, MessageCircle, Repeat2, Lock, Globe } from 'lucide-react'
 import { useBetStore, useChatStore } from '@/stores'
 import { useProofStore } from '@/stores'
 import { useAuthStore } from '@/stores'
@@ -12,6 +12,7 @@ import { getShamePostByBetId } from '@/lib/api/shame'
 import { getOutcome } from '@/lib/api/outcomes'
 import { getPunishmentText } from '@/lib/api/punishments'
 import { computeBetPayouts } from '@/lib/api/betPayouts'
+import { toggleBetVisibility } from '@/lib/api/competitions'
 import type { HallOfShameEntry, Outcome } from '@/lib/database.types'
 import { PrimaryButton } from '../components/PrimaryButton'
 import { ShareSheet } from '../components/ShareSheet'
@@ -26,6 +27,16 @@ import {
   Dialog,
   DialogContent,
 } from '../components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from '../components/ui/alert-dialog'
 
 const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop'
 
@@ -53,6 +64,7 @@ export function BetDetail({ onBack }: BetDetailProps) {
   const joinBet = useBetStore((s) => s.joinBet)
   const isLoading = useBetStore((s) => s.isLoading)
   const error = useBetStore((s) => s.error)
+  const updateActiveBetField = useBetStore((s) => s.updateActiveBetField)
 
   const proofs = useProofStore((s) => s.proofs)
   const votes = useProofStore((s) => s.votes)
@@ -94,6 +106,7 @@ export function BetDetail({ onBack }: BetDetailProps) {
   const [openingChat, setOpeningChat] = useState(false)
   const [proofShareUrl, setProofShareUrl] = useState<string | null>(null)
   const [activeProofSlide, setActiveProofSlide] = useState(0)
+  const [visibilityConfirmOpen, setVisibilityConfirmOpen] = useState(false)
   const prevStatusRef = useRef(activeBet?.status)
 
   // Auto-navigate to outcome when bet resolves (e.g. after a majority vote)
@@ -247,6 +260,17 @@ export function BetDetail({ onBack }: BetDetailProps) {
           >
             <Repeat2 className="w-5 h-5 text-white" />
           </button>
+          {user?.id === activeBet.claimant_id && (
+            <button
+              onClick={() => setVisibilityConfirmOpen(true)}
+              className="w-10 h-10 flex items-center justify-center btn-pressed rounded-lg hover:bg-bg-elevated transition-colors"
+              aria-label={activeBet.is_public ? 'Make Private' : 'Make Public'}
+            >
+              {activeBet.is_public
+                ? <Globe className="w-5 h-5 text-white" />
+                : <Lock className="w-5 h-5 text-accent-coral" />}
+            </button>
+          )}
           <button
             onClick={handleShare}
             className="w-10 h-10 flex items-center justify-center btn-pressed rounded-lg hover:bg-bg-elevated transition-colors"
@@ -842,6 +866,14 @@ export function BetDetail({ onBack }: BetDetailProps) {
 
       {error && <p className="px-6 text-destructive text-sm">{error}</p>}
 
+      {/* Private badge — shown to non-creators when bet is private */}
+      {!activeBet.is_public && user?.id !== activeBet.claimant_id && (
+        <div className="flex items-center gap-2 px-6 mb-4">
+          <Lock className="w-3.5 h-3.5 text-accent-coral" />
+          <span className="text-xs text-accent-coral font-semibold">Private bet</span>
+        </div>
+      )}
+
       {/* Proof share dialog with framed ProofCard */}
       <Dialog open={!!proofShareUrl} onOpenChange={(open) => !open && setProofShareUrl(null)}>
         <DialogContent className="bg-bg-primary border-border-subtle max-w-sm">
@@ -863,6 +895,42 @@ export function BetDetail({ onBack }: BetDetailProps) {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Visibility confirmation dialog */}
+      <AlertDialog open={visibilityConfirmOpen} onOpenChange={setVisibilityConfirmOpen}>
+        <AlertDialogContent className="bg-bg-primary border-border-subtle">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-text-primary">
+              {activeBet.is_public ? 'Switch to Private?' : 'Switch to Public?'}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-text-muted">
+              {activeBet.is_public
+                ? 'This bet will be hidden from your profile. Only participants will be able to see it.'
+                : 'This bet will be visible on your profile. Anyone who visits your profile can see it.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-bg-elevated text-text-primary border-border-subtle">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className={activeBet.is_public ? 'bg-accent-coral hover:bg-accent-coral/90' : 'bg-accent-green hover:bg-accent-green/90'}
+              onClick={async () => {
+                if (!id) return
+                const newValue = !activeBet.is_public
+                try {
+                  await toggleBetVisibility(id, newValue)
+                  updateActiveBetField('is_public', newValue)
+                } catch (e) {
+                  console.error('Failed to toggle visibility:', e)
+                }
+              }}
+            >
+              {activeBet.is_public ? 'Make Private' : 'Make Public'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

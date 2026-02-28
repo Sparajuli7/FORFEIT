@@ -181,6 +181,9 @@ export async function toggleCompetitionVisibility(betId: string, isPublic: boole
   if (error) throw error
 }
 
+/** General-purpose alias — works on any bet row, not just competitions */
+export const toggleBetVisibility = toggleCompetitionVisibility
+
 export async function getLeaderboard(betId: string): Promise<LeaderboardEntry[]> {
   const { data: scores, error } = await supabase
     .from('competition_scores')
