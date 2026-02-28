@@ -10,7 +10,7 @@ export function SplashScreenSportsbook({ onEnter, onLogin }: SplashScreenSportsb
     <div className="h-full bg-bg-primary diagonal-grid grain-texture flex flex-col items-center justify-between px-6 py-12">
       <div className="flex-1 flex flex-col items-center justify-center">
         {/* Wordmark */}
-        <h1 className="forfeit-wordmark text-[64px] font-black text-text-primary mb-4">
+        <h1 className="lynk-wordmark text-[64px] font-black text-text-primary mb-4">
           LYNK
         </h1>
 

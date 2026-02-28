@@ -1,4 +1,4 @@
-# FORFEIT — Deployment Checklist
+# LYNK — Deployment Checklist
 
 ## Prerequisites
 - Supabase account

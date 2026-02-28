@@ -1,5 +1,5 @@
 /**
- * FORFEIT Send Notification Edge Function
+ * LYNK Send Notification Edge Function
  *
  * Triggered by INSERT on notifications table (via database webhook).
  * Sends Web Push notifications to the user's subscribed devices.
@@ -361,7 +361,7 @@ Deno.serve(async (req: Request) => {
 
     // Build push payload
     const pushPayload = JSON.stringify({
-      title: notification.title ?? "FORFEIT",
+      title: notification.title ?? "LYNK",
       body: notification.body ?? "",
       icon: "/icon-192.png",
       badge: "/icon-192.png",

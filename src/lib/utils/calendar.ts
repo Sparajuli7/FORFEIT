@@ -53,7 +53,7 @@ export function formatDeadline(date: Date): string {
 export function generateICSFile(event: CalendarEvent): string {
   const start = event.startDate
   const end = event.endDate ?? new Date(start.getTime() + 60 * 60 * 1000)
-  const uid = `${Date.now()}-${Math.random().toString(36).slice(2)}@forfeit.app`
+  const uid = `${Date.now()}-${Math.random().toString(36).slice(2)}@lynk.app`
 
   const lines = [
     'BEGIN:VCALENDAR',

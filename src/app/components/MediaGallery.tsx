@@ -137,7 +137,7 @@ function Lightbox({
     if (item.type !== 'image') return
     const text = shareText ?? 'Check this out on LYNK 🎲'
     const url = shareUrl ?? ''
-    const file = await fetchImageAsFile(item.url, 'forfeit-proof.jpg')
+    const file = await fetchImageAsFile(item.url, 'lynk-proof.jpg')
     const files = file ? [file] : []
     const usedNative = await shareWithNative({ title: 'LYNK', text, url, files })
     if (!usedNative) setShareSheetOpen(true)

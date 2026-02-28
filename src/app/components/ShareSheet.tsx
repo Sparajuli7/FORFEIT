@@ -77,7 +77,7 @@ export function ShareSheet({
     setIgLoading(true)
     try {
       if (imageUrl) {
-        const file = await fetchImageAsFile(imageUrl, 'forfeit-story.png')
+        const file = await fetchImageAsFile(imageUrl, 'lynk-story.png')
         if (file) {
           await shareToInstagramStories(file, fullText)
           closeAndNotify()

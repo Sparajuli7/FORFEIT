@@ -1,4 +1,4 @@
-# FORFEIT — Social Integration Report
+# LYNK — Social Integration Report
 
 ## 1. What Was Built
 
@@ -37,7 +37,7 @@
 ### Phase 3: Share Buttons on Missing Screens
 
 **Modified files:**
-- `src/app/screens/RecordScreen.tsx` — Added share button in header to share personal stats ("I'm 12W-3L on FORFEIT with a 80% win rate...")
+- `src/app/screens/RecordScreen.tsx` — Added share button in header to share personal stats ("I'm 12W-3L on LYNK with a 80% win rate...")
 - `src/app/screens/CompetitionDetailScreen.tsx` — Added share button in header and ShareSheet to share competition leaderboard status
 - `src/app/screens/ShameProofSubmission.tsx` — Added "Share to Hall of Shame" prompt after successful proof submission (with Skip option)
 - `src/app/components/PunishmentReceipt.tsx` — Added share icon button (top-right) on the receipt itself
@@ -85,7 +85,7 @@
 
 **What it does:**
 - `GET /api/og?type=bet&title=...&status=...&claimant=...&stake=...&result=...` returns a dynamically generated PNG
-- FORFEIT branding (dark background, green/coral accents, status badge)
+- LYNK branding (dark background, green/coral accents, status badge)
 - Supports bet, competition, and profile types
 
 ---
@@ -204,7 +204,7 @@ To modify: find the relevant function and edit the template string. Keep under 2
 ### How to update the OG image design
 
 Edit `api/og.tsx`. The JSX template uses inline styles (required by `@vercel/og`). Key areas:
-- Top row: FORFEIT branding + status badge
+- Top row: LYNK branding + status badge
 - Center: title + metadata (claimant, stake)
 - Bottom: tagline
 
