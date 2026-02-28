@@ -9,7 +9,13 @@ import {
   createJournal,
   type JournalCollection,
 } from '@/lib/utils/journalStorage'
-import { loadPinned, togglePin, PIN_BETS_KEY, PIN_GROUPS_KEY } from '@/lib/utils/pinStorage'
+import {
+  loadPinned,
+  togglePin,
+  PIN_BETS_KEY,
+  PIN_GROUPS_KEY,
+  PIN_JOURNALS_KEY,
+} from '@/lib/utils/pinStorage'
 import { CircleGrid } from '../components/CircleGrid'
 import type { BetWithSides } from '@/stores/betStore'
 
@@ -22,6 +28,78 @@ const JOURNAL_EMOJIS = [
   '🏀', '⚽', '🏈', '🎰', '💰', '🔥', '⚡', '💯',
   '👑', '🌟', '🎖️', '🏅', '🤝', '💪', '🎪', '🦁',
 ]
+
+/**
+ * Maximum items shown per section before "See all" is offered.
+ * Pinned items always make it into the preview regardless of this limit.
+ */
+const PREVIEW_COUNT = 5
+
+// ---------------------------------------------------------------------------
+// Pure helpers (no side-effects — easy to unit-test)
+// ---------------------------------------------------------------------------
+
+/**
+ * Stable sort that moves pinned items to the front, preserving relative order
+ * within both the pinned and non-pinned groups.
+ */
+export function sortWithPinned<T>(
+  items: T[],
+  getId: (item: T) => string,
+  pins: Set<string>,
+): T[] {
+  const pinned: T[] = []
+  const rest: T[] = []
+  for (const item of items) {
+    if (pins.has(getId(item))) pinned.push(item)
+    else rest.push(item)
+  }
+  return [...pinned, ...rest]
+}
+
+/**
+ * Returns the slice to show when a section is collapsed:
+ *  - All pinned items always appear (may exceed PREVIEW_COUNT if many are pinned).
+ *  - Remaining slots up to PREVIEW_COUNT are filled from non-pinned items.
+ * When showAll=true the full sorted list is returned unchanged.
+ */
+export function getVisibleItems<T>(
+  sortedItems: T[],
+  getId: (item: T) => string,
+  pins: Set<string>,
+  showAll: boolean,
+): T[] {
+  if (showAll) return sortedItems
+  const pinned = sortedItems.filter((item) => pins.has(getId(item)))
+  const nonPinned = sortedItems.filter((item) => !pins.has(getId(item)))
+  const remaining = Math.max(0, PREVIEW_COUNT - pinned.length)
+  return [...pinned, ...nonPinned.slice(0, remaining)]
+}
+
+// ---------------------------------------------------------------------------
+// SeeAllToggle — subtle expandable affordance shown below each section
+// ---------------------------------------------------------------------------
+
+function SeeAllToggle({
+  total,
+  showAll,
+  onToggle,
+}: {
+  total: number
+  showAll: boolean
+  onToggle: () => void
+}) {
+  // Only render when there are more items than the preview limit
+  if (total <= PREVIEW_COUNT) return null
+  return (
+    <button
+      onClick={onToggle}
+      className="mt-3 w-full text-center text-[11px] font-bold text-accent-green tracking-wide py-1"
+    >
+      {showAll ? 'Show less ↑' : `See all ${total} →`}
+    </button>
+  )
+}
 
 // ---------------------------------------------------------------------------
 // Create journal bottom-sheet
@@ -108,8 +186,15 @@ export function JournalScreen() {
   const [betsLoading, setBetsLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
 
-  const [pinBets, setPinBets] = useState<Set<string>>(() => loadPinned(PIN_BETS_KEY))
-  const [pinGroups, setPinGroups] = useState<Set<string>>(() => loadPinned(PIN_GROUPS_KEY))
+  // ── Pin state (localStorage-backed, shared with ArchiveScreen for bets/groups) ──
+  const [pinBets, setPinBets]       = useState<Set<string>>(() => loadPinned(PIN_BETS_KEY))
+  const [pinGroups, setPinGroups]   = useState<Set<string>>(() => loadPinned(PIN_GROUPS_KEY))
+  const [pinJournals, setPinJournals] = useState<Set<string>>(() => loadPinned(PIN_JOURNALS_KEY))
+
+  // ── "See all" expansion per section (false = show top 5 only) ──
+  const [showAllJournals, setShowAllJournals] = useState(false)
+  const [showAllGroups, setShowAllGroups]     = useState(false)
+  const [showAllBets, setShowAllBets]         = useState(false)
 
   useEffect(() => {
     fetchGroups()
@@ -131,12 +216,12 @@ export function JournalScreen() {
     navigate(`/journal/${col.id}`)
   }
 
+  // ── Pin toggle handlers ───────────────────────────────────────────────────
   const handlePinBet = (id: string) => {
     const isPinned = togglePin(PIN_BETS_KEY, id)
     setPinBets((prev) => {
       const next = new Set(prev)
-      if (isPinned) next.add(id)
-      else next.delete(id)
+      if (isPinned) next.add(id); else next.delete(id)
       return next
     })
   }
@@ -145,23 +230,51 @@ export function JournalScreen() {
     const isPinned = togglePin(PIN_GROUPS_KEY, id)
     setPinGroups((prev) => {
       const next = new Set(prev)
-      if (isPinned) next.add(id)
-      else next.delete(id)
+      if (isPinned) next.add(id); else next.delete(id)
       return next
     })
   }
 
-  // Items for the unified Pinned section at top
-  const pinnedGroupItems = groups
+  const handlePinJournal = (id: string) => {
+    const isPinned = togglePin(PIN_JOURNALS_KEY, id)
+    setPinJournals((prev) => {
+      const next = new Set(prev)
+      if (isPinned) next.add(id); else next.delete(id)
+      return next
+    })
+  }
+
+  // ── Sorted lists (pinned-first, stable) ───────────────────────────────────
+  const sortedJournals = sortWithPinned(journals, (j) => j.id, pinJournals)
+  const sortedGroups   = sortWithPinned(groups,   (g) => g.id, pinGroups)
+  const sortedBets     = sortWithPinned(personalBets, (b) => b.id, pinBets)
+
+  // ── Visible slices (top-5 default; all pinned always shown) ──────────────
+  const visibleJournals = getVisibleItems(sortedJournals, (j) => j.id, pinJournals, showAllJournals)
+  const visibleGroups   = getVisibleItems(sortedGroups,   (g) => g.id, pinGroups,   showAllGroups)
+  const visibleBets     = getVisibleItems(sortedBets,     (b) => b.id, pinBets,     showAllBets)
+
+  // ── Unified Pinned section items (journals + groups + bets) ──────────────
+  // IDs are prefixed with "j:" | "g:" | "b:" so the click handler can route correctly
+  const pinnedJournalItems = sortedJournals
+    .filter((j) => pinJournals.has(j.id))
+    .map((j) => ({ id: `j:${j.id}`, icon: j.emoji, label: j.name }))
+
+  const pinnedGroupItems = sortedGroups
     .filter((g) => pinGroups.has(g.id))
-    .map((g) => ({ id: `g:${g.id}`, icon: g.avatar_emoji, label: g.name, _groupId: g.id }))
-  const pinnedBetItems = personalBets
+    .map((g) => ({ id: `g:${g.id}`, icon: g.avatar_emoji, label: g.name }))
+
+  const pinnedBetItems = sortedBets
     .filter((b) => pinBets.has(b.id))
     .map((b) => {
       const category = BET_CATEGORIES[b.category]
-      return { id: `b:${b.id}`, icon: category?.emoji ?? '🎯', label: b.title, _betId: b.id }
+      return { id: `b:${b.id}`, icon: category?.emoji ?? '🎯', label: b.title }
     })
-  const hasPinned = pinnedGroupItems.length > 0 || pinnedBetItems.length > 0
+
+  const hasPinned =
+    pinnedJournalItems.length > 0 ||
+    pinnedGroupItems.length > 0 ||
+    pinnedBetItems.length > 0
 
   return (
     <div className="relative h-full bg-bg-primary overflow-y-auto pb-8">
@@ -172,7 +285,8 @@ export function JournalScreen() {
       </div>
 
       {/* ══════════════════════════════════════
-          SECTION 0 — Pinned (shown when any items are pinned)
+          SECTION 0 — Pinned quick-access
+          Shows all pinned journals, groups, and bets at a glance.
           ══════════════════════════════════════ */}
       {hasPinned && (
         <div className="px-6 pt-5 pb-4 border-b border-border-subtle">
@@ -180,10 +294,11 @@ export function JournalScreen() {
             <span>⭐</span> Pinned
           </p>
           <CircleGrid
-            items={[...pinnedGroupItems, ...pinnedBetItems]}
+            items={[...pinnedJournalItems, ...pinnedGroupItems, ...pinnedBetItems]}
             onItemClick={(id) => {
-              if (id.startsWith('g:')) navigate(`/journal/group/${id.slice(2)}`)
-              else navigate(`/bet/${id.slice(2)}`)
+              if (id.startsWith('j:'))      navigate(`/journal/${id.slice(2)}`)
+              else if (id.startsWith('g:')) navigate(`/journal/group/${id.slice(2)}`)
+              else                          navigate(`/bet/${id.slice(2)}`)
             }}
             labelLines={2}
           />
@@ -215,15 +330,24 @@ export function JournalScreen() {
             <span className="text-xs font-bold">Create your first journal</span>
           </button>
         ) : (
-          <CircleGrid
-            items={journals.map((col) => ({
-              id: col.id,
-              icon: col.emoji,
-              label: col.name,
-              sublabel: `${col.bet_ids.length} bet${col.bet_ids.length !== 1 ? 's' : ''}`,
-            }))}
-            onItemClick={(id) => navigate(`/journal/${id}`)}
-          />
+          <>
+            <CircleGrid
+              items={visibleJournals.map((col) => ({
+                id: col.id,
+                icon: col.emoji,
+                label: col.name,
+                sublabel: `${col.bet_ids.length} bet${col.bet_ids.length !== 1 ? 's' : ''}`,
+              }))}
+              onItemClick={(id) => navigate(`/journal/${id}`)}
+              pinnedIds={pinJournals}
+              onPinItem={handlePinJournal}
+            />
+            <SeeAllToggle
+              total={journals.length}
+              showAll={showAllJournals}
+              onToggle={() => setShowAllJournals((v) => !v)}
+            />
+          </>
         )}
       </div>
 
@@ -267,16 +391,23 @@ export function JournalScreen() {
             </button>
           </div>
         ) : (
-          <CircleGrid
-            items={groups.map((g) => ({
-              id: g.id,
-              icon: g.avatar_emoji,
-              label: g.name,
-            }))}
-            onItemClick={(id) => navigate(`/journal/group/${id}`)}
-            pinnedIds={pinGroups}
-            onPinItem={handlePinGroup}
-          />
+          <>
+            <CircleGrid
+              items={visibleGroups.map((g) => ({
+                id: g.id,
+                icon: g.avatar_emoji,
+                label: g.name,
+              }))}
+              onItemClick={(id) => navigate(`/journal/group/${id}`)}
+              pinnedIds={pinGroups}
+              onPinItem={handlePinGroup}
+            />
+            <SeeAllToggle
+              total={groups.length}
+              showAll={showAllGroups}
+              onToggle={() => setShowAllGroups((v) => !v)}
+            />
+          </>
         )}
       </div>
 
@@ -305,21 +436,33 @@ export function JournalScreen() {
             <p className="text-text-muted text-sm">No bets yet — start one from Home.</p>
           </div>
         ) : (
-          <CircleGrid
-            items={personalBets.map((bet) => {
-              const category = BET_CATEGORIES[bet.category]
-              return {
-                id: bet.id,
-                icon: category?.emoji ?? '🎯',
-                label: bet.title,
-                sublabel: bet.status === 'active' ? '🟢 Live' : bet.status === 'completed' ? '✅ Done' : bet.status.replace(/_/g, ' '),
-              }
-            })}
-            onItemClick={(id) => navigate(`/bet/${id}`)}
-            labelLines={2}
-            pinnedIds={pinBets}
-            onPinItem={handlePinBet}
-          />
+          <>
+            <CircleGrid
+              items={visibleBets.map((bet) => {
+                const category = BET_CATEGORIES[bet.category]
+                return {
+                  id: bet.id,
+                  icon: category?.emoji ?? '🎯',
+                  label: bet.title,
+                  sublabel:
+                    bet.status === 'active'
+                      ? '🟢 Live'
+                      : bet.status === 'completed'
+                        ? '✅ Done'
+                        : bet.status.replace(/_/g, ' '),
+                }
+              })}
+              onItemClick={(id) => navigate(`/bet/${id}`)}
+              labelLines={2}
+              pinnedIds={pinBets}
+              onPinItem={handlePinBet}
+            />
+            <SeeAllToggle
+              total={personalBets.length}
+              showAll={showAllBets}
+              onToggle={() => setShowAllBets((v) => !v)}
+            />
+          </>
         )}
       </div>
 

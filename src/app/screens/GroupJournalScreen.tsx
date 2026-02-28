@@ -95,7 +95,7 @@ export function GroupJournalScreen() {
               Create a bet in this group to get started.
             </p>
             <button
-              onClick={() => navigate('/bet/create')}
+              onClick={() => navigate('/compete/create')}
               className="px-5 py-3 rounded-xl bg-accent-green text-white font-bold text-sm"
             >
               Create a bet

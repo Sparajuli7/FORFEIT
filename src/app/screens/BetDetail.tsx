@@ -241,7 +241,7 @@ export function BetDetail({ onBack }: BetDetailProps) {
             </button>
           )}
           <button
-            onClick={() => navigate('/bet/create', { state: { templateBetId: id } })}
+            onClick={() => navigate('/compete/create', { state: { templateBetId: id } })}
             className="w-10 h-10 flex items-center justify-center btn-pressed rounded-lg hover:bg-bg-elevated transition-colors"
             aria-label="Remix"
           >
@@ -759,6 +759,16 @@ export function BetDetail({ onBack }: BetDetailProps) {
                 )}
               </div>
               <p className="text-white font-bold text-base">{formatStake(activeBet, punishmentCardText)}</p>
+
+              {/* Punishment highlight — visible to all participants even after completion,
+                  so visitors can see exactly what the loser had to do */}
+              {(activeBet.stake_custom_punishment || activeBet.stake_punishment_id) && (
+                <div className="mt-2 px-3 py-2 rounded-lg bg-orange-500/10 border border-orange-500/20">
+                  <p className="text-sm font-bold text-orange-400">
+                    🔥 Punishment: {punishmentCardText ?? activeBet.stake_custom_punishment ?? 'Forfeit'}
+                  </p>
+                </div>
+              )}
 
               {/* Per-user money result for resolved bets */}
               {isCompleted && user && payouts && (

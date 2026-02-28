@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useNavigate } from 'react-router'
-import { Bell, MessageCircle, Plus, LogIn, UserPlus, Star } from 'lucide-react'
+import { Bell, MessageCircle, Plus, LogIn, UserPlus, Star, Megaphone } from 'lucide-react'
 import { NotificationPanel } from '../components/NotificationPanel'
 import { PushPermissionBanner } from '../components/PushPermissionBanner'
 import { useGroupStore, useBetStore, useAuthStore, useNotificationStore, useChatStore } from '@/stores'
@@ -329,6 +329,14 @@ export function TheBoard() {
         >
           <span className="text-lg">⚙️</span>
         </button>
+        {/* Feedback — quick entry point from the main board */}
+        <button
+          onClick={() => navigate('/feedback')}
+          className="p-2 rounded-lg hover:bg-bg-elevated transition-colors"
+          aria-label="Give feedback"
+        >
+          <Megaphone className="w-5 h-5 text-text-primary" />
+        </button>
         <button
           onClick={() => navigate('/chat')}
           className="relative p-2 rounded-lg hover:bg-bg-elevated transition-colors"
@@ -374,7 +382,7 @@ export function TheBoard() {
         <div className="flex items-center justify-center gap-3 mb-3">
           <h2 className="text-base font-bold text-white">My Bets</h2>
           <button
-            onClick={() => navigate('/bet/create')}
+            onClick={() => navigate('/compete/create')}
             className="h-8 px-4 rounded-full bg-accent-green text-bg-primary text-sm font-bold flex items-center gap-1.5"
             aria-label="Create bet"
           >
@@ -457,7 +465,7 @@ export function TheBoard() {
           Quick Bet
         </span>
         <button
-          onClick={() => navigate('/bet/create')}
+          onClick={() => navigate('/compete/create')}
           className="pointer-events-auto w-14 h-14 rounded-full bg-accent-green text-bg-primary flex items-center justify-center text-2xl font-black shadow-[0_4px_20px_rgba(0,230,118,0.5)] active:scale-95 transition-transform"
           aria-label="Create bet"
         >

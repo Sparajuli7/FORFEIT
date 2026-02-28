@@ -3,8 +3,9 @@
 // Keys are shared with ArchiveScreen so pins and archive stars are the same.
 // ---------------------------------------------------------------------------
 
-export const PIN_BETS_KEY   = 'forfeit-fav-bets'
-export const PIN_GROUPS_KEY = 'forfeit-fav-groups'
+export const PIN_BETS_KEY      = 'forfeit-fav-bets'
+export const PIN_GROUPS_KEY    = 'forfeit-fav-groups'
+export const PIN_JOURNALS_KEY  = 'forfeit-fav-journals'
 
 export function loadPinned(key: string): Set<string> {
   try {

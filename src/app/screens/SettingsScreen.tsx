@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router'
-import { ChevronLeft, Sun, Moon, LogOut, Eye, EyeOff, Lock, Bell, BellOff } from 'lucide-react'
+import { ChevronLeft, Sun, Moon, LogOut, Eye, EyeOff, Lock, Bell, BellOff, MessageSquarePlus } from 'lucide-react'
 import { useAuthStore, useUiStore, usePushStore, useGroupStore, useCompetitionStore } from '@/stores'
 import { supabase } from '@/lib/supabase'
 import type { NotificationPreferenceRow } from '@/lib/database.types'
@@ -24,7 +24,8 @@ export function SettingsScreen() {
   const setPassword = useAuthStore((s) => s.setPassword)
   const theme = useUiStore((s) => s.theme)
   const toggleTheme = useUiStore((s) => s.toggleTheme)
-  const userId = useAuthStore((s) => s.user?.id)
+  const user = useAuthStore((s) => s.user)
+  const userId = user?.id
 
   // Push notification state
   const pushPermission = usePushStore((s) => s.permission)
@@ -172,88 +173,106 @@ export function SettingsScreen() {
         <h1 className="text-2xl font-black text-text-primary mb-8">Settings</h1>
 
         <div className="space-y-4">
-          {/* Set / Update Password */}
-          <div className="bg-bg-card border border-border-subtle rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <Lock className="w-4 h-4 text-text-muted" />
-              <p className="text-xs font-bold uppercase tracking-wider text-text-muted">
-                Password
+
+          {/* ── Password / Login method ──────────────────────────────────── */}
+          {/* For Google-only users, show a notice instead of unusable fields  */}
+          {user?.app_metadata?.provider === 'google' ? (
+            <div className="bg-bg-card border border-border-subtle rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Lock className="w-4 h-4 text-text-muted" />
+                <p className="text-xs font-bold uppercase tracking-wider text-text-muted">
+                  Login Method
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-xl">🔑</span>
+                <div>
+                  <p className="text-sm font-medium text-text-primary">Google login</p>
+                  <p className="text-xs text-text-muted mt-0.5">
+                    Your account uses Google. You don't need to set a password.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-bg-card border border-border-subtle rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Lock className="w-4 h-4 text-text-muted" />
+                <p className="text-xs font-bold uppercase tracking-wider text-text-muted">
+                  Password
+                </p>
+              </div>
+              <p className="text-xs text-text-muted mb-3">
+                Set or update your password for email + password login.
               </p>
-            </div>
-            <p className="text-xs text-text-muted mb-3">
-              Set or update your password for email + password login.
-            </p>
 
-            <div className="space-y-3">
-              <div className="relative">
-                <Input
-                  type={showNewPassword ? 'text' : 'password'}
-                  placeholder="New password (8+ characters)"
-                  value={newPassword}
-                  onChange={(e) => {
-                    setNewPassword(e.target.value)
-                    setPasswordSuccess(false)
-                    setPasswordError(null)
-                  }}
-                  className="h-11 rounded-xl bg-input-background border-input text-sm w-full pr-12"
-                  autoComplete="new-password"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowNewPassword(!showNewPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary transition-colors"
+              <div className="space-y-3">
+                <div className="relative">
+                  <Input
+                    type={showNewPassword ? 'text' : 'password'}
+                    placeholder="New password (8+ characters)"
+                    value={newPassword}
+                    onChange={(e) => {
+                      setNewPassword(e.target.value)
+                      setPasswordSuccess(false)
+                      setPasswordError(null)
+                    }}
+                    className="h-11 rounded-xl bg-input-background border-input text-sm w-full pr-12"
+                    autoComplete="new-password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary transition-colors"
+                  >
+                    {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+
+                <div className="relative">
+                  <Input
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    placeholder="Confirm password"
+                    value={confirmPassword}
+                    onChange={(e) => {
+                      setConfirmPassword(e.target.value)
+                      setPasswordSuccess(false)
+                      setPasswordError(null)
+                    }}
+                    className="h-11 rounded-xl bg-input-background border-input text-sm w-full pr-12"
+                    autoComplete="new-password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary transition-colors"
+                  >
+                    {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+
+                {passwordError && <p className="text-destructive text-xs">{passwordError}</p>}
+                {passwordSuccess && <p className="text-accent-green text-xs">Password updated!</p>}
+
+                <Button
+                  onClick={handleSetPassword}
+                  disabled={!canSavePassword}
+                  className="w-full h-10 rounded-xl bg-accent-green text-white font-bold text-sm hover:bg-accent-green/90"
                 >
-                  {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
+                  {passwordSaving ? (
+                    <span className="flex items-center gap-2">
+                      <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Saving...
+                    </span>
+                  ) : (
+                    'Set Password'
+                  )}
+                </Button>
               </div>
-
-              <div className="relative">
-                <Input
-                  type={showConfirmPassword ? 'text' : 'password'}
-                  placeholder="Confirm password"
-                  value={confirmPassword}
-                  onChange={(e) => {
-                    setConfirmPassword(e.target.value)
-                    setPasswordSuccess(false)
-                    setPasswordError(null)
-                  }}
-                  className="h-11 rounded-xl bg-input-background border-input text-sm w-full pr-12"
-                  autoComplete="new-password"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary transition-colors"
-                >
-                  {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-
-              {passwordError && (
-                <p className="text-destructive text-xs">{passwordError}</p>
-              )}
-              {passwordSuccess && (
-                <p className="text-accent-green text-xs">Password updated!</p>
-              )}
-
-              <Button
-                onClick={handleSetPassword}
-                disabled={!canSavePassword}
-                className="w-full h-10 rounded-xl bg-accent-green text-white font-bold text-sm hover:bg-accent-green/90"
-              >
-                {passwordSaving ? (
-                  <span className="flex items-center gap-2">
-                    <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Saving...
-                  </span>
-                ) : (
-                  'Set Password'
-                )}
-              </Button>
             </div>
-          </div>
+          )}
 
-          {/* Theme toggle — compact icon row */}
+          {/* ── Theme toggle ─────────────────────────────────────────────── */}
           <div className="bg-bg-card border border-border-subtle rounded-xl px-4 py-3 flex items-center justify-between">
             <p className="text-sm font-medium text-text-primary">
               {theme === 'dark' ? 'Dark Mode' : 'Light Mode'}
@@ -271,7 +290,29 @@ export function SettingsScreen() {
             </button>
           </div>
 
-          {/* Notification preferences */}
+          {/* ── Give Feedback — prominent, placed high ────────────────────── */}
+          <button
+            onClick={() => navigate('/feedback')}
+            className="w-full flex items-center justify-between px-4 py-4 rounded-xl bg-accent-green/15 border border-accent-green/40 hover:bg-accent-green/20 transition-colors active:scale-[0.98]"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full bg-accent-green/20 flex items-center justify-center shrink-0">
+                <MessageSquarePlus className="w-4 h-4 text-accent-green" />
+              </div>
+              <div className="text-left">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-bold text-accent-green">Give Feedback</p>
+                  <span className="text-[9px] font-black bg-accent-green/20 text-accent-green px-1.5 py-0.5 rounded uppercase tracking-widest">
+                    BETA
+                  </span>
+                </div>
+                <p className="text-xs text-text-muted mt-0.5">Help us build something worth using</p>
+              </div>
+            </div>
+            <span className="text-accent-green text-lg leading-none">›</span>
+          </button>
+
+          {/* ── Push Notifications ───────────────────────────────────────── */}
           <div className="bg-bg-card border border-border-subtle rounded-xl p-4">
             <div className="flex items-center gap-2 mb-3">
               <Bell className="w-4 h-4 text-text-muted" />
@@ -375,19 +416,7 @@ export function SettingsScreen() {
             )}
           </div>
 
-          {/* Give Feedback */}
-          <button
-            onClick={() => navigate('/feedback')}
-            className="w-full flex items-center justify-between px-4 py-3.5 rounded-xl bg-bg-card border border-border-subtle hover:bg-bg-elevated transition-colors"
-          >
-            <div className="text-left">
-              <p className="text-sm font-bold text-text-primary">Give Feedback</p>
-              <p className="text-xs text-text-muted mt-0.5">Help us build something worth using</p>
-            </div>
-            <span className="text-text-muted text-lg leading-none">›</span>
-          </button>
-
-          {/* Sign out */}
+          {/* ── Sign out ─────────────────────────────────────────────────── */}
           <button
             onClick={() => setShowSignOutConfirm(true)}
             className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-accent-coral/50 text-accent-coral font-bold text-sm hover:bg-accent-coral/10 transition-colors"

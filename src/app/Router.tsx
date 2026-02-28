@@ -7,7 +7,7 @@ import { AuthGuard } from './guards/AuthGuard'
 import { Splash } from './screens/Splash'
 import { Onboarding } from './screens/Onboarding'
 import { TheBoard } from './screens/TheBoard'
-import { BetCreationWizard } from './screens/BetCreationWizard'
+// BetCreationWizard merged into CompetitionCreateScreen
 import { BetDetail } from './screens/BetDetail'
 import { ProofSubmission } from './screens/ProofSubmission'
 import { ShameProofSubmission } from './screens/ShameProofSubmission'
@@ -15,7 +15,6 @@ import { OutcomeReveal } from './screens/OutcomeReveal'
 import { OutcomeWin } from './screens/OutcomeWin'
 import { OutcomeForfeit } from './screens/OutcomeForfeit'
 import { Competitions } from './screens/Competitions'
-import { RecordScreen } from './screens/RecordScreen'
 import { ProfileScreen } from './screens/ProfileScreen'
 import { SignUpScreen } from './screens/SignUpScreen'
 import { LoginScreen } from './screens/LoginScreen'
@@ -89,7 +88,8 @@ function OnboardingRoute() {
 }
 
 function BetCreateRoute() {
-  return <BetCreationWizard />
+  // /bet/create redirects to /compete/create so location.state (templateBetId) is preserved
+  return <CompetitionCreateScreen />
 }
 
 function ProfileScreenWithId() {
@@ -128,7 +128,8 @@ function CompeteOutcomeRevealRoute() {
   const navigate = useNavigate()
   return (
     <OutcomeReveal
-      onShare={() => navigate('/shame')}
+      // Hall of Shame page retired — share navigates to Player Card instead
+      onShare={() => navigate('/profile/card')}
       onBack={() => navigate('/compete')}
     />
   )
@@ -138,7 +139,8 @@ function OutcomeRevealRoute() {
   const navigate = useNavigate()
   return (
     <OutcomeReveal
-      onShare={() => navigate('/shame')}
+      // Hall of Shame page retired — share navigates to Player Card instead
+      onShare={() => navigate('/profile/card')}
       onBack={() => navigate('/home')}
     />
   )
@@ -148,7 +150,8 @@ function OutcomeWinRoute() {
   const navigate = useNavigate()
   return (
     <OutcomeWin
-      onShare={() => navigate('/shame')}
+      // Hall of Shame page retired — share navigates to Player Card instead
+      onShare={() => navigate('/profile/card')}
       onBack={() => navigate('/home')}
     />
   )
@@ -217,9 +220,13 @@ export function AppRouter() {
             {/* Archive */}
             <Route path="archive" element={<ArchiveScreen />} />
 
-            {/* Record / Hall of Shame (kept accessible, not in main nav) */}
-            <Route path="shame" element={<RecordScreen />} />
-            <Route path="stats" element={<Navigate to="/shame" replace />} />
+            {/* Hall of Shame retired — /shame now redirects to home.
+                RecordScreen and useShameStore are kept in the codebase for
+                future re-use (e.g. group punishment leaderboards) but are no
+                longer reachable as a top-level page. Creative punishments are
+                surfaced directly on Player Cards and Bet Detail instead. */}
+            <Route path="shame" element={<Navigate to="/home" replace />} />
+            <Route path="stats" element={<Navigate to="/home" replace />} />
 
             {/* Profile */}
             <Route path="profile" element={<ProfileScreen />} />
