@@ -58,7 +58,7 @@ export function generateICSFile(event: CalendarEvent): string {
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//FORFEIT//App//EN',
+    'PRODID:-//LYNK//App//EN',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     'BEGIN:VEVENT',

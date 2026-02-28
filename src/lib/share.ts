@@ -32,7 +32,7 @@ export function getGroupInviteUrl(inviteCode: string): string {
 
 /** Build share text for a group invite. */
 export function getGroupInviteShareText(groupName: string): string {
-  return `Join my group "${groupName}" on FORFEIT! 🎲`
+  return `Join my group "${groupName}" on LYNK! 🎲`
 }
 
 // ---------------------------------------------------------------------------
@@ -42,7 +42,7 @@ export function getGroupInviteShareText(groupName: string): string {
 /** Build share text for a bet or challenge. */
 export function getBetShareText(title: string, claimantName?: string): string {
   const who = claimantName ? `${claimantName} claims: ` : ''
-  return `${who}"${title}" — Bet on it in FORFEIT 🎲`
+  return `${who}"${title}" — Bet on it in LYNK 🎲`
 }
 
 /** Build share text for an outcome/result. */
@@ -55,12 +55,12 @@ export function getOutcomeShareText(params: {
 }): string {
   const { title, claimantName, result, riderNames = [], doubterNames = [] } = params
   if (result === 'claimant_succeeded') {
-    return `🏆 ${claimantName} WON: "${title}" — ${doubterNames.length ? doubterNames.join(', ') + ' owe up!' : 'Claimant proved it!'} Bet on your friends in FORFEIT 🎲`
+    return `🏆 ${claimantName} WON: "${title}" — ${doubterNames.length ? doubterNames.join(', ') + ' owe up!' : 'Claimant proved it!'} Bet on your friends in LYNK 🎲`
   }
   if (result === 'claimant_failed') {
-    return `😬 FORFEIT: ${claimantName} lost "${title}" — owes ${riderNames.length ? riderNames.join(', ') : 'the group'}. Bet on your friends in FORFEIT 🎲`
+    return `😬 LYNK: ${claimantName} lost "${title}" — owes ${riderNames.length ? riderNames.join(', ') : 'the group'}. Bet on your friends in LYNK 🎲`
   }
-  return `🤝 NO CONTEST: "${title}" was voided. Bet on your friends in FORFEIT 🎲`
+  return `🤝 NO CONTEST: "${title}" was voided. Bet on your friends in LYNK 🎲`
 }
 
 /** Build share text for personal stats / record. */
@@ -69,7 +69,7 @@ export function getRecordShareText(params: {
   losses: number
   winRate: number
 }): string {
-  return `I'm ${params.wins}W-${params.losses}L on FORFEIT with a ${params.winRate}% win rate. Think you can beat that? 🎯`
+  return `I'm ${params.wins}W-${params.losses}L on LYNK with a ${params.winRate}% win rate. Think you can beat that? 🎯`
 }
 
 /** Build share text for a competition leaderboard. */
@@ -78,7 +78,7 @@ export function getCompetitionShareText(params: {
   rank?: number
 }): string {
   const rankStr = params.rank ? ` — I'm ranked #${params.rank}!` : ''
-  return `🏆 ${params.title} competition on FORFEIT${rankStr} Join and compete 🎲`
+  return `🏆 ${params.title} competition on LYNK${rankStr} Join and compete 🎲`
 }
 
 /** Build share text for a punishment receipt. */
@@ -87,7 +87,7 @@ export function getPunishmentShareText(params: {
   punishment: string
   betTitle: string
 }): string {
-  return `📜 FORFEIT RECEIPT: ${params.loserName} owes ${params.punishment} for losing "${params.betTitle}". No refunds. 😤`
+  return `📜 LYNK RECEIPT: ${params.loserName} owes ${params.punishment} for losing "${params.betTitle}". No refunds. 😤`
 }
 
 /** Build share text for a proof image. */
@@ -97,10 +97,10 @@ export function getProofShareText(params: {
   result?: 'won' | 'lost' | 'proof' | 'shame'
 }): string {
   const { betTitle, personName, result } = params
-  if (result === 'won') return `🏆 PROOF: ${personName} won "${betTitle}" on FORFEIT! 🎲`
-  if (result === 'lost') return `😬 PROOF: ${personName} lost "${betTitle}" on FORFEIT! 🎲`
-  if (result === 'shame') return `😂 HALL OF SHAME: ${personName} completed their punishment for "${betTitle}" on FORFEIT!`
-  return `📸 PROOF: ${personName} submitted proof for "${betTitle}" on FORFEIT! 🎲`
+  if (result === 'won') return `🏆 PROOF: ${personName} won "${betTitle}" on LYNK! 🎲`
+  if (result === 'lost') return `😬 PROOF: ${personName} lost "${betTitle}" on LYNK! 🎲`
+  if (result === 'shame') return `😂 HALL OF SHAME: ${personName} completed their punishment for "${betTitle}" on LYNK!`
+  return `📸 PROOF: ${personName} submitted proof for "${betTitle}" on LYNK! 🎲`
 }
 
 /** Build share text for shame proof submission. */
@@ -108,7 +108,7 @@ export function getShameShareText(params: {
   loserName: string
   betTitle: string
 }): string {
-  return `😂 ${params.loserName} just completed their punishment for losing "${params.betTitle}" on FORFEIT!`
+  return `😂 ${params.loserName} just completed their punishment for losing "${params.betTitle}" on LYNK!`
 }
 
 // ---------------------------------------------------------------------------
@@ -245,7 +245,7 @@ export async function shareWithNative(payload: SharePayload): Promise<boolean> {
   if (!canUseNativeShare()) return false
   try {
     const shareData: ShareData = {
-      title: payload.title ?? 'FORFEIT',
+      title: payload.title ?? 'LYNK',
       text: payload.text,
       url: payload.url,
     }

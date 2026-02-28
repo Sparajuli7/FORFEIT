@@ -1,7 +1,7 @@
 {
-  "name": "FORFEIT",
-  "short_name": "FORFEIT",
-  "description": "Make claims. Bet on friends. Face the consequences.",
+  "name": "LYNK",
+  "short_name": "LYNK",
+  "description": "Social bets and challenges with friends.",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",

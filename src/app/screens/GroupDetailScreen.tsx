@@ -249,7 +249,7 @@ export function GroupDetailScreen() {
     if (!group?.invite_code) return
     const url = getGroupInviteUrl(group.invite_code)
     const text = getGroupInviteShareText(group.name)
-    const used = await shareWithNative({ text, url, title: 'FORFEIT Invite' })
+    const used = await shareWithNative({ text, url, title: 'LYNK Invite' })
     if (!used) setShareSheetOpen(true)
   }
 

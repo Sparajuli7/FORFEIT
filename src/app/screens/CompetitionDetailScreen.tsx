@@ -204,7 +204,7 @@ export function CompetitionDetailScreen() {
             <div className="mb-4">
               <AddToCalendar
                 event={{
-                  title: `FORFEIT: ${competition.title}`,
+                  title: `LYNK: ${competition.title}`,
                   description: `ENDS: ${formatDeadline(new Date(competition.deadline))}\n\nCompetition: "${competition.title}"\nMetric: ${competition.comp_metric ?? 'Score'}\n\n${getCompetitionShareUrl(id!)}`,
                   startDate: new Date(competition.created_at),
                   endDate: new Date(competition.deadline),
@@ -359,7 +359,7 @@ export function CompetitionDetailScreen() {
         open={scoreShareOpen}
         onOpenChange={setScoreShareOpen}
         title="Share your score"
-        text={`I just scored ${lastScore} in "${competition?.title ?? 'a competition'}" on FORFEIT! 🏆🎲`}
+        text={`I just scored ${lastScore} in "${competition?.title ?? 'a competition'}" on LYNK! 🏆🎲`}
         url={id ? getCompetitionShareUrl(id) : ''}
         imageUrl={lastProofUrl}
         caption={`Score: ${lastScore} — ${competition?.title ?? 'Competition'}`}

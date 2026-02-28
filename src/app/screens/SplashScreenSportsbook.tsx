@@ -11,7 +11,7 @@ export function SplashScreenSportsbook({ onEnter, onLogin }: SplashScreenSportsb
       <div className="flex-1 flex flex-col items-center justify-center">
         {/* Wordmark */}
         <h1 className="forfeit-wordmark text-[64px] font-black text-text-primary mb-4">
-          FORFEIT
+          LYNK
         </h1>
 
         {/* Pill badges */}

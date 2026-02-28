@@ -10,10 +10,10 @@ export function SplashScreen({ onGetStarted }: SplashScreenProps) {
       <div className="flex-1 flex flex-col items-center justify-center">
         <h1 
           className="glitch text-[72px] font-black text-white tracking-tight mb-4"
-          data-text="FORFEIT"
+          data-text="LYNK"
           style={{ letterSpacing: '-0.02em' }}
         >
-          FORFEIT
+          LYNK
         </h1>
         <p className="text-text-muted text-center text-base">
           Make claims. Bet on friends. Face the consequences.

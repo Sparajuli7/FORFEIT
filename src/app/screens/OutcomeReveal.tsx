@@ -60,7 +60,7 @@ const WinnerCard = ({ betTitle, winnerName, winnerNames, loserNames, stakeMoney,
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <p className="text-[10px] font-black uppercase tracking-[0.15em] text-accent-green opacity-80">
-          FORFEIT
+          LYNK
         </p>
         <p className="text-[10px] text-text-muted tabular-nums">{resolvedDate}</p>
       </div>
@@ -109,7 +109,7 @@ const WinnerCard = ({ betTitle, winnerName, winnerNames, loserNames, stakeMoney,
         style={{ background: 'linear-gradient(90deg, transparent, rgba(0,230,118,0.3), transparent)' }}
       />
       <p className="text-center text-[9px] font-bold uppercase tracking-widest text-text-muted mt-3 opacity-60">
-        FORFEIT · Bet settled
+        LYNK · Bet settled
       </p>
     </div>
   </div>
@@ -221,7 +221,7 @@ export function OutcomeReveal({ onShare, onBack }: OutcomeRevealProps) {
     setSavingImage(true)
     try {
       const blob = await captureElementAsImage(receiptRef.current, { scale: 2 })
-      await shareImage(blob, 'forfeit-receipt.png', 'FORFEIT Punishment Receipt')
+      await shareImage(blob, 'forfeit-receipt.png', 'LYNK Punishment Receipt')
     } catch { /* ignore */ }
     finally { setSavingImage(false) }
   }
@@ -639,7 +639,7 @@ export function OutcomeReveal({ onShare, onBack }: OutcomeRevealProps) {
           {/* Scrollable content */}
           <div className="flex-1 overflow-y-auto">
             <div className="flex flex-col items-center px-6 pt-10 pb-4">
-              {/* FORFEIT headline */}
+              {/* LYNK headline */}
               <motion.h1
                 className="font-black text-accent-coral text-center mb-2 italic"
                 style={{ fontSize: 72, letterSpacing: '-0.03em', lineHeight: 1 }}
@@ -647,7 +647,7 @@ export function OutcomeReveal({ onShare, onBack }: OutcomeRevealProps) {
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 transition={{ type: 'spring', stiffness: 250, damping: 18 }}
               >
-                FORFEIT
+                LYNK
               </motion.h1>
 
               <motion.p

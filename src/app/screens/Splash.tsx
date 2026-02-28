@@ -8,13 +8,13 @@ export function Splash({ onEnter, onLogin }: SplashProps) {
     <div className="h-full bg-bg-primary diagonal-grid grain-texture flex flex-col items-center justify-between px-6 py-12 relative">
       {/* Main content */}
       <div className="flex-1 flex flex-col items-center justify-center">
-        {/* FORFEIT wordmark with glitch */}
-        <h1 
+        {/* LYNK wordmark with glitch */}
+        <h1
           className="glitch-text text-[72px] font-black text-text-primary italic mb-6"
-          data-text="FORFEIT"
+          data-text="LYNK"
           style={{ letterSpacing: '-0.02em' }}
         >
-          FORFEIT
+          LYNK
         </h1>
 
         {/* Pills */}

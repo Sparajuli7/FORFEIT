@@ -359,7 +359,7 @@ function TradingCard({
             className="text-[11px] font-black tracking-[0.25em] uppercase"
             style={{ color: cfg.accentColor }}
           >
-            FORFEIT
+            LYNK
           </span>
           <span className="text-[9px] tracking-wider" style={{ color: 'rgba(255,255,255,0.2)' }}>
             @{profile.username}
@@ -397,11 +397,11 @@ export function PlayerCardScreen() {
       .finally(() => setLoading(false))
   }, [user?.id])
 
-  const playerShareText = `My FORFEIT player card — ${profile?.wins}W · ${profile?.losses}L · rep ${profile?.rep_score}/100. Can you beat my record?`
+  const playerShareText = `My LYNK player card — ${profile?.wins}W · ${profile?.losses}L · rep ${profile?.rep_score}/100. Can you beat my record?`
   const playerShareUrl = typeof window !== 'undefined' ? `${window.location.origin}/profile/${profile?.username ?? ''}` : ''
 
   const handleShare = async () => {
-    const usedNative = await shareWithNative({ title: 'My FORFEIT Card', text: playerShareText, url: playerShareUrl })
+    const usedNative = await shareWithNative({ title: 'My LYNK Card', text: playerShareText, url: playerShareUrl })
     if (!usedNative) setShareSheetOpen(true)
     setShared(true)
     setTimeout(() => setShared(false), 2000)

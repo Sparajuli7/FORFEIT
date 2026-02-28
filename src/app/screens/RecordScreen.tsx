@@ -116,7 +116,7 @@ export function RecordScreen() {
   const handleShareRecord = async () => {
     const text = getRecordShareText({ wins: t.wins, losses: t.losses, winRate })
     const url = typeof window !== 'undefined' ? window.location.origin : ''
-    const usedNative = await shareWithNative({ title: 'My FORFEIT Record', text, url })
+    const usedNative = await shareWithNative({ title: 'My LYNK Record', text, url })
     if (!usedNative) setShareOpen(true)
   }
 
@@ -177,7 +177,7 @@ export function RecordScreen() {
                 style={{ background: 'linear-gradient(145deg, #1a1200, #0d0d0d)' }}
               >
                 <span className="text-xl">{user?.user_metadata?.avatar_url ? '🃏' : '🃏'}</span>
-                <div className="text-[8px] font-black text-amber-400 uppercase tracking-widest">FORFEIT</div>
+                <div className="text-[8px] font-black text-amber-400 uppercase tracking-widest">LYNK</div>
               </div>
             </div>
           </div>

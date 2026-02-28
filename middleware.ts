@@ -66,7 +66,7 @@ function ogHtml(opts: {
   <meta property="og:image" content="${opts.imageUrl}" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
-  <meta property="og:site_name" content="FORFEIT" />
+  <meta property="og:site_name" content="LYNK" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="${opts.title}" />
   <meta name="twitter:description" content="${opts.description}" />
@@ -92,7 +92,7 @@ export default function middleware(request: Request): Response | undefined {
   const description = 'Make claims. Bet on friends. Face the consequences.'
 
   if (route.type === 'bet') {
-    const title = url.searchParams.get('t') || 'Bet on FORFEIT'
+    const title = url.searchParams.get('t') || 'Bet on LYNK'
     const imageUrl = buildOGImageUrl(origin, {
       type: 'bet',
       title,
@@ -103,7 +103,7 @@ export default function middleware(request: Request): Response | undefined {
   }
 
   if (route.type === 'competition') {
-    const title = url.searchParams.get('t') || 'Competition on FORFEIT'
+    const title = url.searchParams.get('t') || 'Competition on LYNK'
     const imageUrl = buildOGImageUrl(origin, {
       type: 'competition',
       title,
@@ -114,7 +114,7 @@ export default function middleware(request: Request): Response | undefined {
   }
 
   if (route.type === 'profile') {
-    const title = url.searchParams.get('t') || 'Player on FORFEIT'
+    const title = url.searchParams.get('t') || 'Player on LYNK'
     const imageUrl = buildOGImageUrl(origin, {
       type: 'profile',
       title,

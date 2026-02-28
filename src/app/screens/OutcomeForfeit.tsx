@@ -15,9 +15,9 @@ export function OutcomeForfeit({ onSubmitProof, onDispute }: OutcomeForfeitProps
     >
       {/* Content */}
       <div className="flex-1 flex flex-col items-center justify-center w-full">
-        {/* FORFEIT text */}
+        {/* LYNK text */}
         <h1 className="text-[72px] font-black text-accent-coral mb-6 text-center italic" style={{ letterSpacing: '-0.02em' }}>
-          FORFEIT
+          LYNK
         </h1>
 
         {/* Screen crack illustration */}

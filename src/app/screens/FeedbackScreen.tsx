@@ -121,7 +121,7 @@ export function FeedbackScreen() {
           </button>
         </div>
         <p className="text-white/30 text-[10px] font-bold uppercase tracking-widest mb-1">
-          FORFEIT BETA
+          LYNK BETA
         </p>
         <h1 className="text-white text-3xl font-black tracking-tight leading-none">
           Give Us<br />Feedback
@@ -141,7 +141,7 @@ export function FeedbackScreen() {
               01
             </span>
             <p className="text-white text-sm font-bold uppercase tracking-wide">
-              Overall, how do you rate FORFEIT?
+              Overall, how do you rate LYNK?
             </p>
           </div>
           <div className="flex gap-2">

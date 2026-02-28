@@ -8,7 +8,7 @@ export default async function handler(req: Request) {
   const { searchParams } = new URL(req.url)
 
   const type = searchParams.get('type') ?? 'bet'
-  const title = searchParams.get('title') ?? 'FORFEIT'
+  const title = searchParams.get('title') ?? 'LYNK'
   const status = searchParams.get('status') ?? ''
   const claimant = searchParams.get('claimant') ?? ''
   const stake = searchParams.get('stake') ?? ''
@@ -17,7 +17,7 @@ export default async function handler(req: Request) {
   const statusColor =
     result === 'won' || status === 'LIVE'
       ? '#00E676'
-      : result === 'lost' || status === 'FORFEIT'
+      : result === 'lost' || status === 'LYNK'
         ? '#FF6B6B'
         : '#999'
 
@@ -25,7 +25,7 @@ export default async function handler(req: Request) {
     result === 'won'
       ? 'WINNER'
       : result === 'lost'
-        ? 'FORFEIT'
+        ? 'LYNK'
         : status || (type === 'competition' ? 'COMPETE' : 'BET')
 
   return new ImageResponse(
@@ -42,7 +42,7 @@ export default async function handler(req: Request) {
           fontFamily: 'sans-serif',
         }}
       >
-        {/* Top row: FORFEIT branding + status badge */}
+        {/* Top row: LYNK branding + status badge */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div
             style={{
@@ -52,7 +52,7 @@ export default async function handler(req: Request) {
               color: '#00E676',
             }}
           >
-            FORFEIT
+            LYNK
           </div>
           {statusLabel && (
             <div

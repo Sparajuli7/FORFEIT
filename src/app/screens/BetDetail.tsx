@@ -318,7 +318,7 @@ export function BetDetail({ onBack }: BetDetailProps) {
           <div className="flex justify-center mt-3">
             <AddToCalendar
               event={{
-                title: `FORFEIT: ${activeBet.title}`,
+                title: `LYNK: ${activeBet.title}`,
                 description: `DEADLINE: ${formatDeadline(new Date(activeBet.deadline))}\n\nBet: "${activeBet.title}"${claimant?.display_name ? `\nBy: ${claimant.display_name}` : ''}\nStake: ${formatStake(activeBet, punishmentCardText)}\n\n${getBetShareUrl(id!)}`,
                 startDate: new Date(activeBet.deadline),
               } satisfies CalendarEvent}

@@ -1,6 +1,6 @@
 /* eslint-disable no-restricted-globals */
 
-// FORFEIT Service Worker — handles Web Push notifications
+// LYNK Service Worker — handles Web Push notifications
 
 self.addEventListener('install', () => {
   self.skipWaiting()
@@ -17,10 +17,10 @@ self.addEventListener('push', (event) => {
   try {
     payload = event.data.json()
   } catch {
-    payload = { title: 'FORFEIT', body: event.data.text() }
+    payload = { title: 'LYNK', body: event.data.text() }
   }
 
-  const { title = 'FORFEIT', body = '', icon, data } = payload
+  const { title = 'LYNK', body = '', icon, data } = payload
 
   event.waitUntil(
     self.registration.showNotification(title, {

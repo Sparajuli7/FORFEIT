@@ -42,7 +42,7 @@ const FRAME_CONFIG: Record<
     bgGradient: 'from-gold/10 to-transparent',
   },
   forfeit: {
-    badge: 'FORFEIT',
+    badge: 'LYNK',
     badgeColor: 'text-accent-coral',
     borderColor: 'border-accent-coral/40',
     bgGradient: 'from-accent-coral/10 to-transparent',
@@ -56,7 +56,7 @@ const FRAME_CONFIG: Record<
 }
 
 /**
- * ProofCard — shareable, framed proof image template with FORFEIT branding.
+ * ProofCard — shareable, framed proof image template with LYNK branding.
  * Designed for image capture (html-to-image) and social sharing.
  * Use `ref` to capture the card as a PNG image.
  */
@@ -83,8 +83,8 @@ export const ProofCard = forwardRef<HTMLDivElement, ProofCardProps>(
     const config = FRAME_CONFIG[frame]
     const shareUrl = betId ? getBetShareUrl(betId) : ''
     const shareText = caption
-      ? `${caption} — FORFEIT 🎲`
-      : `${config.badge}: "${betTitle}" by ${personName} — FORFEIT 🎲`
+      ? `${caption} — LYNK 🎲`
+      : `${config.badge}: "${betTitle}" by ${personName} — LYNK 🎲`
 
     const handleShare = async (e: React.MouseEvent) => {
       e.stopPropagation()
@@ -92,7 +92,7 @@ export const ProofCard = forwardRef<HTMLDivElement, ProofCardProps>(
       const file = await fetchImageAsFile(imageUrl, 'forfeit-proof.jpg')
       const files = file ? [file] : []
       const usedNative = await shareWithNative({
-        title: `FORFEIT ${config.badge}`,
+        title: `LYNK ${config.badge}`,
         text: shareText,
         url: shareUrl,
         files,
@@ -166,10 +166,10 @@ export const ProofCard = forwardRef<HTMLDivElement, ProofCardProps>(
               className="w-full h-full object-cover"
               crossOrigin="anonymous"
             />
-            {/* Top-left FORFEIT branding */}
+            {/* Top-left LYNK branding */}
             <div className="absolute top-3 left-3">
               <span className="text-xs font-black tracking-[0.15em] text-white/80 drop-shadow-lg">
-                FORFEIT
+                LYNK
               </span>
             </div>
             {/* Top-right badge */}

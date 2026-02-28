@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { Capacitor } from '@capacitor/core'
 import { supabase } from '@/lib/supabase'
 import type { User } from '@supabase/supabase-js'
 import type { Profile, ProfileUpdate } from '@/lib/database.types'
@@ -192,18 +193,39 @@ const useAuthStore = create<AuthStore>()((set, get) => ({
 
   signInWithGoogle: async () => {
     set({ isLoading: true, error: null })
-    const redirectTo =
-      typeof window !== 'undefined'
-        ? `${window.location.origin}/auth/callback`
-        : undefined
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: redirectTo ? { redirectTo } : undefined,
-    })
-    if (error) {
-      set({ error: error.message, isLoading: false })
+
+    if (Capacitor.isNativePlatform()) {
+      // In native apps, open OAuth in system browser and handle deep link callback
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: 'com.lynk.app://auth/callback',
+          skipBrowserRedirect: true,
+        },
+      })
+      if (error) {
+        set({ error: error.message, isLoading: false })
+        return
+      }
+      if (data.url) {
+        const { Browser } = await import('@capacitor/browser')
+        await Browser.open({ url: data.url })
+      }
+    } else {
+      // On web, use standard redirect flow
+      const redirectTo =
+        typeof window !== 'undefined'
+          ? `${window.location.origin}/auth/callback`
+          : undefined
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: redirectTo ? { redirectTo } : undefined,
+      })
+      if (error) {
+        set({ error: error.message, isLoading: false })
+      }
     }
-    // Browser redirects to Google — onAuthStateChange handles the rest on return
+    // onAuthStateChange handles the rest on return
   },
 
   signOut: async () => {

@@ -135,11 +135,11 @@ function Lightbox({
   const handleShareImage = async (e: React.MouseEvent) => {
     e.stopPropagation()
     if (item.type !== 'image') return
-    const text = shareText ?? 'Check this out on FORFEIT 🎲'
+    const text = shareText ?? 'Check this out on LYNK 🎲'
     const url = shareUrl ?? ''
     const file = await fetchImageAsFile(item.url, 'forfeit-proof.jpg')
     const files = file ? [file] : []
-    const usedNative = await shareWithNative({ title: 'FORFEIT', text, url, files })
+    const usedNative = await shareWithNative({ title: 'LYNK', text, url, files })
     if (!usedNative) setShareSheetOpen(true)
   }
 
@@ -235,7 +235,7 @@ function Lightbox({
           open={shareSheetOpen}
           onOpenChange={setShareSheetOpen}
           title="Share image"
-          text={shareText ?? 'Check this out on FORFEIT 🎲'}
+          text={shareText ?? 'Check this out on LYNK 🎲'}
           url={shareUrl ?? ''}
           imageUrl={item.url}
         />
