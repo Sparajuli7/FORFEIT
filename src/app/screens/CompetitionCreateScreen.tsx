@@ -67,6 +67,7 @@ export function CompetitionCreateScreen() {
   const [groupMembers, setGroupMembers] = useState<GroupMemberWithProfile[]>([])
   const [friendsList, setFriendsList] = useState<GroupMemberWithProfile[]>([])
   const [participants, setParticipants] = useState<GroupMemberWithProfile[]>([])
+  const [isSolo, setIsSolo] = useState(false)
   const [peopleTab, setPeopleTab] = useState<'friends' | 'group'>('friends')
   const [inviteCopied, setInviteCopied] = useState(false)
 
@@ -242,8 +243,8 @@ export function CompetitionCreateScreen() {
   }
 
   const handleStep2Next = () => {
-    if (!selectedGroup) { setError('Select a group.'); return }
-    if (participants.length === 0) { setError('Add at least one participant.'); return }
+    if (!isSolo && !selectedGroup) { setError('Select a group.'); return }
+    if (!isSolo && participants.length === 0) { setError('Add at least one participant.'); return }
     const end = new Date(endDate)
     end.setHours(23, 59, 59, 999)
     if (end <= new Date()) { setError('End date must be in the future.'); return }
@@ -252,8 +253,9 @@ export function CompetitionCreateScreen() {
   }
 
   const handleSubmit = async () => {
-    if (!resolvedGroupId) {
-      setError('Select a group.')
+    const groupId = isSolo ? (groups[0]?.id ?? null) : resolvedGroupId
+    if (!groupId) {
+      setError(isSolo ? 'You need to be in at least one group.' : 'Select a group.')
       return
     }
     const end = new Date(endDate)
@@ -266,14 +268,14 @@ export function CompetitionCreateScreen() {
       setError('Please enter a punishment.'); return
     }
 
-    const participantIds = participants.map((p) => p.user_id)
+    const participantIds = isSolo ? [] : participants.map((p) => p.user_id)
 
     setIsSubmitting(true)
     setError(null)
     try {
       const comp = await createCompetition({
         title: title.trim(),
-        groupId: resolvedGroupId,
+        groupId: groupId,
         category: 'fitness',
         metric: metric.trim() || title.trim(),
         participantIds,
@@ -464,188 +466,226 @@ export function CompetitionCreateScreen() {
                 Who's competing?
               </h2>
 
-              {/* ── Group selection ── */}
-              <div>
-                <label className="text-xs font-bold text-text-muted uppercase tracking-wider block mb-2">
-                  Group
-                </label>
-                <Select
-                  value={selectedGroup?.id ?? ''}
-                  onValueChange={(id) => {
-                    const g = groups.find((x) => x.id === id)
-                    setSelectedGroup(g ? { id: g.id, name: g.name, invite_code: g.invite_code } : null)
-                    setParticipants([])
-                  }}
+              {/* ── Solo / Group toggle ── */}
+              <div className="flex items-center gap-1 bg-bg-elevated p-1 rounded-xl">
+                <button
+                  onClick={() => { setIsSolo(false) }}
+                  className={`flex-1 py-2.5 rounded-lg text-center text-xs font-black uppercase tracking-wide transition-all ${
+                    !isSolo
+                      ? 'bg-bg-card text-text-primary shadow-sm'
+                      : 'text-text-muted hover:text-text-primary'
+                  }`}
                 >
-                  <SelectTrigger className="h-12">
-                    <SelectValue placeholder="Select a group" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {groups.map((g) => (
-                      <SelectItem key={g.id} value={g.id}>
-                        {g.avatar_emoji} {g.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  Group Challenge
+                </button>
+                <button
+                  onClick={() => { setIsSolo(true); setParticipants([]) }}
+                  className={`flex-1 py-2.5 rounded-lg text-center text-xs font-black uppercase tracking-wide transition-all ${
+                    isSolo
+                      ? 'bg-bg-card text-text-primary shadow-sm'
+                      : 'text-text-muted hover:text-text-primary'
+                  }`}
+                >
+                  Solo Challenge
+                </button>
               </div>
 
-              {/* ── Add entire group button ── */}
-              {selectedGroup && (
-                <button
-                  onClick={addWholeGroup}
-                  disabled={groupMembers.length === 0}
-                  className="w-full py-3 rounded-xl font-bold text-sm bg-accent-green/20 text-accent-green border border-accent-green/40 disabled:opacity-50"
-                >
-                  {groupMembers.length > 0
-                    ? `Add all ${groupMembers.length} members`
-                    : 'Loading members...'}
-                </button>
+              {isSolo && (
+                <div className="bg-bg-card rounded-xl border border-border-subtle p-4 text-center">
+                  <p className="text-sm font-bold text-text-primary">Just you, no excuses.</p>
+                  <p className="text-xs text-text-muted mt-1">
+                    Set a personal challenge and hold yourself accountable.
+                  </p>
+                </div>
               )}
 
-              {/* ── People picker with Friends / Group Members tabs ── */}
-              <div>
-                <div className="flex items-center gap-1 bg-bg-elevated p-1 rounded-xl mb-3">
-                  <button
-                    onClick={() => setPeopleTab('friends')}
-                    className={`flex-1 py-2.5 rounded-lg text-center text-xs font-black uppercase tracking-wide transition-all ${
-                      peopleTab === 'friends'
-                        ? 'bg-bg-card text-text-primary shadow-sm'
-                        : 'text-text-muted hover:text-text-primary'
-                    }`}
-                  >
-                    Friends
-                  </button>
-                  <button
-                    onClick={() => setPeopleTab('group')}
-                    disabled={!selectedGroup}
-                    className={`flex-1 py-2.5 rounded-lg text-center text-xs font-black uppercase tracking-wide transition-all disabled:opacity-40 ${
-                      peopleTab === 'group'
-                        ? 'bg-bg-card text-text-primary shadow-sm'
-                        : 'text-text-muted hover:text-text-primary'
-                    }`}
-                  >
-                    Group Members
-                  </button>
-                </div>
-
-                {/* People list */}
-                <div className="space-y-2 max-h-52 overflow-y-auto">
-                  {peopleTab === 'friends' ? (
-                    friendsList.length === 0 ? (
-                      <p className="text-sm text-text-muted py-4 text-center">Loading friends...</p>
-                    ) : (
-                      friendsList.map((m) => {
-                        const sel = participants.some((p) => p.user_id === m.user_id)
-                        return (
-                          <button
-                            key={m.user_id}
-                            onClick={() => toggleParticipant(m)}
-                            className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-colors ${
-                              sel ? 'border-accent-green bg-accent-green/10' : 'border-border-subtle bg-bg-card'
-                            }`}
-                          >
-                            <div className="w-9 h-9 rounded-full overflow-hidden bg-bg-elevated shrink-0">
-                              {m.profile.avatar_url ? (
-                                <img src={m.profile.avatar_url} alt="" className="w-full h-full object-cover" />
-                              ) : (
-                                <div className="w-full h-full bg-gradient-to-br from-accent-green/30 to-accent-green/10" />
-                              )}
-                            </div>
-                            <span className="font-bold text-text-primary text-sm flex-1 text-left">
-                              {m.profile.display_name}
-                            </span>
-                            <span className={`text-sm font-black ${sel ? 'text-accent-green' : 'text-border-subtle'}`}>
-                              {sel ? '✓' : '+'}
-                            </span>
-                          </button>
-                        )
-                      })
-                    )
-                  ) : !selectedGroup ? (
-                    <p className="text-sm text-text-muted py-4 text-center">Select a group first</p>
-                  ) : groupMembers.length === 0 ? (
-                    <p className="text-sm text-text-muted py-4 text-center">Loading members...</p>
-                  ) : (
-                    groupMembers.map((m) => {
-                      const sel = participants.some((p) => p.user_id === m.user_id)
-                      return (
-                        <button
-                          key={m.user_id}
-                          onClick={() => toggleParticipant(m)}
-                          className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-colors ${
-                            sel ? 'border-accent-green bg-accent-green/10' : 'border-border-subtle bg-bg-card'
-                          }`}
-                        >
-                          <div className="w-9 h-9 rounded-full overflow-hidden bg-bg-elevated shrink-0">
-                            {m.profile.avatar_url ? (
-                              <img src={m.profile.avatar_url} alt="" className="w-full h-full object-cover" />
-                            ) : (
-                              <div className="w-full h-full bg-gradient-to-br from-accent-green/30 to-accent-green/10" />
-                            )}
-                          </div>
-                          <span className="font-bold text-text-primary text-sm flex-1 text-left">
-                            {m.profile.display_name}
-                          </span>
-                          <span className={`text-sm font-black ${sel ? 'text-accent-green' : 'text-border-subtle'}`}>
-                            {sel ? '✓' : '+'}
-                          </span>
-                        </button>
-                      )
-                    })
-                  )}
-                </div>
-              </div>
-
-              {/* ── Selected participant chips ── */}
-              {participants.length > 0 && (
-                <div>
-                  <p className="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-2">
-                    Competing ({participants.length})
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {participants.map((p) => (
-                      <button
-                        key={p.user_id}
-                        onClick={() => toggleParticipant(p)}
-                        className="flex items-center gap-1.5 bg-accent-green/15 text-accent-green text-xs font-bold px-2.5 py-1 rounded-full border border-accent-green/30"
-                      >
-                        {p.profile.display_name}
-                        <span className="text-accent-green/60 text-[10px] font-black">&times;</span>
-                      </button>
-                    ))}
+              {/* ── Group selection + participants (hidden in solo mode) ── */}
+              {!isSolo && (
+                <>
+                  {/* ── Group selection ── */}
+                  <div>
+                    <label className="text-xs font-bold text-text-muted uppercase tracking-wider block mb-2">
+                      Group
+                    </label>
+                    <Select
+                      value={selectedGroup?.id ?? ''}
+                      onValueChange={(id) => {
+                        const g = groups.find((x) => x.id === id)
+                        setSelectedGroup(g ? { id: g.id, name: g.name, invite_code: g.invite_code } : null)
+                        setParticipants([])
+                      }}
+                    >
+                      <SelectTrigger className="h-12">
+                        <SelectValue placeholder="Select a group" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {groups.map((g) => (
+                          <SelectItem key={g.id} value={g.id}>
+                            {g.avatar_emoji} {g.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                </div>
-              )}
 
-              {/* ── Invite new players ── */}
-              <div className="border-t border-border-subtle pt-4">
-                <p className="text-xs font-bold text-text-muted uppercase tracking-wider mb-2">
-                  Invite new players
-                </p>
-                <button
-                  onClick={handleInviteToGroup}
-                  disabled={!selectedGroup}
-                  className="w-full py-3 rounded-xl font-bold text-sm bg-bg-elevated text-text-primary border border-border-subtle flex items-center justify-center gap-2 hover:bg-bg-card transition-colors disabled:opacity-40"
-                >
-                  {inviteCopied ? (
-                    <>
-                      <Check className="w-4 h-4 text-accent-green" />
-                      <span className="text-accent-green">Link copied!</span>
-                    </>
-                  ) : (
-                    <>
-                      <UserPlus className="w-4 h-4" />
-                      {selectedGroup ? `Invite to ${selectedGroup.name}` : 'Select a group first'}
-                    </>
+                  {/* ── Add entire group button ── */}
+                  {selectedGroup && (
+                    <button
+                      onClick={addWholeGroup}
+                      disabled={groupMembers.length === 0}
+                      className="w-full py-3 rounded-xl font-bold text-sm bg-accent-green/20 text-accent-green border border-accent-green/40 disabled:opacity-50"
+                    >
+                      {groupMembers.length > 0
+                        ? `Add all ${groupMembers.length} members`
+                        : 'Loading members...'}
+                    </button>
                   )}
-                </button>
-                {selectedGroup && (
-                  <p className="text-[10px] text-text-muted text-center mt-1.5">
-                    Share the invite link so new players can join the app and your group
-                  </p>
-                )}
-              </div>
+
+                  {/* ── People picker with Friends / Group Members tabs ── */}
+                  <div>
+                    <div className="flex items-center gap-1 bg-bg-elevated p-1 rounded-xl mb-3">
+                      <button
+                        onClick={() => setPeopleTab('friends')}
+                        className={`flex-1 py-2.5 rounded-lg text-center text-xs font-black uppercase tracking-wide transition-all ${
+                          peopleTab === 'friends'
+                            ? 'bg-bg-card text-text-primary shadow-sm'
+                            : 'text-text-muted hover:text-text-primary'
+                        }`}
+                      >
+                        Friends
+                      </button>
+                      <button
+                        onClick={() => setPeopleTab('group')}
+                        disabled={!selectedGroup}
+                        className={`flex-1 py-2.5 rounded-lg text-center text-xs font-black uppercase tracking-wide transition-all disabled:opacity-40 ${
+                          peopleTab === 'group'
+                            ? 'bg-bg-card text-text-primary shadow-sm'
+                            : 'text-text-muted hover:text-text-primary'
+                        }`}
+                      >
+                        Group Members
+                      </button>
+                    </div>
+
+                    {/* People list */}
+                    <div className="space-y-2 max-h-52 overflow-y-auto">
+                      {peopleTab === 'friends' ? (
+                        friendsList.length === 0 ? (
+                          <p className="text-sm text-text-muted py-4 text-center">Loading friends...</p>
+                        ) : (
+                          friendsList.map((m) => {
+                            const sel = participants.some((p) => p.user_id === m.user_id)
+                            return (
+                              <button
+                                key={m.user_id}
+                                onClick={() => toggleParticipant(m)}
+                                className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-colors ${
+                                  sel ? 'border-accent-green bg-accent-green/10' : 'border-border-subtle bg-bg-card'
+                                }`}
+                              >
+                                <div className="w-9 h-9 rounded-full overflow-hidden bg-bg-elevated shrink-0">
+                                  {m.profile.avatar_url ? (
+                                    <img src={m.profile.avatar_url} alt="" className="w-full h-full object-cover" />
+                                  ) : (
+                                    <div className="w-full h-full bg-gradient-to-br from-accent-green/30 to-accent-green/10" />
+                                  )}
+                                </div>
+                                <span className="font-bold text-text-primary text-sm flex-1 text-left">
+                                  {m.profile.display_name}
+                                </span>
+                                <span className={`text-sm font-black ${sel ? 'text-accent-green' : 'text-border-subtle'}`}>
+                                  {sel ? '✓' : '+'}
+                                </span>
+                              </button>
+                            )
+                          })
+                        )
+                      ) : !selectedGroup ? (
+                        <p className="text-sm text-text-muted py-4 text-center">Select a group first</p>
+                      ) : groupMembers.length === 0 ? (
+                        <p className="text-sm text-text-muted py-4 text-center">Loading members...</p>
+                      ) : (
+                        groupMembers.map((m) => {
+                          const sel = participants.some((p) => p.user_id === m.user_id)
+                          return (
+                            <button
+                              key={m.user_id}
+                              onClick={() => toggleParticipant(m)}
+                              className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-colors ${
+                                sel ? 'border-accent-green bg-accent-green/10' : 'border-border-subtle bg-bg-card'
+                              }`}
+                            >
+                              <div className="w-9 h-9 rounded-full overflow-hidden bg-bg-elevated shrink-0">
+                                {m.profile.avatar_url ? (
+                                  <img src={m.profile.avatar_url} alt="" className="w-full h-full object-cover" />
+                                ) : (
+                                  <div className="w-full h-full bg-gradient-to-br from-accent-green/30 to-accent-green/10" />
+                                )}
+                              </div>
+                              <span className="font-bold text-text-primary text-sm flex-1 text-left">
+                                {m.profile.display_name}
+                              </span>
+                              <span className={`text-sm font-black ${sel ? 'text-accent-green' : 'text-border-subtle'}`}>
+                                {sel ? '✓' : '+'}
+                              </span>
+                            </button>
+                          )
+                        })
+                      )}
+                    </div>
+                  </div>
+
+                  {/* ── Selected participant chips ── */}
+                  {participants.length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-2">
+                        Competing ({participants.length})
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {participants.map((p) => (
+                          <button
+                            key={p.user_id}
+                            onClick={() => toggleParticipant(p)}
+                            className="flex items-center gap-1.5 bg-accent-green/15 text-accent-green text-xs font-bold px-2.5 py-1 rounded-full border border-accent-green/30"
+                          >
+                            {p.profile.display_name}
+                            <span className="text-accent-green/60 text-[10px] font-black">&times;</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── Invite new players ── */}
+                  <div className="border-t border-border-subtle pt-4">
+                    <p className="text-xs font-bold text-text-muted uppercase tracking-wider mb-2">
+                      Invite new players
+                    </p>
+                    <button
+                      onClick={handleInviteToGroup}
+                      disabled={!selectedGroup}
+                      className="w-full py-3 rounded-xl font-bold text-sm bg-bg-elevated text-text-primary border border-border-subtle flex items-center justify-center gap-2 hover:bg-bg-card transition-colors disabled:opacity-40"
+                    >
+                      {inviteCopied ? (
+                        <>
+                          <Check className="w-4 h-4 text-accent-green" />
+                          <span className="text-accent-green">Link copied!</span>
+                        </>
+                      ) : (
+                        <>
+                          <UserPlus className="w-4 h-4" />
+                          {selectedGroup ? `Invite to ${selectedGroup.name}` : 'Select a group first'}
+                        </>
+                      )}
+                    </button>
+                    {selectedGroup && (
+                      <p className="text-[10px] text-text-muted text-center mt-1.5">
+                        Share the invite link so new players can join the app and your group
+                      </p>
+                    )}
+                  </div>
+                </>
+              )}
 
               {/* ── Calendar date range picker ── */}
               <div className="space-y-3">
@@ -704,7 +744,7 @@ export function CompetitionCreateScreen() {
 
               <PrimaryButton
                 onClick={handleStep2Next}
-                disabled={!selectedGroup || participants.length === 0}
+                disabled={!isSolo && (!selectedGroup || participants.length === 0)}
               >
                 Next
               </PrimaryButton>
